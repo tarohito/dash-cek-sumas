@@ -1,0 +1,55 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Enable class-based dark mode in Tailwind CSS v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 100% Pure Flat Design - Disable all drop shadows & elevation */
+*, ::before, ::after {
+  --tw-shadow: 0 0 #0000 !important;
+  --tw-shadow-colored: 0 0 #0000 !important;
+  box-shadow: none !important;
+}
+
+/* Smooth atmospheric transition for theme switching */
+html {
+  transition: background-color 300ms ease, color 300ms ease;
+}
+
+body {
+  transition: background-color 300ms ease, color 300ms ease;
+  font-family: inherit;
+}
+
+/* Leaflet Custom Popup & Marker Styles */
+.leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 16px !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: normal !important;
+}
+
+.leaflet-popup-tip-container {
+  display: none !important;
+}
+
+.leaflet-container {
+  font-family: inherit !important;
+  z-index: 10 !important;
+  outline: none !important;
+}
+
+.custom-scan-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Smooth dark mode tile filter for map when dark theme is active */
+.dark .leaflet-tile-pane {
+  filter: brightness(0.82) invert(1) contrast(2.6) hue-rotate(200deg) saturate(0.35);
+}

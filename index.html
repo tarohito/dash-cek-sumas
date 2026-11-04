@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/assets/brand/logo_horizontal.svg" />
+    <title>MKI Dashboard</title>
+    <meta name="description" content="Dashboard Monitoring Geolokasi Pemindaian &amp; Manajemen Tag Fisik Shieldtag MKI" />
+    <meta property="og:title" content="MKI Dashboard" />
+    <meta property="og:description" content="Dashboard Monitoring Geolokasi Pemindaian &amp; Manajemen Tag Fisik Shieldtag MKI" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('mki_theme');
+          var isDark = saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch (_) {}
+      })();
+    </script>
+  </head>
+  <body class="bg-[#f8fafc] dark:bg-black text-slate-800 dark:text-zinc-200 antialiased min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
