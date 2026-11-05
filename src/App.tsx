@@ -37,7 +37,6 @@ import {
   TrendingUp,
   RefreshCw,
   FolderKanban,
-  ShieldCheck,
   ArrowUpRight,
   Plus,
   Image as ImageIcon,
@@ -61,9 +60,7 @@ import {
   CheckCheck,
   Send,
   FileEdit,
-  ShieldAlert,
-  AlertTriangle,
-  ArrowUpDown
+  AlertTriangle
 } from 'lucide-react';
 import { ScanLocationMap } from './components/ScanLocationMap';
 import { ScanActivityChart } from './components/ScanActivityChart';
@@ -644,7 +641,7 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
 
   const [selectedSku, setSelectedSku] = useState('');
-  const [selectedPinLength, setSelectedPinLength] = useState('5');
+  const [selectedPinLength, setSelectedPinLength] = useState('8');
   
   // TEMA & ANIMASI
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -1953,6 +1950,47 @@ export default function App() {
       triggerAlert(
         'Gagal Mengubah Status',
         'Terjadi kesalahan saat memperbarui status akun pengguna.',
+        'error'
+      );
+    }
+  };
+
+  const handleToggleBatchStatus = async (batch: any) => {
+    const isCurrentlySuspended = batch.status === 'Disuspend';
+    const nextStatus = isCurrentlySuspended ? 'Aktif' : 'Disuspend';
+
+    // Update state batches & activeBatch secara langsung
+    setBatches(prev => prev.map(b => b.id === batch.id ? { ...b, status: nextStatus } : b));
+    setActiveBatch((prev: any) => prev && prev.id === batch.id ? { ...prev, status: nextStatus } : prev);
+
+    const newLog = {
+      id: Date.now(),
+      batchId: batch.batchId,
+      timestamp: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+      user: currentRole,
+      reason: isCurrentlySuspended 
+        ? 'Pemulihan status langsung melalui badge status' 
+        : 'Suspensi langsung melalui badge status',
+      changes: [
+        { field: 'Status Batch', old: batch.status, new: nextStatus }
+      ]
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+
+    triggerAlert(
+      nextStatus === 'Disuspend' ? 'Batch Disuspend' : 'Batch Dipulihkan',
+      `Status batch "${batch.batchId}" berhasil diubah menjadi: ${nextStatus}.`,
+      nextStatus === 'Disuspend' ? 'warning' : 'success'
+    );
+
+    try {
+      await api.updateBatch(batch.id, { status: nextStatus });
+      await api.createAuditLog(newLog);
+    } catch (err) {
+      console.error('Gagal memperbarui status batch di SQLite:', err);
+      triggerAlert(
+        'Gagal Mengubah Status',
+        'Terjadi kesalahan saat memperbarui status batch.',
         'error'
       );
     }
@@ -3746,13 +3784,8 @@ export default function App() {
                 )}
               </div>
 
-              {/* Controls Pengurutan & Filter dengan Icon ArrowUpDown Konsisten */}
+              {/* Controls Pengurutan & Filter Brand */}
               <div className="flex flex-wrap items-center gap-2.5">
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  <ArrowUpDown size={14} className="hidden sm:block flex-shrink-0" />
-                  <span className="hidden md:inline font-medium text-slate-500 dark:text-zinc-400">Urutkan:</span>
-                </div>
-
                 {/* Dropdown Sort By Brand (Tanpa Pencarian) */}
                 <div className="w-full sm:w-auto min-w-[150px] sm:min-w-[170px]">
                   <CustomSelect
@@ -3773,10 +3806,6 @@ export default function App() {
                   />
                 </div>
 
-                <div className="h-4 w-[1px] bg-slate-200 dark:bg-zinc-700 hidden sm:block"></div>
-
-                <Filter size={14} className="text-slate-400 hidden sm:block flex-shrink-0" />
-                
                 {/* Dropdown Custom Semua Kategori */}
                 <div className="w-full sm:w-auto min-w-[170px] sm:min-w-[190px]">
                   <CustomSelect
@@ -4050,7 +4079,7 @@ export default function App() {
               </button>
             ) : (
               <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 text-xs">
-                <ShieldCheck size={13} className="text-[#c28e62]" />
+                <CheckCircle2 size={13} className="text-[#c28e62]" />
                 <span>Mode Operator (Hanya Administrator yang dapat mengelola user)</span>
               </div>
             )}
@@ -4084,13 +4113,8 @@ export default function App() {
                 )}
               </div>
 
-              {/* Controls Pengurutan & Filter Peran dengan Icon ArrowUpDown Konsisten */}
+              {/* Controls Pengurutan & Filter Peran User */}
               <div className="flex flex-wrap items-center gap-2.5">
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  <ArrowUpDown size={14} className="hidden sm:block flex-shrink-0" />
-                  <span className="hidden md:inline font-medium text-slate-500 dark:text-zinc-400">Urutkan:</span>
-                </div>
-
                 {/* Dropdown Sort By User (Tanpa Pencarian) */}
                 <div className="w-full sm:w-auto min-w-[150px] sm:min-w-[170px]">
                   <CustomSelect
@@ -4112,9 +4136,6 @@ export default function App() {
                   />
                 </div>
 
-                <div className="h-4 w-[1px] bg-slate-200 dark:bg-zinc-700 hidden sm:block"></div>
-
-                <Filter size={14} className="text-slate-400 hidden sm:block flex-shrink-0" />
                 <div className="w-full sm:w-auto min-w-[160px] sm:min-w-[180px]">
                   <CustomSelect
                     value={userFilterRole}
@@ -4169,10 +4190,10 @@ export default function App() {
                                   el.onerror = null;
                                   el.src = getInitialsAvatar(user.name);
                                 }}
-                                className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-zinc-700 flex-shrink-0" 
+                                className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-zinc-700 flex-shrink-0" 
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-xl bg-[#c28e62]/15 text-[#c28e62] flex items-center justify-center font-bold text-sm border border-[#c28e62]/25 flex-shrink-0">
+                              <div className="w-10 h-10 rounded-full bg-[#c28e62]/15 text-[#c28e62] flex items-center justify-center font-bold text-sm border border-[#c28e62]/25 flex-shrink-0">
                                 {user.name.charAt(0).toUpperCase()}
                               </div>
                             )}
@@ -4202,7 +4223,7 @@ export default function App() {
                               ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
                               : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
                           }`}>
-                            <ShieldCheck size={13} />
+                            <UserCheck size={13} />
                             <span>{user.role}</span>
                           </span>
                         </td>
@@ -4507,11 +4528,6 @@ export default function App() {
 
                 {/* Sort By & Filter Status Controls */}
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <ArrowUpDown size={14} className="hidden sm:block flex-shrink-0" />
-                    <span className="hidden md:inline font-medium text-slate-500 dark:text-zinc-400">Urutkan:</span>
-                  </div>
-
                   {/* Dropdown Sort By (Tanpa Pencarian) */}
                   <div className="w-full sm:w-auto min-w-[170px] sm:min-w-[195px]">
                     <CustomSelect
@@ -4686,29 +4702,33 @@ export default function App() {
                             );
                           })()}
                         </td>
-                        {/* KOLOM 4: STATUS BATCH (KONSISTEN: AKTIF / DISUSPEND) */}
-                        <td className="px-4 sm:px-6 py-4">
-                          <div className="relative inline-flex items-center cursor-default select-none">
+                        {/* KOLOM 4: STATUS BATCH (MODAL ALASAN: AKTIF / DISUSPEND) */}
+                        <td className="px-4 sm:px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (batch.status === 'Disuspend') {
+                                openUnsuspendModal(batch);
+                              } else {
+                                openSuspendModal(batch);
+                              }
+                            }}
+                            data-tooltip={batch.status === 'Disuspend' ? 'Klik untuk Pulihkan / Aktifkan Batch' : 'Klik untuk Suspend Batch'}
+                            data-tooltip-pos="top"
+                            className="relative inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105 active:scale-95"
+                          >
                             {batch.status === 'Disuspend' ? (
-                              <span
-                                data-tooltip="Status: Disuspend (Tag Dibekukan Sementara)"
-                                data-tooltip-pos="top"
-                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60"
-                              >
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors">
                                 <Ban size={13} className="text-amber-600 dark:text-amber-400" />
                                 <span>Disuspend</span>
                               </span>
                             ) : (
-                              <span
-                                data-tooltip="Status: Aktif (Siap Digunakan & Dialokasikan)"
-                                data-tooltip-pos="top"
-                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60"
-                              >
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
                                 <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
                                 <span>Aktif</span>
                               </span>
                             )}
-                          </div>
+                          </button>
                         </td>
                         <td className="px-4 sm:px-6 py-4 text-right">
                           <div className={`relative inline-block transition-opacity duration-150 ${openDropdownId === batch.id ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'}`}>
@@ -4935,7 +4955,7 @@ export default function App() {
                           {isSuspicious ? (
                             /* Peringatan Anomali / Suspicious: WARNA PENTING (ROSE/RED) */
                             <div className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center">
-                              <ShieldAlert size={15} />
+                              <AlertTriangle size={15} />
                             </div>
                           ) : isPendingReset ? (
                             /* Permintaan Reset Menunggu Tindakan: WARNA PENTING (AMBER) */
@@ -5193,18 +5213,24 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
-                    Panjang PIN Acak
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                    <span>Panjang PIN Acak</span>
+                    <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
+                      Default: 8 Digit
+                    </span>
                   </label>
-                  <CustomSelect 
+                  <CustomSelect
                     value={selectedPinLength}
                     onChange={setSelectedPinLength}
                     placeholder="Pilih Panjang PIN"
+                    searchable={false}
+                    buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full px-4 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
                     options={[
-                      { value: '5', label: '5 Karakter' },
-                      { value: '6', label: '6 Karakter' },
-                      { value: '7', label: '7 Karakter' },
-                      { value: '8', label: '8 Karakter' }
+                      { value: '8', label: '8 Digit (Default)' },
+                      { value: '7', label: '7 Digit' },
+                      { value: '6', label: '6 Digit' },
+                      { value: '5', label: '5 Digit' },
+                      { value: '4', label: '4 Digit' },
                     ]}
                   />
                 </div>
@@ -5259,10 +5285,10 @@ export default function App() {
               <div className="px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/70 rounded-full flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>Format ID Tag Unik:</span>
+                  <span>Format PIN Acak Unik:</span>
                 </span>
                 <span className="font-mono font-bold text-slate-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 px-3 py-1 rounded-full border border-slate-200 dark:border-zinc-700">
-                  8 Digit Acak (Otomatis)
+                  {selectedPinLength} Digit (Otomatis)
                 </span>
               </div>
             </div>
@@ -5319,7 +5345,7 @@ export default function App() {
             {/* MODAL BODY */}
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs sm:text-sm">
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
-                <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                 <span>
                   Perubahan URL pengalihan akan langsung berlaku saat QR Code fisik batch ini dipindai oleh publik, tanpa perlu mencetak ulang stiker tag QR.
                 </span>
@@ -5755,45 +5781,41 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) { closeDetailModal(); } }}
           className="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] mx-1 sm:mx-4 border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-4xl lg:max-w-5xl overflow-hidden flex flex-col max-h-[90vh] mx-1 sm:mx-4 border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
             
             <div className="pt-3.5 sm:pt-4 px-4 sm:px-6 border-b border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 flex-shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <Layers size={18} className="text-[#c28e62]" />
                   <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">Detail Batch ID</h3>
-                  {activeBatch?.status === 'Disuspend' ? (
-                    <span 
-                      data-tooltip="Status: Disuspend (Tag Dibekukan Sementara)"
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60"
-                    >
-                      <Ban size={13} className="text-amber-600 dark:text-amber-400" />
-                      <span>Disuspend</span>
-                    </span>
-                  ) : (
-                    <span 
-                      data-tooltip="Status: Aktif (Siap Digunakan & Dialokasikan)"
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60"
-                    >
-                      <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
-                      <span>Aktif</span>
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
-                      if (activeBatch) {
-                        openDownloadModal(activeBatch);
+                      if (!activeBatch) return;
+                      if (activeBatch.status === 'Disuspend') {
+                        openUnsuspendModal(activeBatch);
+                      } else {
+                        openSuspendModal(activeBatch);
                       }
                     }}
-                    className="px-3.5 py-1.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                    title="Unduh Data Batch Langsung"
+                    data-tooltip={activeBatch?.status === 'Disuspend' ? 'Klik untuk Pulihkan / Aktifkan Batch' : 'Klik untuk Suspend Batch'}
+                    data-tooltip-pos="top"
+                    className="relative inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105 active:scale-95"
                   >
-                    <Download size={14} />
-                    <span>Unduh</span>
+                    {activeBatch?.status === 'Disuspend' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors">
+                        <Ban size={13} className="text-amber-600 dark:text-amber-400" />
+                        <span>Disuspend</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors">
+                        <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>Aktif</span>
+                      </span>
+                    )}
                   </button>
+                </div>
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={closeDetailModal} 
                     data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
@@ -6085,11 +6107,11 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* GRID PIN TAG DENGAN PEMBUNGKUS FLEKSIBEL (MENYESUAIKAN JUMLAH PIN SECARA DINAMIS) */}
+                  {/* GRID PIN TAG PAS 8 KOLOM (SIMETRIS & IMBANG KIRI-KANAN) */}
                   <div 
-                    className="border border-slate-200 dark:border-zinc-700/80 rounded-2xl bg-slate-50/60 dark:bg-zinc-900/60 p-3 sm:p-3.5 relative transition-all flex-shrink-0 w-fit max-w-full overflow-x-hidden"
+                    className="border border-slate-200 dark:border-zinc-700/80 rounded-2xl bg-slate-50/60 dark:bg-zinc-900/60 p-3 sm:p-4 relative transition-all flex-shrink-0 w-full overflow-x-hidden"
                     style={{
-                      maxHeight: filteredTags.length <= 16 ? 'none' : '440px',
+                      maxHeight: filteredTags.length <= 16 ? 'none' : '480px',
                       overflowY: filteredTags.length <= 16 ? 'hidden' : 'auto',
                       overflowX: 'hidden'
                     }}
@@ -6101,7 +6123,7 @@ export default function App() {
                         <span>Memuat data tag dari database...</span>
                       </div>
                     ) : filteredTags.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 sm:gap-2.5 w-full">
                         {filteredTags.map((tag) => {
                           const isAvailable = tag.status === 'Tersedia';
                           const isSelected = selectedTagsToAllocate.includes(tag.id);
@@ -6120,18 +6142,19 @@ export default function App() {
                               }}
                               onMouseLeave={() => setHoveredTagInfo(null)}
                               className={`
-                                relative flex items-center justify-center py-2 sm:py-2.5 px-3 min-w-[92px] sm:min-w-[100px] rounded-lg border text-[11px] sm:text-[13px] font-mono font-bold tracking-wider sm:tracking-widest select-none transition-all
+                                relative flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center font-mono select-none transition-all w-full
                                 ${isInteractive ? 'cursor-pointer hover:-translate-y-0.5' : 'cursor-default'}
                                 ${
                                   activeBatch?.isB2B && !isAvailable 
-                                    ? 'bg-slate-200/90 dark:bg-zinc-950/90 border border-slate-300/80 dark:border-zinc-800 text-slate-400 dark:text-zinc-600 opacity-70 cursor-not-allowed' 
+                                    ? 'bg-slate-200/90 dark:bg-zinc-950/90 border-slate-300/80 dark:border-zinc-800 text-slate-400 dark:text-zinc-600 opacity-70 cursor-not-allowed' 
                                     : isSelected
-                                      ? 'bg-[#c28e62] dark:bg-[#c28e62] border border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10' 
-                                      : 'bg-emerald-50/70 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-500/60 text-emerald-800 dark:text-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60'
+                                      ? 'bg-[#c28e62] dark:bg-[#c28e62] border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10 shadow-xs' 
+                                      : 'bg-emerald-50/70 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-500/60 text-emerald-800 dark:text-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60'
                                 }
                               `}
                             >
-                              <span>{tag.pin}</span>
+                              <span className="font-bold text-xs sm:text-[13px] tracking-wider truncate w-full">{tag.pin}</span>
+                              <span className={`text-[10px] font-sans font-normal truncate w-full mt-0.5 ${isSelected ? 'text-white/80' : 'text-slate-400 dark:text-zinc-500'}`}>{tag.tagNumber}</span>
                             </div>
                           );
                         })}
@@ -6337,6 +6360,20 @@ export default function App() {
                   className="px-5 py-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
                 >
                   Tutup
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (activeBatch) {
+                      openDownloadModal(activeBatch);
+                    }
+                  }}
+                  className="px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] dark:bg-[#c28e62] dark:hover:bg-[#b07d53] rounded-full transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  data-tooltip="Unduh Lembar Cetak PDF A3+ / File CSV"
+                  data-tooltip-pos="top"
+                >
+                  <Download size={15} />
+                  <span>Unduh</span>
                 </button>
                 {activeBatch?.isB2B && activeTab === 'tags' && selectedTagsToAllocate.length > 0 && (
                   <button 
@@ -6740,11 +6777,11 @@ export default function App() {
                   <div className="w-9 h-9 rounded-lg bg-[#fcf7f3] dark:bg-zinc-800 text-[#c28e62] flex items-center justify-center mb-3 group-hover:bg-[#c28e62] group-hover:text-white transition-colors">
                     <Printer size={18} />
                   </div>
-                  <h4 className="font-bold text-slate-700 dark:text-zinc-200 text-xs sm:text-sm mb-1 group-hover:text-[#c28e62] transition-colors">
-                    Layout Cetak PDF (A3+ 31x47 cm)
+                  <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm mb-1 group-hover:text-[#c28e62] transition-colors">
+                    Cetak Stiker (PDF A3+)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Lembar cetak stiker A3+ (31x47 cm) dengan QR Code dan kotak PIN di bawahnya. Mendukung opsi simpan lokasi & penamaan native OS.
+                    Label 25 x 62 mm (Full Putih, Outline Cutting Merah, QR 25x25 mm & PIN 2 baris). Format lembar cetak A3+ isi 60 label.
                   </p>
                 </button>
 
@@ -6756,11 +6793,11 @@ export default function App() {
                   <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                     <FileSpreadsheet size={18} />
                   </div>
-                  <h4 className="font-bold text-slate-700 dark:text-zinc-200 text-xs sm:text-sm mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    Data Tabular (Spreadsheet CSV)
+                  <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                    Data Tag (Excel / CSV)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Daftar mentah Nomor Tag, PIN, dan status dalam format tabel spreadsheet dengan opsi simpan lokasi native OS.
+                    Daftar nomor seri tag, PIN acak, status pemakaian, dan link verifikasi.
                   </p>
                 </button>
               </div>
@@ -7680,7 +7717,7 @@ export default function App() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-[#c28e62]" />
+                    <UserCheck size={14} className="text-[#c28e62]" />
                     <span>Peran & Hak Akses (Role)</span>
                   </span>
                   <span className="text-[11px] font-normal text-slate-400">Pilihan: Administrator / Operator</span>

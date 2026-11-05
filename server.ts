@@ -250,6 +250,24 @@ try {
   updateUserStmt.run('Siti Rahma', 'siti.rahma', 'siti.r@mki.co.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30', 'u4');
 } catch (_) {}
 
+// Migration: Ensure all tags and batches have strictly 8-digit PIN
+try {
+  const shortPins = db.prepare("SELECT id, pin FROM tags WHERE LENGTH(pin) < 8").all() as { id: string; pin: string }[];
+  if (shortPins && shortPins.length > 0) {
+    const updatePinStmt = db.prepare("UPDATE tags SET pin = ? WHERE id = ?");
+    const updateAllPins = db.transaction(() => {
+      for (const t of shortPins) {
+        let newPin = t.pin;
+        while (newPin.length < 8) {
+          newPin += Math.floor(Math.random() * 10).toString();
+        }
+        updatePinStmt.run(newPin, t.id);
+      }
+    });
+    updateAllPins();
+  }
+} catch (_) {}
+
 // Seed password_reset_requests if empty
 const resetRequestsCountRow = db.prepare('SELECT COUNT(*) as count FROM password_reset_requests').get() as { count: number };
 if (resetRequestsCountRow && resetRequestsCountRow.count === 0) {
@@ -748,15 +766,16 @@ if (scanActivitiesCountRow && scanActivitiesCountRow.count === 0) {
   insertAllActivities(initialActivities);
 }
 
-// Generate permanent tags helper with 8-digit random ID format
-function generateTagsForBatch(batchId: string, brand: string, count: number, pinLen: number, allocatedCount = 0, projectName = '', specs = 'Phenolic Board 12mm') {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+// Generate permanent tags helper with 8-digit random ID format and configurable PIN length (default 8 digit)
+function generateTagsForBatch(batchId: string, brand: string, count: number, pinLen = 8, allocatedCount = 0, projectName = '', specs = 'Phenolic Board 12mm') {
+  const chars = '0123456789';
   const tags = [];
   const usedTagNumbers = new Set<string>();
+  const targetPinLen = Math.min(12, Math.max(4, Number(pinLen) || 8));
 
   for (let i = 1; i <= count; i++) {
     let pin = '';
-    for (let p = 0; p < pinLen; p++) {
+    for (let p = 0; p < targetPinLen; p++) {
       pin += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     const isAllocated = i <= allocatedCount;
@@ -1200,7 +1219,7 @@ app.post('/api/batches', (req, res) => {
   try {
     const b = req.body;
     const qty = Math.max(1, parseInt(b.qty) || 1);
-    const pinLength = parseInt(b.pinLength) || 6;
+    const pinLength = Math.min(12, Math.max(4, parseInt(b.pinLength) || 8)); // Default 8 digit, mendukung opsi 4, 5, 6, 7, 8 digit
     const isB2B = b.isB2B ? 1 : 0;
     const redirectUrl = (b.redirectUrl && b.redirectUrl.trim()) || 'https://cek.sumas.id/';
     const qrType = b.qrType || 'dynamic';
