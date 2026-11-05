@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bgGradS" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#be185d"/>
+      <stop offset="100%" stop-color="#831843"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="60" fill="url(#bgGradS)"/>
+  <!-- Hijab / Headscarf background -->
+  <path d="M34 50 C34 26 86 26 86 50 C86 78 78 88 60 88 C42 88 34 78 34 50 Z" fill="#f43f5e"/>
+  <!-- Face oval -->
+  <ellipse cx="60" cy="50" rx="17" ry="19" fill="#fde68a"/>
+  <!-- Eyes -->
+  <circle cx="53" cy="50" r="2.3" fill="#1f2937"/>
+  <circle cx="67" cy="50" r="2.3" fill="#1f2937"/>
+  <!-- Smile -->
+  <path d="M54 59 Q60 64 66 59" fill="none" stroke="#881337" stroke-width="2" stroke-linecap="round"/>
+  <!-- Hijab draping and shoulder -->
+  <path d="M26 108 C26 84 40 76 60 76 C80 76 94 84 94 108 Z" fill="#e11d48"/>
+  <path d="M42 66 C42 78 48 88 60 88 C72 88 78 78 78 66 Z" fill="#be123c"/>
+</svg>

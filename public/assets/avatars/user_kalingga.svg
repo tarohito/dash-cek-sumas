@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bgGradK" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accentGradK" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c28e62"/>
+      <stop offset="100%" stop-color="#b07d53"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="60" fill="url(#bgGradK)"/>
+  <circle cx="60" cy="48" r="22" fill="#fed7aa"/>
+  <!-- Hair & glasses -->
+  <path d="M38 46 C38 28 82 28 82 46 C82 34 76 26 60 26 C44 26 38 34 38 46 Z" fill="#334155"/>
+  <rect x="44" y="44" width="13" height="9" rx="2" fill="none" stroke="#1e293b" stroke-width="2"/>
+  <rect x="63" y="44" width="13" height="9" rx="2" fill="none" stroke="#1e293b" stroke-width="2"/>
+  <line x1="57" y1="48" x2="63" y2="48" stroke="#1e293b" stroke-width="2"/>
+  <!-- Smile -->
+  <path d="M53 60 Q60 65 67 60" fill="none" stroke="#9a3412" stroke-width="2" stroke-linecap="round"/>
+  <!-- Shoulders & Suit with bronze tie -->
+  <path d="M26 108 C26 84 42 74 60 74 C78 74 94 84 94 108 Z" fill="#1e293b"/>
+  <path d="M52 74 L60 88 L68 74 Z" fill="#fed7aa"/>
+  <polygon points="58,84 62,84 64,106 56,106" fill="url(#accentGradK)"/>
+</svg>

@@ -6,9 +6,8 @@ import {
   X, 
   Check,
   AlertTriangle,
-  CheckCircle2,
   Layers,
-  FolderKanban
+  Plus
 } from 'lucide-react';
 
 export interface CategoryItem {
@@ -39,16 +38,26 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
   const [selectedLevel2Id, setSelectedLevel2Id] = useState<string | null>(null);
   const [selectedLevel3Id, setSelectedLevel3Id] = useState<string | null>(null);
 
-  // Search filter per column
-  const [searchLevel1, setSearchLevel1] = useState<string>('');
-  const [searchLevel2, setSearchLevel2] = useState<string>('');
-  const [searchLevel3, setSearchLevel3] = useState<string>('');
+  // Single unified search in top section header
+  const [globalSearch, setGlobalSearch] = useState<string>('');
+
+  // Inline Quick-Add states directly on front cards (no modal)
+  const [newLevel1Name, setNewLevel1Name] = useState<string>('');
+  const [newLevel2Name, setNewLevel2Name] = useState<string>('');
+  const [newLevel3Name, setNewLevel3Name] = useState<string>('');
+
+  // Inline Edit State (Langsung edit di baris teks tanpa modal)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
+
+  // Delete Confirmation Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<CategoryItem | null>(null);
 
   const showAlert = (title: string, message: string, type: 'success' | 'warning' | 'error' | 'info' = 'success') => {
     if (onAlert) onAlert(title, message, type);
   };
 
-  // Helper level label
   const getLevelLabel = (level: number) => {
     if (level === 1) return 'Kategori Utama';
     if (level === 2) return 'Sub Kategori';
@@ -78,25 +87,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
     return diffMs >= -60000 && diffMs <= maxMinutes * 60 * 1000;
   };
 
-  // Modal State (Create Only)
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [targetLevel, setTargetLevel] = useState<number>(1);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    parentId: null as string | null,
-    level: 1
-  });
-
-  // Inline Edit State (Langsung edit di teks tanpa modal)
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState<string>('');
-
-  // Delete Confirmation Modal State
-  const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<CategoryItem | null>(null);
-
-  // Fetch categories from backend
+  // Fetch categories from SQLite API
   const fetchCategories = async () => {
     try {
       setIsLoading(true);
@@ -130,50 +121,71 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
     fetchCategories();
   }, []);
 
-  // Filtered lists for each column with recently created items at the top
+  // Matching category hierarchy for global search
+  const matchingCategoryIds = useMemo(() => {
+    const q = globalSearch.trim().toLowerCase();
+    if (!q) return null;
+
+    const matched = new Set<string>();
+    categories.forEach(cat => {
+      if (cat.name.toLowerCase().includes(q)) {
+        matched.add(cat.id);
+        // Include its parents if any
+        if (cat.parentId) {
+          matched.add(cat.parentId);
+          const parent = categories.find(c => c.id === cat.parentId);
+          if (parent?.parentId) matched.add(parent.parentId);
+        }
+      }
+    });
+    return matched;
+  }, [categories, globalSearch]);
+
+  // Filtered lists for each column
   const level1List = useMemo(() => {
-    const list = categories
-      .filter(c => c.level === 1)
-      .filter(c => !searchLevel1.trim() || c.name.toLowerCase().includes(searchLevel1.toLowerCase()));
+    const list = categories.filter(c => c.level === 1);
+    const filtered = matchingCategoryIds ? list.filter(c => matchingCategoryIds.has(c.id)) : list;
     
-    return [...list].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
       const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
       if (aRecent && !bRecent) return -1;
       if (!aRecent && bRecent) return 1;
       return 0;
     });
-  }, [categories, searchLevel1]);
+  }, [categories, matchingCategoryIds]);
 
   const level2List = useMemo(() => {
     if (!selectedLevel1Id) return [];
-    const list = categories
-      .filter(c => c.level === 2 && c.parentId === selectedLevel1Id)
-      .filter(c => !searchLevel2.trim() || c.name.toLowerCase().includes(searchLevel2.toLowerCase()));
+    const list = categories.filter(c => c.level === 2 && c.parentId === selectedLevel1Id);
+    const filtered = matchingCategoryIds ? list.filter(c => matchingCategoryIds.has(c.id)) : list;
     
-    return [...list].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
       const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
       if (aRecent && !bRecent) return -1;
       if (!aRecent && bRecent) return 1;
       return 0;
     });
-  }, [categories, selectedLevel1Id, searchLevel2]);
+  }, [categories, selectedLevel1Id, matchingCategoryIds]);
 
   const level3List = useMemo(() => {
     if (!selectedLevel2Id) return [];
-    const list = categories
-      .filter(c => c.level === 3 && c.parentId === selectedLevel2Id)
-      .filter(c => !searchLevel3.trim() || c.name.toLowerCase().includes(searchLevel3.toLowerCase()));
+    const list = categories.filter(c => c.level === 3 && c.parentId === selectedLevel2Id);
+    const filtered = matchingCategoryIds ? list.filter(c => matchingCategoryIds.has(c.id)) : list;
     
-    return [...list].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
       const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
       if (aRecent && !bRecent) return -1;
       if (!aRecent && bRecent) return 1;
       return 0;
     });
-  }, [categories, selectedLevel2Id, searchLevel3]);
+  }, [categories, selectedLevel2Id, matchingCategoryIds]);
+
+  // Selected item objects for contextual placeholder
+  const selectedLevel1 = useMemo(() => categories.find(c => c.id === selectedLevel1Id), [categories, selectedLevel1Id]);
+  const selectedLevel2 = useMemo(() => categories.find(c => c.id === selectedLevel2Id), [categories, selectedLevel2Id]);
 
   // Helper count children
   const getChildrenCount = (parentId: string) => {
@@ -182,7 +194,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
 
   // Select Level 1 item
   const handleSelectLevel1 = (catId: string) => {
-    if (editingId) return; // Prevent changing selection while editing
+    if (editingId) return;
     setSelectedLevel1Id(catId);
     setSelectedLevel3Id(null);
     const children = categories.filter(c => c.level === 2 && c.parentId === catId);
@@ -195,44 +207,74 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
 
   // Select Level 2 item
   const handleSelectLevel2 = (catId: string) => {
-    if (editingId) return; // Prevent changing selection while editing
+    if (editingId) return;
     setSelectedLevel2Id(catId);
     setSelectedLevel3Id(null);
   };
 
-  // Parent category context for level 2 & 3
-  const parentCategory = useMemo(() => {
-    if (targetLevel === 2) {
-      return categories.find(c => c.id === formData.parentId || c.id === selectedLevel1Id);
-    }
-    if (targetLevel === 3) {
-      return categories.find(c => c.id === formData.parentId || c.id === selectedLevel2Id);
-    }
-    return null;
-  }, [categories, targetLevel, formData.parentId, selectedLevel1Id, selectedLevel2Id]);
+  // DIRECT FRONT QUICK-ADD: Langsung tambah di form depan tanpa modal
+  const handleQuickAdd = async (level: number, parentId: string | null, name: string, e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
 
-  // Open Create Modal (Tanpa kode kategori)
-  const handleOpenCreate = (level: number) => {
-    let parentId: string | null = null;
-    if (level === 2) {
-      if (!selectedLevel1Id) return;
-      parentId = selectedLevel1Id;
-    } else if (level === 3) {
-      if (!selectedLevel2Id) return;
-      parentId = selectedLevel2Id;
+    if (level === 2 && !parentId) {
+      showAlert('Pilih Kategori Utama', 'Silakan pilih kategori utama terlebih dahulu.', 'warning');
+      return;
+    }
+    if (level === 3 && !parentId) {
+      showAlert('Pilih Sub Kategori', 'Silakan pilih sub kategori terlebih dahulu.', 'warning');
+      return;
     }
 
-    setFormData({
-      name: '',
-      description: '',
-      parentId,
-      level
-    });
-    setTargetLevel(level);
-    setModalOpen(true);
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        name: trimmed,
+        description: null,
+        parentId,
+        level,
+        code: null,
+        status: 'Aktif'
+      };
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const newCat = await res.json();
+        setCategories(prev => [...prev, newCat]);
+
+        // Clear input form
+        if (level === 1) {
+          setNewLevel1Name('');
+          setSelectedLevel1Id(newCat.id);
+          setSelectedLevel2Id(null);
+        } else if (level === 2) {
+          setNewLevel2Name('');
+          setSelectedLevel2Id(newCat.id);
+        } else if (level === 3) {
+          setNewLevel3Name('');
+        }
+
+        showAlert(
+          'Kategori Ditambahkan',
+          `"${newCat.name}" berhasil ditambahkan ke ${getLevelLabel(newCat.level)}`,
+          'success'
+        );
+      } else {
+        showAlert('Gagal Menambahkan Kategori', 'Terjadi kendala saat menyimpan kategori baru.', 'error');
+      }
+    } catch (err) {
+      console.error('Gagal menyimpan kategori:', err);
+      showAlert('Gagal Menambahkan Kategori', 'Koneksi ke server bermasalah.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // INLINE EDIT: Langsung mengedit di teks tanpa modal & tanpa kode kategori
+  // INLINE EDIT: Langsung mengedit di teks baris tanpa modal
   const handleStartInlineEdit = (cat: CategoryItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEditingId(cat.id);
@@ -269,7 +311,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: trimmed,
-          code: null, // tanpa kode kategori
+          code: null,
           description: currentCat?.description || null
         })
       });
@@ -286,7 +328,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
       }
     } catch (err) {
       console.error('Gagal memperbarui kategori:', err);
-      showAlert('Gagal Memperbarui Kategori', 'Koneksi ke server bermasalah saat memperbarui kategori.', 'error');
+      showAlert('Gagal Memperbarui Kategori', 'Koneksi ke server bermasalah.', 'error');
     } finally {
       setIsSubmitting(false);
       setEditingId(null);
@@ -299,54 +341,6 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
     if (e) e.stopPropagation();
     setCategoryToDelete(cat);
     setDeleteModalOpen(true);
-  };
-
-  // Execute Create Category (Tanpa kode kategori)
-  const handleSubmitForm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) return;
-
-    try {
-      setIsSubmitting(true);
-      const payload = {
-        name: formData.name.trim(),
-        description: formData.description?.trim() || null,
-        parentId: formData.parentId,
-        level: formData.level,
-        code: null, // tanpa kode kategori
-        status: 'Aktif'
-      };
-      const res = await fetch('/api/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const newCat = await res.json();
-        setCategories(prev => [...prev, newCat]);
-        setModalOpen(false);
-
-        showAlert(
-          'Kategori Ditambahkan',
-          `"${newCat.name}" berhasil ditambahkan ke ${getLevelLabel(newCat.level)}`,
-          'success'
-        );
-
-        if (newCat.level === 2 && newCat.parentId === selectedLevel1Id) {
-          setSelectedLevel2Id(newCat.id);
-        } else if (newCat.level === 1) {
-          setSelectedLevel1Id(newCat.id);
-          setSelectedLevel2Id(null);
-        }
-      } else {
-        showAlert('Gagal Menambahkan Kategori', 'Terjadi kendala saat menyimpan kategori baru.', 'error');
-      }
-    } catch (err) {
-      console.error('Gagal menyimpan kategori:', err);
-      showAlert('Gagal Menambahkan Kategori', 'Koneksi ke server bermasalah saat menyimpan kategori.', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   // Execute Delete
@@ -396,32 +390,40 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
-      <div className="w-full max-w-[1720px] mx-auto space-y-4 sm:space-y-5">
-        {/* TOP STATUS BAR KATEGORI DENGAN RESET FILTER */}
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex items-center justify-between gap-3">
+    <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300">
+      <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
+        
+        {/* TOP STATUS BAR KATEGORI: SECTION STRUKTUR HIRARKI + FITUR PENCARIAN 1 INPUTAN DI ATAS KANAN */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
               <Layers size={16} />
             </div>
             <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-              Struktur Hierarki Kategori Produk (3 Level)
+              Struktur Hirarki Kategori Produk (3 Level)
             </span>
           </div>
 
-          {(searchLevel1 || searchLevel2 || searchLevel3) && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchLevel1('');
-                setSearchLevel2('');
-                setSearchLevel3('');
-              }}
-              className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
-            >
-              Reset Filter
-            </button>
-          )}
+          {/* SINGLE UNIFIED SEARCH INPUT DI ATAS KANAN (UKURAN DISAMAKAN DENGAN BUTTON TAMBAH SKU) */}
+          <div className="relative w-full sm:w-80">
+            <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+            <input
+              type="text"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              placeholder="Cari kategori, sub kategori, varian..."
+              className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-9 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+            />
+            {globalSearch && (
+              <button
+                type="button"
+                onClick={() => setGlobalSearch('')}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 3 COLUMN GRID: KATEGORI UTAMA, SUB KATEGORI, VARIAN / JENIS */}
@@ -430,53 +432,37 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
           {/* KOLOM 1: KATEGORI UTAMA */}
           <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden flex flex-col h-[600px]">
             <div className="p-3.5 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-800/40">
-              <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-xs text-slate-800 dark:text-zinc-100 uppercase tracking-wider">Kategori Utama</h3>
                   <span className="text-[11px] font-mono text-slate-400">({level1List.length})</span>
                 </div>
-                {/* PRIMARY BUTTON: CLEAN TEXT ONLY (NO ICON) */}
-                <button
-                  onClick={() => handleOpenCreate(1)}
-                  className="px-3.5 py-1 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-[11px] font-semibold transition-colors cursor-pointer"
-                >
-                  Tambah
-                </button>
               </div>
-              <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
+              {/* FORM LANGSUNG DI DEPAN (TANPA MODAL) */}
+              <form onSubmit={(e) => handleQuickAdd(1, null, newLevel1Name, e)} className="flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={searchLevel1}
-                  onChange={(e) => setSearchLevel1(e.target.value)}
-                  placeholder="Cari kategori utama..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62]"
+                  value={newLevel1Name}
+                  onChange={(e) => setNewLevel1Name(e.target.value)}
+                  placeholder="Nama kategori utama baru..."
+                  className="flex-1 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-3.5 py-1.5 text-xs text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
                 />
-                {searchLevel1 && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchLevel1('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !newLevel1Name.trim()}
+                  title="Tambah Kategori Utama"
+                  className="w-8 h-8 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                >
+                  <Plus size={16} />
+                </button>
+              </form>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {level1List.length === 0 ? (
                 <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs flex flex-col items-center gap-2">
-                  <span>{searchLevel1 ? 'Tidak ada kategori utama yang cocok' : 'Belum ada kategori utama'}</span>
-                  {searchLevel1 && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchLevel1('')}
-                      className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
-                    >
-                      Reset Filter
-                    </button>
-                  )}
+                  <span>{globalSearch ? 'Tidak ada kategori utama yang cocok dengan pencarian' : 'Belum ada kategori utama'}</span>
                 </div>
               ) : (
                 level1List.map(item => {
@@ -542,7 +528,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             )}
                           </div>
 
-                          {/* AKSI: EDIT & HAPUS (MUNCUL SAAT HOVER ATAU KLIK/AKTIF) */}
+                          {/* AKSI: EDIT & HAPUS */}
                           <div 
                             className={`flex items-center gap-0.5 shrink-0 transition-opacity duration-150 ${
                               isSelected 
@@ -580,40 +566,32 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
           {/* KOLOM 2: SUB KATEGORI */}
           <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden flex flex-col h-[600px]">
             <div className="p-3.5 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-800/40">
-              <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-xs text-slate-800 dark:text-zinc-100 uppercase tracking-wider">Sub Kategori</h3>
                   <span className="text-[11px] font-mono text-slate-400">({level2List.length})</span>
                 </div>
-                {/* PRIMARY BUTTON: CLEAN TEXT ONLY (NO ICON) */}
-                <button
-                  onClick={() => handleOpenCreate(2)}
-                  disabled={!selectedLevel1Id}
-                  className="px-3.5 py-1 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-semibold transition-colors cursor-pointer"
-                >
-                  Tambah
-                </button>
               </div>
-              <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
+              {/* FORM LANGSUNG DI DEPAN (TANPA MODAL) */}
+              <form onSubmit={(e) => handleQuickAdd(2, selectedLevel1Id, newLevel2Name, e)} className="flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={searchLevel2}
+                  value={newLevel2Name}
                   disabled={!selectedLevel1Id}
-                  onChange={(e) => setSearchLevel2(e.target.value)}
-                  placeholder="Cari sub kategori..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
+                  onChange={(e) => setNewLevel2Name(e.target.value)}
+                  placeholder={selectedLevel1 ? `Sub kategori untuk "${selectedLevel1.name}"...` : 'Pilih kategori utama dulu...'}
+                  className="flex-1 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-3.5 py-1.5 text-xs text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
                 />
-                {searchLevel2 && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchLevel2('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !selectedLevel1Id || !newLevel2Name.trim()}
+                  title="Tambah Sub Kategori"
+                  className="w-8 h-8 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                >
+                  <Plus size={16} />
+                </button>
+              </form>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -621,16 +599,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                 <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs">Pilih kategori utama terlebih dahulu</div>
               ) : level2List.length === 0 ? (
                 <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs flex flex-col items-center gap-2">
-                  <span>{searchLevel2 ? 'Tidak ada sub kategori yang cocok' : 'Belum ada sub kategori'}</span>
-                  {searchLevel2 && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchLevel2('')}
-                      className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
-                    >
-                      Reset Filter
-                    </button>
-                  )}
+                  <span>{globalSearch ? 'Tidak ada sub kategori yang cocok' : 'Belum ada sub kategori'}</span>
                 </div>
               ) : (
                 level2List.map(item => {
@@ -696,7 +665,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             )}
                           </div>
 
-                          {/* AKSI: EDIT & HAPUS (MUNCUL SAAT HOVER ATAU KLIK/AKTIF) */}
+                          {/* AKSI: EDIT & HAPUS */}
                           <div 
                             className={`flex items-center gap-0.5 shrink-0 transition-opacity duration-150 ${
                               isSelected 
@@ -734,40 +703,32 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
           {/* KOLOM 3: VARIAN / JENIS */}
           <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden flex flex-col h-[600px]">
             <div className="p-3.5 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-800/40">
-              <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-xs text-slate-800 dark:text-zinc-100 uppercase tracking-wider">Varian / Jenis</h3>
                   <span className="text-[11px] font-mono text-slate-400">({level3List.length})</span>
                 </div>
-                {/* PRIMARY BUTTON: CLEAN TEXT ONLY (NO ICON) */}
-                <button
-                  onClick={() => handleOpenCreate(3)}
-                  disabled={!selectedLevel2Id}
-                  className="px-3.5 py-1 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-semibold transition-colors cursor-pointer"
-                >
-                  Tambah
-                </button>
               </div>
-              <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
+              {/* FORM LANGSUNG DI DEPAN (TANPA MODAL) */}
+              <form onSubmit={(e) => handleQuickAdd(3, selectedLevel2Id, newLevel3Name, e)} className="flex items-center gap-1.5">
                 <input
                   type="text"
-                  value={searchLevel3}
+                  value={newLevel3Name}
                   disabled={!selectedLevel2Id}
-                  onChange={(e) => setSearchLevel3(e.target.value)}
-                  placeholder="Cari varian / jenis..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
+                  onChange={(e) => setNewLevel3Name(e.target.value)}
+                  placeholder={selectedLevel2 ? `Varian untuk "${selectedLevel2.name}"...` : 'Pilih sub kategori dulu...'}
+                  className="flex-1 bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-3.5 py-1.5 text-xs text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
                 />
-                {searchLevel3 && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchLevel3('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !selectedLevel2Id || !newLevel3Name.trim()}
+                  title="Tambah Varian / Jenis"
+                  className="w-8 h-8 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                >
+                  <Plus size={16} />
+                </button>
+              </form>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -775,16 +736,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                 <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs">Pilih sub kategori terlebih dahulu</div>
               ) : level3List.length === 0 ? (
                 <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs flex flex-col items-center gap-2">
-                  <span>{searchLevel3 ? 'Tidak ada varian / jenis yang cocok' : 'Belum ada varian / jenis'}</span>
-                  {searchLevel3 && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchLevel3('')}
-                      className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
-                    >
-                      Reset Filter
-                    </button>
-                  )}
+                  <span>{globalSearch ? 'Tidak ada varian / jenis yang cocok' : 'Belum ada varian / jenis'}</span>
                 </div>
               ) : (
                 level3List.map(item => {
@@ -848,7 +800,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             )}
                           </div>
 
-                          {/* AKSI: EDIT & HAPUS (MUNCUL SAAT HOVER ATAU KLIK/AKTIF) */}
+                          {/* AKSI: EDIT & HAPUS */}
                           <div 
                             className={`flex items-center gap-0.5 shrink-0 transition-opacity duration-150 ${
                               isSelected 
@@ -887,117 +839,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
 
       </div>
 
-      {/* MODAL: CREATE CATEGORY (KONSISTEN DENGAN DESAIN MODAL LAINNYA) */}
-      {modalOpen && (
-        <div 
-          onClick={(e) => { 
-            if (e.target === e.currentTarget && !isSubmitting) setModalOpen(false); 
-          }}
-          className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
-        >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
-            {/* MODAL HEADER */}
-            <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-800/80 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
-                  <Layers size={20} />
-                </div>
-                <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">
-                  Tambah {getLevelLabel(targetLevel)}
-                </h3>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setModalOpen(false)} 
-                className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* MODAL FORM BODY */}
-            <form onSubmit={handleSubmitForm} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
-                {/* INFO KATEGORI INDUK (JIKA LEVEL 2 ATAU 3) */}
-                {parentCategory && (
-                  <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
-                      <FolderKanban size={16} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
-                        Kategori Induk ({targetLevel === 2 ? 'Kategori Utama' : 'Sub Kategori'})
-                      </div>
-                      <div className="text-xs font-bold text-slate-700 dark:text-zinc-200 truncate mt-0.5">
-                        {parentCategory.name}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* NAMA KATEGORI */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                    Nama {getLevelLabel(targetLevel)} <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder={
-                      targetLevel === 1 
-                        ? 'Contoh: Material & Konstruksi, Fashion & Apparel...'
-                        : targetLevel === 2
-                          ? 'Contoh: Partisi Cubicle Toilet, Pakaian Pria, Outerwear...'
-                          : 'Contoh: Phenolic Board 12mm Standard, Heavy Duty, Nylon Set...'
-                    }
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all"
-                  />
-                </div>
-
-                {/* DESKRIPSI (OPSIONAL) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                    Catatan / Deskripsi <span className="text-[11px] font-normal text-slate-400">(Opsional)</span>
-                  </label>
-                  <textarea 
-                    rows={3}
-                    placeholder="Tuliskan catatan spesifikasi atau peruntukan kategori ini..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none resize-none transition-all font-medium placeholder:font-normal"
-                  />
-                </div>
-              </div>
-
-              {/* MODAL FOOTER */}
-              <div className="px-5 sm:px-6 py-4 bg-slate-50/90 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end flex-shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <button 
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => setModalOpen(false)} 
-                    className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={isSubmitting || !formData.name.trim()}
-                    className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-[#c28e62] to-[#b37f54] hover:opacity-95 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    {isSubmitting ? 'Menyimpan...' : `Tambah ${getLevelLabel(targetLevel)}`}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: DELETE CONFIRMATION (KONSISTEN DENGAN MODAL HAPUS LAINNYA) */}
+      {/* MODAL: DELETE CONFIRMATION (HANYA UNTUK KEAMANAN HAPUS DATA) */}
       {deleteModalOpen && categoryToDelete && (
         <div 
           onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) setDeleteModalOpen(false); }}

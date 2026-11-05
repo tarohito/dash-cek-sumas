@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="blimeyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="coralGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="40" fill="url(#blimeyGrad)"/>
+  <circle cx="100" cy="100" r="76" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="6 4"/>
+  <!-- Bold modern streetwear emblem -->
+  <text x="100" y="98" text-anchor="middle" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="36" fill="url(#coralGrad)" letter-spacing="2">BLIMEY!</text>
+  <text x="100" y="126" text-anchor="middle" font-family="'Helvetica Neue', sans-serif" font-weight="700" font-size="11" fill="#94a3b8" letter-spacing="4">ORIGINAL APPAREL</text>
+  <rect x="70" y="136" width="60" height="2" fill="#c28e62"/>
+</svg>

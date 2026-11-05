@@ -159,7 +159,11 @@ db.exec(`
     brandName TEXT NOT NULL,
     sku TEXT NOT NULL,
     category TEXT,
-    isB2B INTEGER DEFAULT 0
+    isB2B INTEGER DEFAULT 0,
+    description TEXT,
+    createdAt TEXT,
+    skuCode TEXT,
+    image TEXT
   );
 
   CREATE TABLE IF NOT EXISTS password_reset_requests (
@@ -239,6 +243,14 @@ try {
 } catch (_) {}
 try {
   db.prepare('ALTER TABLE users ADD COLUMN password TEXT').run();
+} catch (_) {}
+
+// Migration: Ensure products table has description and createdAt
+try {
+  db.prepare('ALTER TABLE products ADD COLUMN description TEXT').run();
+} catch (_) {}
+try {
+  db.prepare('ALTER TABLE products ADD COLUMN skuCode TEXT').run();
 } catch (_) {}
 
 // Update existing users with full data matching Tambah Pengguna form
@@ -331,7 +343,7 @@ if (brandCountRow && brandCountRow.count === 0) {
   insertBrand.run(
     'br-assc',
     'ASSC',
-    'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=200&auto=format&fit=crop&q=80',
+    '/assets/brand/assc_logo.svg',
     'u4',
     'Siti Rahma',
     'siti.r@mki.co.id',
@@ -344,7 +356,7 @@ if (brandCountRow && brandCountRow.count === 0) {
   insertBrand.run(
     'br-blimey',
     'BLIMEY!',
-    'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=200&auto=format&fit=crop&q=80',
+    '/assets/brand/blimey_logo.svg',
     'u3',
     'Budi Santoso',
     'budi.s@mki.co.id',
@@ -358,6 +370,31 @@ if (brandCountRow && brandCountRow.count === 0) {
 
 try {
   db.prepare("UPDATE brands SET logo = '/assets/brand/logo_horizontal.svg' WHERE LOWER(name) = 'sumas' OR logo LIKE '%logo_vertikal%' OR logo LIKE '%aistudio%'").run();
+  db.prepare("UPDATE brands SET logo = '/assets/brand/assc_logo.svg' WHERE LOWER(name) = 'assc' OR logo LIKE '%unsplash%'").run();
+  db.prepare("UPDATE brands SET logo = '/assets/brand/blimey_logo.svg' WHERE LOWER(name) = 'blimey!' OR logo LIKE '%unsplash%'").run();
+} catch (_) {}
+
+// Migration: Ensure all users have sharp, local vector avatars
+try {
+  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_kalingga.svg' WHERE id = 'u1'").run();
+  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_budi.svg' WHERE id = 'u2'").run();
+  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_rina.svg' WHERE id = 'u3'").run();
+  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_siti.svg' WHERE id = 'u4'").run();
+  db.prepare("UPDATE password_reset_requests SET avatar = '/assets/avatars/user_budi.svg' WHERE userId = 'u2' OR userName LIKE '%Budi%'").run();
+  db.prepare("UPDATE password_reset_requests SET avatar = '/assets/avatars/user_rina.svg' WHERE userId = 'u3' OR userName LIKE '%Rina%'").run();
+  db.prepare("UPDATE password_reset_requests SET avatar = '/assets/avatars/user_siti.svg' WHERE userId = 'u4' OR userName LIKE '%Siti%'").run();
+} catch (_) {}
+
+// Migration: Ensure products have rich description and creation dates
+try {
+  db.prepare("UPDATE products SET description = 'Partisi panel pintu phenolic 12mm tahan air dan benturan fasilitas komersial', createdAt = '28 Okt 2026, 09:30' WHERE id = 'p1'").run();
+  db.prepare("UPDATE products SET description = 'Lembaran phenolic board high density solid core untuk sekat partisi cubicle', createdAt = '28 Okt 2026, 09:40' WHERE id = 'p2'").run();
+  db.prepare("UPDATE products SET description = 'Set engsel gravity, handle indikator, lock set, dan leg support stainless 304', createdAt = '28 Okt 2026, 09:45' WHERE id = 'p3'").run();
+  db.prepare("UPDATE products SET description = 'Exclusive collection t-shirt dengan tag hologram keaslian dan verifikasi serial', createdAt = '10 Nov 2026, 14:00' WHERE id = 'p4'").run();
+  db.prepare("UPDATE products SET description = 'Heavyweight fleece hoodie dengan cetak sablon rubber premium dan tag pelindung QR', createdAt = '10 Nov 2026, 14:15' WHERE id = 'p5'").run();
+  db.prepare("UPDATE products SET description = 'Polo strapback cap katun twill dengan bordir logo ikonik dan tag fisik', createdAt = '10 Nov 2026, 14:20' WHERE id = 'p6'").run();
+  db.prepare("UPDATE products SET description = 'Edisi terbatas drop t-shirt bertema tipografi grafis dan label barcode verifikasi', createdAt = '12 Nov 2026, 11:00' WHERE id = 'p7'").run();
+  db.prepare("UPDATE products SET description = 'Jacket casual windproof streetwear dengan tag verifikasi digital anti-palsu', createdAt = '12 Nov 2026, 11:30' WHERE id = 'p8'").run();
 } catch (_) {}
 
 // Seed initial products / SKUs if empty
@@ -1973,11 +2010,53 @@ app.get('/api/products', (_req, res) => {
 app.post('/api/products', (req, res) => {
   try {
     const p = req.body;
+    const createdAt = p.createdAt || new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const skuCode = p.skuCode || `SKU-${Date.now().toString().slice(-4)}`;
     db.prepare(`
-      INSERT INTO products (id, brandId, brandName, sku, category, isB2B)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(p.id, p.brandId, p.brandName, p.sku, p.category || 'Umum', p.isB2B ? 1 : 0);
-    res.json(p);
+      INSERT INTO products (id, brandId, brandName, sku, skuCode, category, isB2B, description, createdAt, image)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(p.id, p.brandId, p.brandName, p.sku, skuCode, p.category || 'Umum', p.isB2B ? 1 : 0, p.description || null, createdAt, p.image || null);
+    res.json({ ...p, skuCode, createdAt, isB2B: Boolean(p.isB2B), image: p.image || null });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+app.put('/api/products/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as any;
+    if (!existing) {
+      return res.status(404).json({ error: 'Product tidak ditemukan' });
+    }
+    const p = req.body;
+    const brandId = p.brandId !== undefined ? p.brandId : existing.brandId;
+    const brandName = p.brandName !== undefined ? p.brandName : existing.brandName;
+    const sku = p.sku !== undefined ? p.sku : existing.sku;
+    const skuCode = p.skuCode !== undefined ? p.skuCode : (existing.skuCode || `SKU-${id.toUpperCase()}`);
+    const category = p.category !== undefined ? p.category : existing.category;
+    const isB2B = p.isB2B !== undefined ? (p.isB2B ? 1 : 0) : existing.isB2B;
+    const description = p.description !== undefined ? p.description : existing.description;
+    const image = p.image !== undefined ? p.image : existing.image;
+
+    db.prepare(`
+      UPDATE products 
+      SET brandId = ?, brandName = ?, sku = ?, skuCode = ?, category = ?, isB2B = ?, description = ?, image = ?
+      WHERE id = ?
+    `).run(brandId, brandName, sku, skuCode, category, isB2B, description, image, id);
+
+    res.json({
+      id,
+      brandId,
+      brandName,
+      sku,
+      skuCode,
+      category,
+      isB2B: Boolean(isB2B),
+      description,
+      image,
+      createdAt: existing.createdAt
+    });
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }

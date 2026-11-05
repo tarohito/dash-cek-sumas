@@ -13,6 +13,7 @@ import {
   Sun, 
   Search, 
   ChevronLeft, 
+  ChevronRight,
   LogOut,
   Hash,
   AlertCircle,
@@ -66,6 +67,7 @@ import { ScanLocationMap } from './components/ScanLocationMap';
 import { ScanActivityChart } from './components/ScanActivityChart';
 import { CustomTooltipProvider } from './components/CustomTooltip';
 import { CategoryManager } from './components/CategoryManager';
+import { CreateSkuPage } from './components/CreateSkuPage';
 import { generateA3PlusStickersPdf, generateTagsCsv, saveFileWithNativePicker } from './utils/pdfGenerator';
 
 // ==========================================
@@ -164,6 +166,13 @@ const getRelativeCreatedTime = (createdAt?: string | null, idVal?: string | null
   return `${diffMinutes} mnt`;
 };
 
+const formatDateTimeDisplay = (dateVal?: string | null, idVal?: string | null): string => {
+  if (!dateVal && !idVal) return 'Katalog Master';
+  const dt = parseFlexibleDate(dateVal, idVal);
+  if (!dt) return String(dateVal || 'Katalog Master');
+  return dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 const NewBadge: React.FC<{ 
   date?: string | null; 
   id?: string | null; 
@@ -181,7 +190,7 @@ const NewBadge: React.FC<{
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700/80 tracking-wider uppercase select-none transition-all shadow-xs shrink-0 ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700/80 tracking-wider uppercase select-none transition-all  shrink-0 ${className}`}
     >
       <span className="relative flex h-1.5 w-1.5">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -339,7 +348,7 @@ const CustomSelect = ({
           />
           {/* MENU DROPDOWN PALING ATAS DENGAN SHADOW & MAX-H */}
           <div 
-            className={`fixed z-[999991] bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-80 flex flex-col shadow-2xl ${
+            className={`fixed z-[999991] bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-80 flex flex-col  ${
               direction === 'up' ? '-translate-y-full origin-bottom' : 'origin-top'
             }`}
             style={{ 
@@ -350,7 +359,7 @@ const CustomSelect = ({
           >
             {/* FITUR PENCARIAN DI DALAM MENU DROPDOWN */}
             {searchable && (
-              <div className="p-1.5 pb-2 border-b border-slate-100 dark:border-zinc-700/80 mb-1 sticky top-0 bg-white dark:bg-zinc-800 z-30 shadow-xs">
+              <div className="p-1.5 pb-2 border-b border-slate-100 dark:border-zinc-700/80 mb-1 sticky top-0 bg-white dark:bg-zinc-800 z-30">
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                   <input
@@ -780,8 +789,12 @@ export default function App() {
     brandId: string;
     brandName: string;
     sku: string;
+    skuCode?: string;
     category: string;
     isB2B: boolean;
+    description?: string;
+    image?: string;
+    createdAt?: string;
   }
 
   // HELPER API UNTUK SQLITE
@@ -947,6 +960,11 @@ export default function App() {
       if (!res.ok) throw new Error('Gagal menghapus user');
       return res.json();
     },
+    async getCategories() {
+      const res = await fetch('/api/categories');
+      if (!res.ok) throw new Error('Gagal memuat categories');
+      return res.json();
+    },
     async getProducts() {
       const res = await fetch('/api/products');
       if (!res.ok) throw new Error('Gagal memuat products');
@@ -959,6 +977,15 @@ export default function App() {
         body: JSON.stringify(product),
       });
       if (!res.ok) throw new Error('Gagal membuat product');
+      return res.json();
+    },
+    async updateProduct(id: string, product: any) {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product),
+      });
+      if (!res.ok) throw new Error('Gagal memperbarui product');
       return res.json();
     },
     async deleteProduct(id: string) {
@@ -1049,6 +1076,49 @@ export default function App() {
     }
   });
 
+  // State master kategori produk dari database SQLite (untuk resolusi hirarki 3 layer)
+  const [categories, setCategories] = useState<{ id: string; name: string; level: number; parentId?: string | null; code?: string }[]>([]);
+
+  // Helper resolusi teks kategori 3 layer (misal: "Material & Konstruksi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard")
+  const resolveCategoryHierarchy = (categoryStr: string, categoriesList?: { id: string; name: string; level: number; parentId?: string | null }[]) => {
+    if (!categoryStr) return null;
+    const trimmed = categoryStr.trim();
+
+    // 1. Cek pemisah umum ' > ', '>', '›', '→', atau ' / '
+    for (const sep of ['>', '›', '→', ' / ']) {
+      if (trimmed.includes(sep)) {
+        const parts = trimmed.split(sep).map(p => p.trim()).filter(Boolean);
+        if (parts.length > 1) return parts;
+      }
+    }
+
+    // 2. Lookup ke database kategori berdasarkan nama jika kategori tunggal
+    if (categoriesList && categoriesList.length > 0) {
+      const match = categoriesList.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+      if (match) {
+        if (match.level === 3) {
+          const parent = categoriesList.find(c => c.id === match.parentId);
+          const grandparent = parent ? categoriesList.find(c => c.id === parent.parentId) : null;
+          const res: string[] = [];
+          if (grandparent) res.push(grandparent.name);
+          if (parent) res.push(parent.name);
+          res.push(match.name);
+          return res;
+        } else if (match.level === 2) {
+          const parent = categoriesList.find(c => c.id === match.parentId);
+          const res: string[] = [];
+          if (parent) res.push(parent.name);
+          res.push(match.name);
+          return res;
+        } else if (match.level === 1) {
+          return [match.name];
+        }
+      }
+    }
+
+    return null;
+  };
+
   // Metrik Live yang diagregasikan langsung dari database & state batches & brands
   const liveStats = React.useMemo(() => {
     let totalTags = 0;
@@ -1121,18 +1191,20 @@ export default function App() {
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      const [dbBatches, dbLogs, dbBrands, dbUsers, dbProducts] = await Promise.all([
+      const [dbBatches, dbLogs, dbBrands, dbUsers, dbProducts, dbCategories] = await Promise.all([
         api.getBatches(), 
         api.getAuditLogs(),
         api.getBrands(),
         api.getUsers(),
-        api.getProducts()
+        api.getProducts(),
+        api.getCategories()
       ]);
       if (Array.isArray(dbBatches)) setBatches(dbBatches);
       if (Array.isArray(dbLogs)) setAuditLogs(dbLogs);
       if (Array.isArray(dbBrands)) setBrands(dbBrands);
       if (Array.isArray(dbUsers)) setUsers(dbUsers);
       if (Array.isArray(dbProducts)) setProducts(dbProducts);
+      if (Array.isArray(dbCategories)) setCategories(dbCategories);
       setLastSyncTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       setDbStatus('connected');
     } catch (err) {
@@ -1150,9 +1222,10 @@ export default function App() {
       api.getAuditLogs(), 
       api.getBrands(), 
       api.getUsers(),
-      api.getProducts()
+      api.getProducts(),
+      api.getCategories()
     ])
-      .then(([dbBatches, dbLogs, dbBrands, dbUsers, dbProducts]) => {
+      .then(([dbBatches, dbLogs, dbBrands, dbUsers, dbProducts, dbCategories]) => {
         if (!isMounted) return;
         if (Array.isArray(dbBatches)) {
           setBatches(dbBatches);
@@ -1168,6 +1241,9 @@ export default function App() {
         }
         if (Array.isArray(dbProducts)) {
           setProducts(dbProducts);
+        }
+        if (Array.isArray(dbCategories)) {
+          setCategories(dbCategories);
         }
         setDbStatus('connected');
         setLastSyncTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -1228,13 +1304,14 @@ export default function App() {
     }
   }, [products]);
 
-  // Sinkronisasi otomatis saat berpindah ke menu Brand atau Users
+  // Sinkronisasi otomatis saat berpindah ke menu Brand, SKU, atau Users
   useEffect(() => {
-    if (activeMenu === 'brand' || activeMenu === 'users') {
-      Promise.all([api.getBrands(), api.getUsers()])
-        .then(([dbBrands, dbUsers]) => {
+    if (activeMenu === 'brand' || activeMenu === 'users' || activeMenu === 'sku') {
+      Promise.all([api.getBrands(), api.getUsers(), api.getProducts()])
+        .then(([dbBrands, dbUsers, dbProducts]) => {
           if (Array.isArray(dbBrands)) setBrands(dbBrands);
           if (Array.isArray(dbUsers)) setUsers(dbUsers);
+          if (Array.isArray(dbProducts)) setProducts(dbProducts);
         })
         .catch(() => {});
     }
@@ -1265,6 +1342,41 @@ export default function App() {
     category: 'B2B Material & Konstruksi',
     status: 'Aktif' as 'Aktif' | 'Nonaktif'
   });
+
+  // ==========================================
+  // STATE KHUSUS SKU / PRODUK MANAGEMENT (CRUD)
+  // ==========================================
+  const [skuSearch, setSkuSearch] = useState('');
+  const [skuFilterBrand, setSkuFilterBrand] = useState('all');
+  const [skuSortBy, setSkuSortBy] = useState('newest');
+  const [skuPage, setSkuPage] = useState(1);
+  const [skuPerPage, setSkuPerPage] = useState(10);
+  const [skuSubView, setSkuSubView] = useState<'list' | 'create'>('list');
+
+  const [isCreateSkuModalOpen, setIsCreateSkuModalOpen] = useState(false);
+  const [isEditSkuModalOpen, setIsEditSkuModalOpen] = useState(false);
+  const [isDeleteSkuModalOpen, setIsDeleteSkuModalOpen] = useState(false);
+  const [isDetailSkuModalOpen, setIsDetailSkuModalOpen] = useState(false);
+
+  const [skuToEdit, setSkuToEdit] = useState<ProductItem | null>(null);
+  const [skuToDelete, setSkuToDelete] = useState<ProductItem | null>(null);
+  const [skuToView, setSkuToView] = useState<ProductItem | null>(null);
+
+  const [openSkuDropdownId, setOpenSkuDropdownId] = useState<string | null>(null);
+  const [skuDropdownPos, setSkuDropdownPos] = useState({ top: 0, left: 0 });
+  const [skuDropdownDirection, setSkuDropdownDirection] = useState<'up' | 'down'>('down');
+
+  const defaultSkuForm = {
+    id: '',
+    brandId: '',
+    brandName: '',
+    sku: '',
+    skuCode: '',
+    category: '',
+    isB2B: true,
+    description: ''
+  };
+  const [skuForm, setSkuForm] = useState(defaultSkuForm);
 
   // ==========================================
   // STATE KHUSUS USER MANAGEMENT (CRUD)
@@ -1358,23 +1470,19 @@ export default function App() {
   ];
 
   const presetUserAvatars = [
-    { label: 'Avatar 1 (Wanita)', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80' },
-    { label: 'Avatar 2 (Pria)', url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80' },
-    { label: 'Avatar 3 (Pria Profesional)', url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80' },
-    { label: 'Avatar 4 (Wanita Bisnis)', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80' },
-    { label: 'Avatar 5 (Kreatif)', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80' },
+    { label: 'Kalingga Jeandy (Admin)', url: '/assets/avatars/user_kalingga.svg' },
+    { label: 'Budi Santoso (Operator)', url: '/assets/avatars/user_budi.svg' },
+    { label: 'Rina Wijaya (Operator)', url: '/assets/avatars/user_rina.svg' },
+    { label: 'Siti Rahma (Operator)', url: '/assets/avatars/user_siti.svg' },
   ];
 
   const [logoInputTab, setLogoInputTab] = useState<'upload' | 'url' | 'preset'>('upload');
 
-  // Preset foto/logo brand arsitektural dan retail siap pakai
+  // Preset foto/logo brand arsitektural dan retail siap pakai (100% lokal SVG)
   const presetBrandLogos = [
-    { label: 'Sumas / Architectural', url: '/assets/brand/logo_horizontal.svg' },
-    { label: 'ASSC / Streetwear', url: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=200&auto=format&fit=crop&q=80' },
-    { label: 'BLIMEY! / Denim', url: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=200&auto=format&fit=crop&q=80' },
-    { label: 'Interior & Cubicle', url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=200&auto=format&fit=crop&q=80' },
-    { label: 'Smart Tag & IoT', url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200&auto=format&fit=crop&q=80' },
-    { label: 'Phenolic Timber', url: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=200&auto=format&fit=crop&q=80' }
+    { label: 'Sumas / Architectural & Material', url: '/assets/brand/logo_horizontal.svg' },
+    { label: 'ASSC / Streetwear & Fashion', url: '/assets/brand/assc_logo.svg' },
+    { label: 'BLIMEY! / Apparel & Lifestyle', url: '/assets/brand/blimey_logo.svg' },
   ];
 
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
@@ -1595,6 +1703,28 @@ export default function App() {
           setOpenUserDropdownId(null);
           return;
         }
+        if (openSkuDropdownId) {
+          setOpenSkuDropdownId(null);
+          return;
+        }
+        if (isCreateSkuModalOpen) {
+          setIsCreateSkuModalOpen(false);
+          return;
+        }
+        if (isEditSkuModalOpen) {
+          setIsEditSkuModalOpen(false);
+          return;
+        }
+        if (isDeleteSkuModalOpen) {
+          setIsDeleteSkuModalOpen(false);
+          setSkuToDelete(null);
+          return;
+        }
+        if (isDetailSkuModalOpen) {
+          setIsDetailSkuModalOpen(false);
+          setSkuToView(null);
+          return;
+        }
         if (isCreateUserModalOpen) {
           setIsCreateUserModalOpen(false);
           return;
@@ -1639,6 +1769,11 @@ export default function App() {
     isEditBrandModalOpen,
     isDeleteBrandModalOpen,
     isDetailBrandModalOpen,
+    isCreateSkuModalOpen,
+    isEditSkuModalOpen,
+    isDeleteSkuModalOpen,
+    isDetailSkuModalOpen,
+    openSkuDropdownId,
     isCreateUserModalOpen,
     isEditUserModalOpen,
     isDeleteUserModalOpen,
@@ -1686,7 +1821,7 @@ export default function App() {
   // Menutup dropdown segera saat pengguna mulai scroll / wheel atau sentuh layar,
   // sehingga scroll halaman TIDAK PERNAH terblokir atau macet!
   useEffect(() => {
-    if (!openDropdownId && !openBrandDropdownId && !openUserDropdownId) return;
+    if (!openDropdownId && !openBrandDropdownId && !openUserDropdownId && !openSkuDropdownId) return;
 
     const handleOutsideClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -1694,12 +1829,14 @@ export default function App() {
       setOpenDropdownId(null);
       setOpenBrandDropdownId(null);
       setOpenUserDropdownId(null);
+      setOpenSkuDropdownId(null);
     };
 
     const handleScrollOrWheel = () => {
       setOpenDropdownId(null);
       setOpenBrandDropdownId(null);
       setOpenUserDropdownId(null);
+      setOpenSkuDropdownId(null);
     };
 
     window.addEventListener('mousedown', handleOutsideClick, true);
@@ -1715,7 +1852,7 @@ export default function App() {
       window.removeEventListener('touchmove', handleScrollOrWheel, true);
       window.removeEventListener('resize', handleScrollOrWheel);
     };
-  }, [openDropdownId, openBrandDropdownId, openUserDropdownId]);
+  }, [openDropdownId, openBrandDropdownId, openUserDropdownId, openSkuDropdownId]);
 
   // Live timer ticker untuk update NewBadge otomatis hilang setelah 5 menit
   const [, setLiveTick] = useState<number>(Date.now());
@@ -2379,6 +2516,230 @@ export default function App() {
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  // ==========================================
+  // HANDLERS KHUSUS SKU / PRODUK (CRUD & RELATIONAL)
+  // ==========================================
+  const toggleSkuDropdownMenu = (e: React.MouseEvent<HTMLButtonElement>, productId: string) => {
+    e.stopPropagation();
+    if (openSkuDropdownId === productId) {
+      setOpenSkuDropdownId(null);
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const estimatedDropdownHeight = 160; 
+    
+    if (spaceBelow < estimatedDropdownHeight) {
+      setSkuDropdownDirection('up');
+      setSkuDropdownPos({ top: rect.top - 4, left: rect.right }); 
+    } else {
+      setSkuDropdownDirection('down');
+      setSkuDropdownPos({ top: rect.bottom + 4, left: rect.right }); 
+    }
+    
+    setOpenSkuDropdownId(productId);
+  };
+
+  const getSkuBatches = (skuName: string, brandName?: string) => {
+    const sNorm = (skuName || '').toLowerCase().trim();
+    const bNorm = (brandName || '').toLowerCase().trim();
+    return batches.filter(b => {
+      const bSku = (b.sku || '').toLowerCase().trim();
+      const bBrand = (b.brand || '').toLowerCase().trim();
+      const matchBrand = !bNorm || bBrand === bNorm;
+      const matchSku = bSku === sNorm || bSku.includes(sNorm) || sNorm.includes(bSku);
+      return matchBrand && matchSku;
+    });
+  };
+
+  const handleOpenCreateSku = () => {
+    setSkuSubView('create');
+  };
+
+  const handleSaveNewSkuFromPage = async (productData: {
+    brandId: string;
+    brandName: string;
+    sku: string;
+    skuCode: string;
+    category: string;
+    isB2B: boolean;
+    description?: string;
+    image?: string;
+  }) => {
+    const matchedBrand = brands.find(b => b.id === productData.brandId) || brands.find(b => b.name === productData.brandName) || brands[0];
+    const newSkuItem: ProductItem = {
+      id: `p-${Date.now()}`,
+      brandId: matchedBrand?.id || 'br-sumas',
+      brandName: matchedBrand?.name || 'Sumas',
+      sku: productData.sku.trim(),
+      skuCode: productData.skuCode.trim() || `SKU-${Date.now().toString().slice(-4)}`,
+      category: productData.category.trim() || 'Umum',
+      isB2B: Boolean(productData.isB2B),
+      description: productData.description?.trim() || undefined,
+      image: productData.image,
+      createdAt: new Date().toISOString()
+    };
+
+    setProducts(prev => [newSkuItem, ...prev]);
+    setSkuSubView('list');
+
+    try {
+      await api.createProduct(newSkuItem);
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts)) setProducts(freshProducts);
+      triggerAlert(
+        'SKU Berhasil Ditambahkan',
+        `Produk "${newSkuItem.sku}" (${newSkuItem.brandName}) berhasil didaftarkan ke katalog master.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Gagal membuat SKU di SQLite:', err);
+      triggerAlert(
+        'Gagal Menyimpan SKU',
+        'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
+        'error'
+      );
+    }
+  };
+
+  const handleCreateSku = async () => {
+    if (!skuForm.sku.trim()) {
+      triggerAlert('Nama SKU Wajib Diisi', 'Silakan masukkan nama atau kode SKU produk.', 'warning');
+      return;
+    }
+
+    const matchedBrand = brands.find(b => b.id === skuForm.brandId) || brands.find(b => b.name === skuForm.brandName) || brands[0];
+    const newSkuItem: ProductItem = {
+      id: `p-${Date.now()}`,
+      brandId: matchedBrand?.id || 'br-sumas',
+      brandName: matchedBrand?.name || 'Sumas',
+      sku: skuForm.sku.trim(),
+      skuCode: skuForm.skuCode.trim() || `SKU-${Date.now().toString().slice(-4)}`,
+      category: skuForm.category.trim() || 'Umum',
+      isB2B: Boolean(skuForm.isB2B),
+      description: skuForm.description.trim() || undefined,
+      createdAt: new Date().toISOString()
+    };
+
+    setProducts(prev => [newSkuItem, ...prev]);
+    setIsCreateSkuModalOpen(false);
+
+    try {
+      await api.createProduct(newSkuItem);
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts)) setProducts(freshProducts);
+      triggerAlert(
+        'SKU Berhasil Ditambahkan',
+        `Produk "${newSkuItem.sku}" (${newSkuItem.brandName}) berhasil didaftarkan ke katalog master.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Gagal membuat SKU di SQLite:', err);
+      triggerAlert(
+        'Gagal Menyimpan SKU',
+        'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
+        'error'
+      );
+    }
+  };
+
+  const handleOpenEditSku = (prod: ProductItem) => {
+    setSkuToEdit(prod);
+    setSkuForm({
+      id: prod.id,
+      brandId: prod.brandId,
+      brandName: prod.brandName,
+      sku: prod.sku,
+      skuCode: prod.skuCode || `SKU-${prod.id.toUpperCase()}`,
+      category: prod.category || '',
+      isB2B: Boolean(prod.isB2B),
+      description: prod.description || ''
+    });
+    setOpenSkuDropdownId(null);
+    setIsEditSkuModalOpen(true);
+  };
+
+  const handleUpdateSku = async () => {
+    if (!skuForm.id || !skuForm.sku.trim()) {
+      triggerAlert('Nama SKU Wajib Diisi', 'Silakan masukkan nama atau kode SKU produk.', 'warning');
+      return;
+    }
+
+    const matchedBrand = brands.find(b => b.id === skuForm.brandId) || brands.find(b => b.name === skuForm.brandName) || brands[0];
+    const updatedData: Partial<ProductItem> = {
+      brandId: matchedBrand?.id || skuForm.brandId,
+      brandName: matchedBrand?.name || skuForm.brandName,
+      sku: skuForm.sku.trim(),
+      skuCode: skuForm.skuCode.trim() || (skuToEdit?.skuCode || `SKU-${skuForm.id.toUpperCase()}`),
+      category: skuForm.category.trim() || 'Umum',
+      isB2B: Boolean(skuForm.isB2B),
+      description: skuForm.description.trim()
+    };
+
+    setProducts(prev => prev.map(p => p.id === skuForm.id ? { ...p, ...updatedData } : p));
+    setIsEditSkuModalOpen(false);
+    setSkuToEdit(null);
+
+    try {
+      await api.updateProduct(skuForm.id, updatedData);
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts)) setProducts(freshProducts);
+      triggerAlert(
+        'SKU Berhasil Diperbarui',
+        `Data produk "${skuForm.sku.trim()}" telah diperbarui di database.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Gagal memperbarui SKU di SQLite:', err);
+      triggerAlert(
+        'Gagal Memperbarui SKU',
+        'Terjadi kesalahan sistem saat memperbarui data SKU.',
+        'error'
+      );
+    }
+  };
+
+  const handleOpenDeleteSku = (prod: ProductItem) => {
+    setSkuToDelete(prod);
+    setOpenSkuDropdownId(null);
+    setIsDeleteSkuModalOpen(true);
+  };
+
+  const handleConfirmDeleteSku = async () => {
+    if (!skuToDelete) return;
+    const skuId = skuToDelete.id;
+    const skuName = skuToDelete.sku;
+
+    setProducts(prev => prev.filter(p => p.id !== skuId));
+    setIsDeleteSkuModalOpen(false);
+    setSkuToDelete(null);
+
+    try {
+      await api.deleteProduct(skuId);
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts)) setProducts(freshProducts);
+      triggerAlert(
+        'SKU Berhasil Dihapus',
+        `Produk "${skuName}" berhasil dihapus dari master katalog.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Gagal menghapus SKU di SQLite:', err);
+      triggerAlert(
+        'Gagal Menghapus SKU',
+        'Terjadi kesalahan saat menghapus data SKU.',
+        'error'
+      );
+    }
+  };
+
+  const handleOpenDetailSku = (prod: ProductItem) => {
+    setSkuToView(prod);
+    setOpenSkuDropdownId(null);
+    setIsDetailSkuModalOpen(true);
   };
 
   const toggleTagSelection = (tagId: string) => {
@@ -3301,6 +3662,59 @@ export default function App() {
     return Array.from(new Set(users.map(u => u.role))).filter(Boolean);
   }, [users]);
 
+  // Memoized calculations for SKU / Produk Table
+  const filteredProducts = React.useMemo(() => {
+    const q = skuSearch.toLowerCase().trim();
+    const matched = products.filter(p => {
+      const matchSearch = !q ||
+        (p.sku && p.sku.toLowerCase().includes(q)) ||
+        (p.brandName && p.brandName.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q)) ||
+        (p.description && p.description.toLowerCase().includes(q));
+
+      const matchBrand = skuFilterBrand === 'all' || 
+        p.brandId === skuFilterBrand || 
+        (p.brandName && p.brandName.toLowerCase() === skuFilterBrand.toLowerCase());
+
+      return matchSearch && matchBrand;
+    });
+
+    return [...matched].sort((a, b) => {
+      if (skuSortBy === 'newest') {
+        const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
+        const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
+        if (aRecent && !bRecent) return -1;
+        if (!aRecent && bRecent) return 1;
+        const dtA = parseFlexibleDate(a.createdAt, a.id)?.getTime() || 0;
+        const dtB = parseFlexibleDate(b.createdAt, b.id)?.getTime() || 0;
+        return dtB - dtA;
+      }
+      if (skuSortBy === 'oldest') {
+        const dtA = parseFlexibleDate(a.createdAt, a.id)?.getTime() || 0;
+        const dtB = parseFlexibleDate(b.createdAt, b.id)?.getTime() || 0;
+        return dtA - dtB;
+      }
+      if (skuSortBy === 'name-asc') {
+        return (a.sku || '').localeCompare(b.sku || '');
+      }
+      if (skuSortBy === 'name-desc') {
+        return (b.sku || '').localeCompare(a.sku || '');
+      }
+      if (skuSortBy === 'brand-asc') {
+        return (a.brandName || '').localeCompare(b.brandName || '');
+      }
+      return 0;
+    });
+  }, [products, skuSearch, skuFilterBrand, skuSortBy]);
+
+  const totalSkuPages = Math.ceil(filteredProducts.length / skuPerPage) || 1;
+  const currentProducts = React.useMemo(() => {
+    const start = (skuPage - 1) * skuPerPage;
+    return filteredProducts.slice(start, start + skuPerPage);
+  }, [filteredProducts, skuPage, skuPerPage]);
+
+  const activeDropdownSku = products.find(p => p.id === openSkuDropdownId);
+
   const openDownloadModal = (batch: any) => {
     setOpenDropdownId(null);
     setBatchToDownload(batch);
@@ -3418,6 +3832,7 @@ export default function App() {
           onClick={(e) => { 
             e.preventDefault(); 
             setActiveMenu(id); 
+            if (id === 'sku') setSkuSubView('list');
             if (isMobile) setIsMobileMenuOpen(false); 
           }} 
           className={`group flex items-center transition-all ${
@@ -3749,7 +4164,7 @@ export default function App() {
 
             <button
               onClick={handleOpenCreateBrand}
-              className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer shadow-xs"
+              className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
             >
               <span>Tambah Brand / Merk</span>
             </button>
@@ -3849,7 +4264,7 @@ export default function App() {
             <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto scrollbar-thin">
                 <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[700px]">
-                <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-100 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px]">
+                <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                   <tr>
                     <th className="px-5 py-3.5">Brand / Merk</th>
                     <th className="px-5 py-3.5">Pemilik (Akun Pengguna)</th>
@@ -4072,7 +4487,7 @@ export default function App() {
             {currentRole === 'Administrator' ? (
               <button
                 onClick={handleOpenCreateUser}
-                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer shadow-xs"
+                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
               >
                 <span>Tambah Pengguna</span>
               </button>
@@ -4176,7 +4591,7 @@ export default function App() {
             <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden">
               <div className="overflow-x-auto scrollbar-thin">
                 <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[640px]">
-                <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-100 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px]">
+                <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                   <tr>
                     <th className="px-5 py-3.5">Pengguna</th>
                     <th className="px-5 py-3.5">Hak Akses</th>
@@ -4359,7 +4774,7 @@ export default function App() {
             ) : (
               <button
                 onClick={handleOpenCreateUser}
-                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b37f54] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer shadow-xs"
+                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b37f54] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
               >
                 <span>Daftarkan Akun Pengguna Sekarang</span>
               </button>
@@ -4370,6 +4785,338 @@ export default function App() {
     </div>
   );
 };
+
+  // ==========================================
+  // RENDER HALAMAN SKU PRODUK (KATALOG MASTER)
+  // ==========================================
+  const renderSkuContent = () => {
+    if (skuSubView === 'create') {
+      return (
+        <CreateSkuPage
+          brands={brands}
+          categories={categories}
+          onBack={() => setSkuSubView('list')}
+          onSave={handleSaveNewSkuFromPage}
+          onAlert={triggerAlert}
+        />
+      );
+    }
+
+    const isFilterActive = skuSearch || skuFilterBrand !== 'all' || skuSortBy !== 'newest';
+
+    const brandFilterOptions = [
+      { value: 'all', label: 'Semua Brand' },
+      ...brands.map(b => ({ value: b.id, label: b.name }))
+    ];
+
+    const sortOptions = [
+      { value: 'newest', label: 'Terbaru' },
+      { value: 'oldest', label: 'Terlama' },
+      { value: 'name-asc', label: 'Nama SKU (A - Z)' },
+      { value: 'name-desc', label: 'Nama SKU (Z - A)' },
+      { value: 'brand-asc', label: 'Nama Brand (A - Z)' }
+    ];
+
+    const connectedBrandsCount = new Set(products.map(p => p.brandName)).size;
+    const totalBatchesCount = batches.length;
+    const totalPhysicalTagsCount = batches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
+
+    return (
+      <div 
+        className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300"
+        onScroll={() => { 
+          if (openDropdownId) setOpenDropdownId(null); 
+          if (openBrandDropdownId) setOpenBrandDropdownId(null);
+          if (openUserDropdownId) setOpenUserDropdownId(null);
+          if (openSkuDropdownId) setOpenSkuDropdownId(null);
+        }}
+      >
+        <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
+          {/* TOP STATUS BAR / HEADER SKU */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+                <Box size={16} />
+              </div>
+              <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                Master Katalog SKU Produk
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenCreateSku}
+              className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
+            >
+              Tambah SKU Produk
+            </button>
+          </div>
+
+          {/* SEARCH & FILTER CONTROLS (CLEAN & MINIMAL) */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Cari SKU, brand, kategori, atau deskripsi..."
+                  value={skuSearch}
+                  onChange={(e) => {
+                    setSkuSearch(e.target.value);
+                    setSkuPage(1);
+                  }}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#cd9a6f]"
+                />
+                {skuSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSkuSearch('');
+                      setSkuPage(1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Controls Pengurutan & Filter Brand */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Filter Brand */}
+                <div className="w-full sm:w-auto min-w-[140px] sm:min-w-[160px]">
+                  <CustomSelect
+                    value={skuFilterBrand}
+                    onChange={(val) => {
+                      setSkuFilterBrand(val);
+                      setSkuPage(1);
+                    }}
+                    placeholder="Semua Brand"
+                    searchable={false}
+                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                    options={brandFilterOptions}
+                  />
+                </div>
+
+                {/* Urutkan SKU */}
+                <div className="w-full sm:w-auto min-w-[140px] sm:min-w-[160px]">
+                  <CustomSelect
+                    value={skuSortBy}
+                    onChange={(val) => {
+                      setSkuSortBy(val);
+                      setSkuPage(1);
+                    }}
+                    placeholder="Urutkan SKU"
+                    searchable={false}
+                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                    options={sortOptions}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Reset Filter Button */}
+            {isFilterActive && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSkuSearch('');
+                  setSkuFilterBrand('all');
+                  setSkuSortBy('newest');
+                  setSkuPage(1);
+                }}
+                className="text-xs text-[#c28e62] hover:underline font-semibold self-center sm:self-auto cursor-pointer"
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
+
+          {/* SKU TABLE DISPLAY (RINGKAS, DATA PENTING DI DEPAN, CLEAN) */}
+          {currentProducts.length > 0 ? (
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full text-left text-xs sm:text-sm min-w-[760px]">
+                  <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
+                    <tr>
+                      <th className="px-5 py-3.5 whitespace-nowrap">SKU &amp; Nama Produk</th>
+                      <th className="px-5 py-3.5 whitespace-nowrap">Brand / Merk</th>
+                      <th className="px-5 py-3.5 min-w-[220px] max-w-[340px]">Kategori</th>
+                      <th className="px-5 py-3.5 whitespace-nowrap">Batch &amp; Tag Fisik</th>
+                      <th className="px-4 py-3.5 text-right whitespace-nowrap">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 text-slate-700 dark:text-zinc-300">
+                    {currentProducts.map((prod) => {
+                      const linkedBatches = getSkuBatches(prod.sku, prod.brandName);
+                      const totalTags = linkedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
+
+                      return (
+                        <tr 
+                          key={prod.id}
+                          className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors group/sku"
+                        >
+                          {/* KOLOM 1: SKU & NAMA PRODUK (KLIK AREA NAMA PRODUK UNTUK DETAIL SKU) */}
+                          <td className="px-5 py-3.5">
+                            <div 
+                              onClick={() => handleOpenDetailSku(prod)}
+                              className="min-w-0 inline-block cursor-pointer group/sku-name text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm group-hover/sku-name:text-[#c28e62] group-hover/sku-name:underline underline-offset-2 transition-colors">
+                                  {prod.sku}
+                                </span>
+                                {isRecentlyCreated(prod.createdAt, prod.id, 5) && (
+                                  <NewBadge date={prod.createdAt} id={prod.id} />
+                                )}
+                              </div>
+                              <div className="text-[11px] sm:text-xs font-mono font-medium text-slate-500 dark:text-zinc-400 mt-0.5 tracking-tight group-hover/sku-name:text-slate-700 dark:group-hover/sku-name:text-zinc-300">
+                                {prod.skuCode || `SKU-${prod.id.toUpperCase()}`}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* KOLOM 2: BRAND / MERK (MODEL BADGE SEPERTI DI TABEL PENGGUNA) */}
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
+                              <span>{prod.brandName}</span>
+                            </span>
+                          </td>
+
+                          {/* KOLOM 3: KATEGORI (MENGAKOMODASI TEKS PANJANG & HIRARKI 3 LAYER) */}
+                          <td className="px-5 py-3.5 min-w-[220px] max-w-[340px]">
+                            {(() => {
+                              const rawCat = prod.category || 'Umum';
+                              const hierarchy = resolveCategoryHierarchy(rawCat, categories);
+
+                              if (hierarchy && hierarchy.length >= 2) {
+                                const topLevels = hierarchy.slice(0, hierarchy.length - 1);
+                                const leafLevel = hierarchy[hierarchy.length - 1];
+
+                                return (
+                                  <div className="flex flex-col gap-0.5 whitespace-normal break-words">
+                                    <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-400 dark:text-zinc-500 font-medium flex-wrap leading-tight">
+                                      {topLevels.map((lvl, idx) => (
+                                        <React.Fragment key={idx}>
+                                          {idx > 0 && <ChevronRight size={10} className="shrink-0 text-slate-300 dark:text-zinc-600" />}
+                                          <span>{lvl}</span>
+                                        </React.Fragment>
+                                      ))}
+                                    </div>
+                                    <span className="font-semibold text-slate-800 dark:text-zinc-200 text-xs sm:text-sm leading-snug">
+                                      {leafLevel}
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <span className="text-slate-700 dark:text-zinc-300 text-xs sm:text-sm font-medium whitespace-normal break-words leading-snug block">
+                                  {rawCat}
+                                </span>
+                              );
+                            })()}
+                          </td>
+
+                          {/* KOLOM 4: BATCH DAN TAG (1 KOLOM 2 BARIS DENGAN ICON QRCODE SEPERTI DI MENU TAG) */}
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
+                                <QrCode size={15} />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm">
+                                  {linkedBatches.length} <span className="font-normal text-slate-500 dark:text-zinc-400 text-xs">Batch</span>
+                                </span>
+                                <span className="text-slate-500 dark:text-zinc-400 font-mono text-[11px] sm:text-xs mt-0.5">
+                                  {totalTags.toLocaleString('id-ID')} <span className="font-sans">Tag Fisik</span>
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* KOLOM 5: AKSI */}
+                          <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className={`relative inline-block transition-opacity duration-150 ${
+                              openSkuDropdownId === prod.id 
+                                ? 'opacity-100 pointer-events-auto' 
+                                : 'opacity-0 pointer-events-none group-hover/sku:opacity-100 group-hover/sku:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
+                            }`}>
+                              <button 
+                                type="button"
+                                onClick={(e) => toggleSkuDropdownMenu(e, prod.id)}
+                                className={`p-1.5 rounded-full transition-colors relative z-20 cursor-pointer ${
+                                  openSkuDropdownId === prod.id 
+                                    ? 'bg-slate-200 dark:bg-zinc-700 text-slate-800 dark:text-zinc-100' 
+                                    : 'text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                                }`}
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PAGINATION CONTROLS */}
+              <TablePagination
+                currentPage={skuPage}
+                totalPages={totalSkuPages}
+                totalItems={filteredProducts.length}
+                itemsPerPage={skuPerPage}
+                onPageChange={setSkuPage}
+                onItemsPerPageChange={(items) => {
+                  setSkuPerPage(items);
+                  setSkuPage(1);
+                }}
+                itemName="SKU Produk"
+              />
+            </div>
+          ) : (
+            <div className="p-8 sm:p-12 rounded-3xl border border-dashed border-slate-300 dark:border-zinc-700 bg-white/60 dark:bg-zinc-900/40 flex flex-col items-center justify-center text-center max-w-xl mx-auto my-8">
+              <div className="w-16 h-16 mx-auto bg-slate-50 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4 text-[#c28e62] border border-slate-200 dark:border-zinc-700">
+                <Box size={28} />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-100 mb-2">
+                {isFilterActive ? 'Tidak Ada SKU yang Sesuai' : 'Belum Ada SKU Terdaftar'}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md mb-4">
+                {isFilterActive
+                  ? 'Tidak ditemukan SKU produk dengan kriteria pencarian atau filter saat ini. Coba ubah kata kunci atau klik tombol reset filter di bawah.'
+                  : 'Mulai dengan mendaftarkan kode SKU produk pertama ke katalog master sistem untuk memulai registrasi batch dan pembuatan tag fisik.'}
+              </p>
+              {isFilterActive ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSkuSearch('');
+                    setSkuFilterBrand('all');
+                    setSkuSortBy('newest');
+                    setSkuPage(1);
+                  }}
+                  className="px-5 py-2 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                >
+                  Reset Filter
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleOpenCreateSku}
+                  className="px-5 py-2.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  Daftarkan SKU Produk Sekarang
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const availableCount = tagsAvailableCount || (activeBatch?.availableCount ?? currentTags.filter((t: any) => t.status === 'Tersedia').length);
   const usedCount = tagsUsedCount || (activeBatch?.usedCount ?? currentTags.filter((t: any) => t.status === 'Telah Digunakan').length);
@@ -4507,7 +5254,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsCreateBatchModalOpen(true)}
-                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer shadow-xs"
+                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
               >
                 <span>Generate Batch Baru</span>
               </button>
@@ -4617,23 +5364,23 @@ export default function App() {
               
               <div className="overflow-x-auto scrollbar-thin">
                 <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[760px]">
-                  <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-100 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                     <tr>
-                      <th className="px-4 sm:px-6 py-3.5">Batch ID & Info</th>
-                      <th className="px-4 sm:px-6 py-3.5">Produk SKU</th>
-                      <th className="px-4 sm:px-6 py-3.5">Jumlah Tag</th>
-                      <th className="px-4 sm:px-6 py-3.5">Status</th>
-                      <th className="px-4 sm:px-6 py-3.5 text-right">Aksi</th>
+                      <th className="px-5 py-3.5">Batch ID &amp; Info</th>
+                      <th className="px-5 py-3.5">Produk SKU</th>
+                      <th className="px-5 py-3.5">Jumlah Tag</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5 text-right">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-zinc-700 text-slate-700 dark:text-zinc-300">
+                  <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 text-slate-700 dark:text-zinc-300">
                     {currentBatches.map((batch) => (
                       <tr 
                         key={batch.id} 
                         style={{ contentVisibility: 'auto', containIntrinsicSize: '0 56px' }}
                         className="group/row hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors"
                       >
-                        <td className="px-4 sm:px-6 py-4">
+                        <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-800 dark:text-zinc-100">{batch.batchId}</span>
                             <NewBadge date={batch.createdAt || batch.date} id={batch.id} />
@@ -4653,7 +5400,7 @@ export default function App() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 sm:px-6 py-4">
+                        <td className="px-5 py-3.5">
                           <div className="font-semibold">{batch.sku}</div>
                           <div className="text-xs text-[#c28e62] font-medium mt-0.5">{batch.brand}</div>
                           {(() => {
@@ -4676,7 +5423,7 @@ export default function App() {
                             );
                           })()}
                         </td>
-                        <td className="px-4 sm:px-6 py-4">
+                        <td className="px-5 py-3.5">
                           {(() => {
                             const used = typeof batch.usedCount === 'number' 
                               ? batch.usedCount 
@@ -4719,7 +5466,7 @@ export default function App() {
                           })()}
                         </td>
                         {/* KOLOM 4: STATUS BATCH (MODAL ALASAN: AKTIF / DISUSPEND) */}
-                        <td className="px-4 sm:px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
                             onClick={() => {
@@ -4746,7 +5493,7 @@ export default function App() {
                             )}
                           </button>
                         </td>
-                        <td className="px-4 sm:px-6 py-4 text-right">
+                        <td className="px-5 py-3.5 text-right">
                           <div className={`relative inline-block transition-opacity duration-150 ${openDropdownId === batch.id ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'}`}>
                             <button 
                               onClick={(e) => toggleDropdownMenu(e, batch.id)}
@@ -4828,6 +5575,8 @@ export default function App() {
           renderBrandContent()
         ) : activeMenu === 'category' ? (
           <CategoryManager currentRole={currentRole} onAlert={triggerAlert} />
+        ) : activeMenu === 'sku' ? (
+          renderSkuContent()
         ) : activeMenu === 'users' ? (
           renderUsersContent()
         ) : (
@@ -5173,7 +5922,7 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) setIsCreateBatchModalOpen(false); }}
           className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200 shadow-2xl">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
             {/* MODAL HEADER */}
             <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-800/80 flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -5263,7 +6012,7 @@ export default function App() {
                     onClick={() => setFormQrType('dynamic')}
                     className={`text-xs font-semibold rounded-full transition-colors cursor-pointer ${
                       formQrType === 'dynamic'
-                        ? 'bg-white dark:bg-zinc-900 text-[#c28e62] shadow-xs'
+                        ? 'bg-white dark:bg-zinc-900 text-[#c28e62] '
                         : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
                     }`}
                   >
@@ -5274,7 +6023,7 @@ export default function App() {
                     onClick={() => setFormQrType('static')}
                     className={`text-xs font-semibold rounded-full transition-colors cursor-pointer ${
                       formQrType === 'static'
-                        ? 'bg-white dark:bg-zinc-900 text-[#c28e62] shadow-xs'
+                        ? 'bg-white dark:bg-zinc-900 text-[#c28e62] '
                         : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
                     }`}
                   >
@@ -5322,7 +6071,7 @@ export default function App() {
                 type="button"
                 onClick={handleGenerateBatch}
                 disabled={!selectedSku || !formQty} 
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
               >
                 Generate Batch
               </button>
@@ -5337,7 +6086,7 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) setIsEditUrlModalOpen(false); }}
           className="fixed inset-0 bg-black/65 z-[10006] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200 shadow-2xl">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
             {/* MODAL HEADER */}
             <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-800/80 flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -5400,7 +6149,7 @@ export default function App() {
                 type="button"
                 onClick={handleSaveRedirectUrl}
                 disabled={isUpdatingUrl || !editRedirectUrlInput.trim()}
-                className="px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center shadow-xs"
+                className="px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
               >
                 {isUpdatingUrl ? (
                   <span>Menyimpan...</span>
@@ -5598,7 +6347,7 @@ export default function App() {
                   type="button"
                   onClick={handleSaveEditProject}
                   disabled={!editProjectForm.name.trim() || !editProjectForm.reason.trim()}
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>Simpan Perubahan</span>
                 </button>
@@ -5933,7 +6682,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => openEditUrlModal(activeBatch)}
-                    className="px-4 py-1.5 rounded-full bg-white dark:bg-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-600 border border-slate-200 dark:border-zinc-600 text-[#c28e62] dark:text-[#cd9a6f] font-semibold text-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                    className="px-4 py-1.5 rounded-full bg-white dark:bg-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-600 border border-slate-200 dark:border-zinc-600 text-[#c28e62] dark:text-[#cd9a6f] font-semibold text-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                   >
                     <Globe size={13} />
                     <span>Edit URL</span>
@@ -6186,7 +6935,7 @@ export default function App() {
                                   activeBatch?.isB2B && !isAvailable 
                                     ? 'bg-slate-200/90 dark:bg-zinc-950/90 border-slate-300/80 dark:border-zinc-800 text-slate-400 dark:text-zinc-600 opacity-70 cursor-not-allowed' 
                                     : isSelected
-                                      ? 'bg-[#c28e62] dark:bg-[#c28e62] border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10 shadow-xs' 
+                                      ? 'bg-[#c28e62] dark:bg-[#c28e62] border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10 ' 
                                       : 'bg-emerald-50/70 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-500/60 text-emerald-800 dark:text-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60'
                                 }
                               `}
@@ -6417,7 +7166,7 @@ export default function App() {
                       openDownloadModal(activeBatch);
                     }
                   }}
-                  className="px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] dark:bg-[#c28e62] dark:hover:bg-[#b07d53] rounded-full transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  className="px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] dark:bg-[#c28e62] dark:hover:bg-[#b07d53] rounded-full transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                   data-tooltip="Unduh Lembar Cetak PDF A3+ / File CSV"
                   data-tooltip-pos="top"
                 >
@@ -6444,7 +7193,7 @@ export default function App() {
           <div className="fixed inset-0 z-[999990]" onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); }} />
           <div 
             data-dropdown-menu="true"
-            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-2xl ${
+            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200  ${
               dropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
             }`}
             style={{ 
@@ -6511,7 +7260,7 @@ export default function App() {
           <div className="fixed inset-0 z-[999990]" onClick={(e) => { e.stopPropagation(); setOpenBrandDropdownId(null); }} />
           <div 
             data-dropdown-menu="true"
-            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-2xl ${
+            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200  ${
               brandDropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
             }`}
             style={{ 
@@ -6569,7 +7318,7 @@ export default function App() {
           <div className="fixed inset-0 z-[999990]" onClick={(e) => { e.stopPropagation(); setOpenUserDropdownId(null); }} />
           <div 
             data-dropdown-menu="true"
-            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-2xl ${
+            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200  ${
               userDropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
             }`}
             style={{ 
@@ -6830,7 +7579,7 @@ export default function App() {
                     Cetak Stiker (PDF A3+)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Layout cetak presisi lembar A3+ (isi 60 label) siap produksi percetakan.
+                    Layout cetak A3+ siap produksi (60 label per lembar).
                   </p>
                 </button>
 
@@ -6846,7 +7595,7 @@ export default function App() {
                     Data Tag (Excel / CSV)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Data tabular nomor seri tag, PIN autentikasi, status, dan URL verifikasi.
+                    Rekap nomor seri, PIN autentikasi, dan tautan verifikasi.
                   </p>
                 </button>
               </div>
@@ -7172,7 +7921,7 @@ export default function App() {
                   type="button"
                   onClick={isEditBrandModalOpen ? handleUpdateBrand : handleCreateBrand}
                   disabled={!brandForm.name.trim()}
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isEditBrandModalOpen ? 'Simpan Perubahan' : 'Buat Brand Sekarang'}
                 </button>
@@ -7662,7 +8411,7 @@ export default function App() {
                   (!isEditUserModalOpen && (!userForm.password.trim() || userForm.password !== userForm.confirmPassword)) ||
                   (isEditUserModalOpen && isResetPasswordMode && (!userForm.password.trim() || userForm.password !== userForm.confirmPassword))
                 }
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
               >
                 {isEditUserModalOpen ? (
                   <span>Simpan Perubahan</span>
@@ -7897,7 +8646,7 @@ export default function App() {
                   type="button"
                   onClick={handleQuickCreateUser}
                   disabled={!userForm.name.trim() || !userForm.email.trim() || !isValidEmail(userForm.email)}
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>Simpan & Pilih Pemilik</span>
                 </button>
@@ -8229,7 +8978,7 @@ export default function App() {
                     setIsDetailBrandModalOpen(false);
                     handleOpenEditBrand(brandToView);
                   }}
-                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Edit Data Brand
                 </button>
@@ -8372,6 +9121,535 @@ export default function App() {
         document.body
       )}
 
+      {/* ============================================================== */}
+      {/* SKU DROPDOWN MENU PORTAL (3-DOTS ACTION) */}
+      {/* ============================================================== */}
+      {openSkuDropdownId && activeDropdownSku && createPortal(
+        <>
+          <div 
+            className="fixed inset-0 z-[999990]" 
+            onClick={(e) => { e.stopPropagation(); setOpenSkuDropdownId(null); }} 
+          />
+          <div 
+            data-dropdown-menu="true"
+            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 ${
+              skuDropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
+            }`}
+            style={{
+              top: `${skuDropdownPos.top}px`,
+              left: `${Math.max(12, Math.min(skuDropdownPos.left - 192, window.innerWidth - 204))}px`
+            }}
+          >
+            <button 
+              type="button"
+              onClick={() => { setOpenSkuDropdownId(null); handleOpenDetailSku(activeDropdownSku); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Eye size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Detail SKU Produk
+            </button>
+            
+            <button 
+              type="button"
+              onClick={() => { setOpenSkuDropdownId(null); handleOpenEditSku(activeDropdownSku); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Edit3 size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit Data SKU
+            </button>
+
+            <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
+            
+            <button 
+              type="button"
+              onClick={() => { setOpenSkuDropdownId(null); handleOpenDeleteSku(activeDropdownSku); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus SKU
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL TAMBAH / EDIT SKU PRODUK */}
+      {/* ============================================================== */}
+      {(isCreateSkuModalOpen || isEditSkuModalOpen) && createPortal(
+        <div 
+          onClick={(e) => { 
+            if (e.target === e.currentTarget) { 
+              setIsCreateSkuModalOpen(false); 
+              setIsEditSkuModalOpen(false); 
+            } 
+          }}
+          className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
+            {/* MODAL HEADER */}
+            <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-800/80 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
+                  <Box size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">
+                    {isEditSkuModalOpen ? 'Edit SKU Produk' : 'Tambah SKU Produk Baru'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+                    {isEditSkuModalOpen ? 'Perbarui data spesifikasi dan relasi katalog produk' : 'Daftarkan SKU baru ke master katalog brand'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => { setIsCreateSkuModalOpen(false); setIsEditSkuModalOpen(false); }} 
+                data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
+                className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* MODAL BODY */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs sm:text-sm">
+              {/* Brand Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Brand / Merk Pemilik SKU <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={skuForm.brandId}
+                  onChange={(e) => {
+                    const bId = e.target.value;
+                    const b = brands.find(brand => brand.id === bId);
+                    setSkuForm(prev => ({
+                      ...prev,
+                      brandId: bId,
+                      brandName: b ? b.name : prev.brandName,
+                      category: b?.category || prev.category,
+                      isB2B: b ? b.name.toLowerCase() === 'sumas' : prev.isB2B
+                    }));
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] cursor-pointer"
+                >
+                  {brands.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} — ({b.category})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+                  SKU akan terhubung langsung dengan profil dan izin kepemilikan brand ini.
+                </p>
+              </div>
+
+              {/* SKU Name Input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Nama SKU Produk <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Pintu Cubicle Toilet, Dew Drops, dll."
+                  value={skuForm.sku}
+                  onChange={(e) => setSkuForm(prev => ({ ...prev, sku: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                />
+              </div>
+
+              {/* SKU Code Input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Kode SKU <span className="text-slate-400 font-normal">(Contoh: SMS-CUB-01, ASC-TOP-01)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Kode identifikasi barang unik (otomatis jika kosong)"
+                  value={skuForm.skuCode}
+                  onChange={(e) => setSkuForm(prev => ({ ...prev, skuCode: e.target.value.toUpperCase() }))}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] font-mono uppercase"
+                />
+              </div>
+
+              {/* Category Input (Terkoneksi dengan Database Kategori - Mendukung Hirarki 3 Layer) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                  <span>Kategori Produk</span>
+                  <span className="text-[11px] font-normal text-slate-400">Format 3 layer didukung</span>
+                </label>
+                <input
+                  type="text"
+                  list="category-suggestions"
+                  placeholder="Contoh: Material &amp; Konstruksi &gt; Partisi Cubicle Toilet &gt; Phenolic Board 12mm Standard"
+                  value={skuForm.category}
+                  onChange={(e) => setSkuForm(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                />
+                <datalist id="category-suggestions">
+                  {categories.length > 0 ? (
+                    <>
+                      {categories.filter(c => c.level === 3).map(l3 => {
+                        const l2 = categories.find(c => c.id === l3.parentId);
+                        const l1 = l2 ? categories.find(c => c.id === l2.parentId) : null;
+                        const fullPath = [l1?.name, l2?.name, l3.name].filter(Boolean).join(' > ');
+                        return <option key={l3.id} value={fullPath} />;
+                      })}
+                      {categories.filter(c => c.level === 2).map(l2 => {
+                        const l1 = categories.find(c => c.id === l2.parentId);
+                        const path = [l1?.name, l2.name].filter(Boolean).join(' > ');
+                        return <option key={l2.id} value={path} />;
+                      })}
+                      {categories.filter(c => c.level === 1).map(l1 => (
+                        <option key={l1.id} value={l1.name} />
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <option value="Material & Konstruksi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard" />
+                      <option value="Material & Konstruksi > Aksesoris & Hardware Cubicle > Nylon Fitting Set Hitam" />
+                      <option value="Material & Konstruksi > Wall Cladding & Plafon > Exterior Architectural Cladding" />
+                      <option value="Pakaian & Fashion > Atasan & T-Shirt > Oversized Boxy Cut Tee" />
+                      <option value="Pakaian & Fashion > Outerwear & Jaket > Heavyweight Fleece Hoodie" />
+                      <option value="Aksesoris & Merchandise > Topi & Headwear > 6-Panel Curved Dad Cap" />
+                      <option value="Aksesoris & Merchandise > Tas & Pouch > Utility Cordura Sling Bag" />
+                    </>
+                  )}
+                </datalist>
+              </div>
+
+              {/* Description Textarea */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Deskripsi &amp; Spesifikasi Produk
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Tuliskan spesifikasi produk, dimensi, ketahanan, atau catatan registrasi..."
+                  value={skuForm.description}
+                  onChange={(e) => setSkuForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] resize-none"
+                />
+              </div>
+            </div>
+
+            {/* MODAL FOOTER */}
+            <div className="px-5 sm:px-6 py-3.5 bg-slate-50 dark:bg-zinc-850 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => { setIsCreateSkuModalOpen(false); setIsEditSkuModalOpen(false); }}
+                className="px-4 py-2 rounded-full text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:bg-slate-200/60 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={isEditSkuModalOpen ? handleUpdateSku : handleCreateSku}
+                className="px-5 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Check size={14} />
+                <span>{isEditSkuModalOpen ? 'Perbarui SKU' : 'Simpan SKU'}</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL DETAIL SKU PRODUK (RELATIONAL VIEW) */}
+      {/* ============================================================== */}
+      {isDetailSkuModalOpen && skuToView && createPortal(
+        <div 
+          onClick={(e) => { 
+            if (e.target === e.currentTarget) { 
+              setIsDetailSkuModalOpen(false); 
+              setSkuToView(null); 
+            } 
+          }}
+          className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
+            {/* DETAIL HEADER */}
+            <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-800/80 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
+                  <Box size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">
+                      {skuToView.sku}
+                    </h3>
+                    <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold">
+                      {skuToView.skuCode || `SKU-${skuToView.id.toUpperCase()}`}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+                    Master Katalog Produk &amp; Riwayat Tag Fisik
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }} 
+                data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
+                className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* DETAIL CONTENT BODY */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs sm:text-sm">
+              {/* RELATIONAL GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Brand Info Card */}
+                {(() => {
+                  const bObj = brands.find(b => b.id === skuToView.brandId || b.name.toLowerCase() === skuToView.brandName.toLowerCase());
+                  return (
+                    <div className="bg-slate-50 dark:bg-zinc-800/70 p-4 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider block mb-2">
+                        Brand Pemilik
+                      </span>
+                      <div className="flex items-center gap-3">
+                        {bObj?.logo ? (
+                          <img
+                            src={bObj.logo}
+                            alt={skuToView.brandName}
+                            onError={(e) => {
+                              const el = e.currentTarget;
+                              el.onerror = null;
+                              el.src = getBrandInitialsLogo(skuToView.brandName);
+                            }}
+                            className="w-10 h-10 rounded-xl object-contain bg-white dark:bg-zinc-800 p-1 border border-slate-200 dark:border-zinc-700 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold text-sm shrink-0">
+                            {skuToView.brandName.slice(0, 1)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-sm truncate">
+                            {skuToView.brandName}
+                          </h4>
+                          <p className="text-[11px] text-slate-400 dark:text-zinc-500 truncate">
+                            {bObj?.ownerName ? `PIC: ${bObj.ownerName}` : 'Brand Terverifikasi'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Production & Category Card */}
+                {(() => {
+                  const linkedBatches = getSkuBatches(skuToView.sku, skuToView.brandName);
+                  const totalProducedTags = linkedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
+                  return (
+                    <div className="bg-slate-50 dark:bg-zinc-800/70 p-4 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider block mb-2">
+                        Kategori &amp; Ringkasan Produksi
+                      </span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 dark:text-zinc-400 text-xs">Kategori:</span>
+                          <span className="font-semibold text-slate-700 dark:text-zinc-200 text-xs truncate max-w-[170px]">
+                            {skuToView.category || 'Umum'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 dark:text-zinc-400 text-xs">Tag Fisik Tercetak:</span>
+                          <span className="font-mono font-bold text-[#c28e62] text-xs">
+                            {totalProducedTags.toLocaleString('id-ID')} Tag ({linkedBatches.length} Batch)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Description Box */}
+              <div className="bg-white dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-200 dark:border-zinc-700/70">
+                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider block mb-1">
+                  Deskripsi &amp; Catatan Produk
+                </span>
+                <p className="text-slate-700 dark:text-zinc-300 leading-relaxed text-xs">
+                  {skuToView.description || 'Tidak ada deskripsi tambahan untuk produk ini dalam katalog master.'}
+                </p>
+              </div>
+
+              {/* LINKED PRODUCTION BATCHES */}
+              {(() => {
+                const linkedBatches = getSkuBatches(skuToView.sku, skuToView.brandName);
+                const totalProducedTags = linkedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FolderKanban size={15} className="text-[#c28e62]" />
+                        <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm">
+                          Riwayat Batch &amp; Tag Fisik Terhubung
+                        </h4>
+                      </div>
+                      <span className="text-xs font-semibold text-[#c28e62] font-mono">
+                        {linkedBatches.length} Batch • {totalProducedTags.toLocaleString('id-ID')} Tag
+                      </span>
+                    </div>
+
+                    {linkedBatches.length > 0 ? (
+                      <div className="border border-slate-200 dark:border-zinc-700/80 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-zinc-800">
+                        {linkedBatches.map(b => (
+                          <div 
+                            key={b.id}
+                            className="p-3 sm:p-3.5 bg-slate-50/50 dark:bg-zinc-800/30 flex items-center justify-between gap-3 hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-slate-800 dark:text-zinc-100 font-mono">
+                                  {b.batchId}
+                                </span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                                  b.status === 'Disuspend' 
+                                    ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400' 
+                                    : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
+                                }`}>
+                                  {b.status || 'Aktif'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                                Rilis: {b.date} • PIN {b.pinLength} Digit • Format {b.qrType || 'dynamic'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="text-right">
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200 font-mono block">
+                                  {Number(b.qty).toLocaleString('id-ID')} Tag
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsDetailSkuModalOpen(false);
+                                  setSkuToView(null);
+                                  setActiveBatch(b);
+                                  setActiveMenu('tag-qr');
+                                  openDetailModal(b);
+                                }}
+                                className="px-3 py-1.5 rounded-full bg-[#c28e62]/10 hover:bg-[#c28e62]/20 text-[#c28e62] text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                Buka Tag →
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-6 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-slate-400 dark:text-zinc-500 text-xs">
+                        Belum ada batch produksi yang didaftarkan menggunakan SKU ini.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* DETAIL FOOTER */}
+            <div className="px-5 sm:px-6 py-3.5 bg-slate-50 dark:bg-zinc-850 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between flex-shrink-0">
+              <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                Terdaftar: {skuToView.createdAt ? formatDateTimeDisplay(skuToView.createdAt) : 'Katalog Master MKI'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toEdit = skuToView;
+                    setIsDetailSkuModalOpen(false);
+                    setSkuToView(null);
+                    handleOpenEditSku(toEdit);
+                  }}
+                  className="px-4 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Edit3 size={13} />
+                  <span>Edit SKU Ini</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }}
+                  className="px-4 py-2 rounded-full text-xs font-semibold bg-slate-200/70 dark:bg-zinc-750 text-slate-700 dark:text-zinc-300 hover:bg-slate-300/70 transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL KONFIRMASI HAPUS SKU */}
+      {/* ============================================================== */}
+      {isDeleteSkuModalOpen && skuToDelete && createPortal(
+        <div 
+          onClick={(e) => { 
+            if (e.target === e.currentTarget) { 
+              setIsDeleteSkuModalOpen(false); 
+              setSkuToDelete(null); 
+            } 
+          }}
+          className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-md overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200 p-5 sm:p-6 text-center">
+            <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-base mb-1">
+              Hapus SKU Produk?
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-4">
+              Anda akan menghapus SKU <span className="font-semibold text-slate-700 dark:text-zinc-200">"{skuToDelete.sku}"</span> ({skuToDelete.brandName}) dari master katalog.
+            </p>
+
+            {(() => {
+              const linkedBatches = getSkuBatches(skuToDelete.sku, skuToDelete.brandName);
+              if (linkedBatches.length > 0) {
+                return (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl p-3 text-left mb-4 text-xs text-amber-800 dark:text-amber-300">
+                    <p className="font-bold flex items-center gap-1.5 mb-1">
+                      <AlertTriangle size={14} /> Perhatian Relasi Data
+                    </p>
+                    <p className="text-[11px] leading-relaxed">
+                      SKU ini memiliki <span className="font-bold">{linkedBatches.length} batch produksi</span> yang terhubung di sistem. Menghapus SKU akan memutus tautan katalog master namun data fisik batch tetap tersimpan di arsip log.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <div className="flex items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => { setIsDeleteSkuModalOpen(false); setSkuToDelete(null); }}
+                className="px-5 py-2.5 rounded-full text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSku}
+                className="px-5 py-2.5 rounded-full text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer"
+              >
+                Ya, Hapus SKU
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* BLUEPRINT STANDARD: FLOATING ALERT NOTIFICATION TOASTS (TOP-RIGHT CORNER) */}
       {alerts.length > 0 && createPortal(
         <div 
@@ -8389,7 +9667,7 @@ export default function App() {
               <div
                 key={alert.id}
                 role="alert"
-                className="pointer-events-auto w-full bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl border border-slate-200/90 dark:border-zinc-800 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.12),0_4px_12px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_32px_-6px_rgba(0,0,0,0.5)] p-3.5 sm:p-4 flex items-start gap-3 transition-all duration-300 animate-in fade-in slide-in-from-top-3"
+                className="pointer-events-auto w-full bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl border border-slate-200/90 dark:border-zinc-800 dark: p-3.5 sm:p-4 flex items-start gap-3 transition-all duration-300 animate-in fade-in slide-in-from-top-3"
               >
                 {/* ICON INDICATOR */}
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${

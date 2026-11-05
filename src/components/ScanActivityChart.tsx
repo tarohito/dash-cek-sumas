@@ -136,17 +136,6 @@ export const ScanActivityChart: React.FC = () => {
               12 Bulan
             </button>
           </div>
-
-          {/* Reset filter button if active (seperti di halaman tag qrcode) */}
-          {timeRange !== '7d' && (
-            <button
-              type="button"
-              onClick={() => setTimeRange('7d')}
-              className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
-            >
-              Reset Filter
-            </button>
-          )}
         </div>
       </div>
 
