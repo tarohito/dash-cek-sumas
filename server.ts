@@ -53,7 +53,7 @@ db.exec(`
     status TEXT NOT NULL,
     isB2B INTEGER NOT NULL,
     tags TEXT,
-    redirectUrl TEXT DEFAULT 'https://cek.sumas.id/verify',
+    redirectUrl TEXT DEFAULT 'https://cek.sumas.id/',
     qrType TEXT DEFAULT 'dynamic',
     requirePin INTEGER DEFAULT 1,
     enableGps INTEGER DEFAULT 1
@@ -198,7 +198,7 @@ db.exec(`
 
 // Migrations: Pastikan kolom QR Code Dinamis tersedia di tabel batches
 try {
-  db.exec("ALTER TABLE batches ADD COLUMN redirectUrl TEXT DEFAULT 'https://cek.sumas.id/verify'");
+  db.exec("ALTER TABLE batches ADD COLUMN redirectUrl TEXT DEFAULT 'https://cek.sumas.id/'");
 } catch (_) {}
 try {
   db.exec("ALTER TABLE batches ADD COLUMN qrType TEXT DEFAULT 'dynamic'");
@@ -208,6 +208,11 @@ try {
 } catch (_) {}
 try {
   db.exec("ALTER TABLE batches ADD COLUMN enableGps INTEGER DEFAULT 1");
+} catch (_) {}
+
+// Migration: Update any existing batch redirectUrl to https://cek.sumas.id/
+try {
+  db.prepare("UPDATE batches SET redirectUrl = 'https://cek.sumas.id/' WHERE redirectUrl LIKE '%verify%' OR redirectUrl LIKE '%maklonkosmetik%' OR redirectUrl IS NULL OR redirectUrl = ''").run();
 } catch (_) {}
 
 // Migration: Ensure Sumas brand name has capitalized first letter across tables
@@ -1040,7 +1045,7 @@ app.get('/api/batches', (_req, res) => {
     const result = rows.map((row) => ({
       ...row,
       isB2B: Boolean(row.isB2B),
-      redirectUrl: row.redirectUrl || 'https://cek.sumas.id/verify',
+      redirectUrl: row.redirectUrl || 'https://cek.sumas.id/',
       qrType: row.qrType || 'dynamic',
       requirePin: row.requirePin === null || row.requirePin === undefined ? true : Boolean(row.requirePin),
       enableGps: row.enableGps === null || row.enableGps === undefined ? true : Boolean(row.enableGps),
@@ -1127,6 +1132,25 @@ app.get('/api/batches/:id/tags', (req, res) => {
   }
 });
 
+// Endpoint untuk mengambil seluruh tag batch (untuk render PDF A3+ dan ekspor data)
+app.get('/api/batches/:id/all-tags', (req, res) => {
+  try {
+    const { id } = req.params;
+    const batch = db.prepare('SELECT * FROM batches WHERE id = ?').get(id) as any;
+    if (!batch) {
+      return res.status(404).json({ error: 'Batch tidak ditemukan' });
+    }
+    const tags = db.prepare('SELECT id, batchId, tagNumber, pin, status, project, specs FROM tags WHERE batchId = ? ORDER BY rowid ASC').all(id);
+    res.json({
+      batch,
+      tags,
+      total: tags.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // Get batch summary and project allocations
 app.get('/api/batches/:id/summary', (req, res) => {
   try {
@@ -1178,7 +1202,7 @@ app.post('/api/batches', (req, res) => {
     const qty = Math.max(1, parseInt(b.qty) || 1);
     const pinLength = parseInt(b.pinLength) || 6;
     const isB2B = b.isB2B ? 1 : 0;
-    const redirectUrl = (b.redirectUrl && b.redirectUrl.trim()) || 'https://cek.sumas.id/verify';
+    const redirectUrl = (b.redirectUrl && b.redirectUrl.trim()) || 'https://cek.sumas.id/';
     const qrType = b.qrType || 'dynamic';
     const requirePin = b.requirePin === false || b.requirePin === 0 ? 0 : 1;
     const enableGps = b.enableGps === false || b.enableGps === 0 ? 0 : 1;
@@ -1238,7 +1262,7 @@ app.patch('/api/batches/:id/redirect-url', (req, res) => {
       return res.status(404).json({ error: 'Batch tidak ditemukan' });
     }
 
-    const newUrl = redirectUrl !== undefined ? redirectUrl.trim() : (batch.redirectUrl || 'https://cek.sumas.id/verify');
+    const newUrl = redirectUrl !== undefined ? redirectUrl.trim() : (batch.redirectUrl || 'https://cek.sumas.id/');
     const newQrType = qrType || batch.qrType || 'dynamic';
     const newRequirePin = requirePin !== undefined ? (requirePin ? 1 : 0) : (batch.requirePin ?? 1);
     const newEnableGps = enableGps !== undefined ? (enableGps ? 1 : 0) : (batch.enableGps ?? 1);
@@ -1315,7 +1339,7 @@ app.get('/q/:tagNumber', (req, res) => {
     const batch = db.prepare('SELECT * FROM batches WHERE id = ?').get(tag.batchId) as any;
     const targetUrl = (batch && batch.redirectUrl && batch.redirectUrl.trim()) 
       ? batch.redirectUrl.trim() 
-      : 'https://cek.sumas.id/verify';
+      : 'https://cek.sumas.id/';
 
     // Log the scan point
     try {

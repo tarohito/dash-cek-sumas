@@ -99,45 +99,77 @@ export const ScanLocationMap: React.FC = () => {
 
   // Initialize Leaflet Map
   useEffect(() => {
+    let isMounted = true;
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    // Center of Indonesia Archipelago
-    const map = L.map(mapContainerRef.current, {
-      center: [-2.2, 118.0],
-      zoom: 5,
-      minZoom: 4,
-      maxZoom: 18,
-      zoomControl: false,
-      scrollWheelZoom: true
-    });
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      delete (mapContainerRef.current as any)._leaflet_id;
+    }
 
-    // Add Zoom Control at bottom right
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    let map: L.Map | null = null;
+    try {
+      // Center of Indonesia Archipelago
+      map = L.map(mapContainerRef.current, {
+        center: [-2.2, 118.0],
+        zoom: 5,
+        minZoom: 4,
+        maxZoom: 18,
+        zoomControl: false,
+        scrollWheelZoom: true
+      });
 
-    // OpenStreetMap standard tile layer
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> kontributor'
-    });
-    osmLayer.addTo(map);
+      // Add Zoom Control at bottom right
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    mapInstanceRef.current = map;
+      // OpenStreetMap standard tile layer
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> kontributor'
+      });
+      osmLayer.addTo(map);
+
+      mapInstanceRef.current = map;
+    } catch (e) {
+      console.warn('Map initialization warning:', e);
+      return;
+    }
+
+    const safeInvalidateSize = () => {
+      if (!isMounted) return;
+      const currentMap = mapInstanceRef.current;
+      if (currentMap && (currentMap as any)._mapPane && (currentMap as any)._container) {
+        try {
+          currentMap.invalidateSize();
+        } catch (_) {}
+      }
+    };
 
     // Handle container resize & transitions
     const resizeObserver = new ResizeObserver(() => {
-      map.invalidateSize();
+      safeInvalidateSize();
     });
-    resizeObserver.observe(mapContainerRef.current);
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
 
-    setTimeout(() => {
-      map.invalidateSize();
+    const timer = setTimeout(() => {
+      safeInvalidateSize();
     }, 400);
 
     return () => {
+      isMounted = false;
+      clearTimeout(timer);
       resizeObserver.disconnect();
-      map.remove();
-      mapInstanceRef.current = null;
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (_) {}
+        mapInstanceRef.current = null;
+      }
+      if (mapContainerRef.current && (mapContainerRef.current as any)._leaflet_id) {
+        delete (mapContainerRef.current as any)._leaflet_id;
+      }
     };
   }, []);
 
@@ -147,7 +179,11 @@ export const ScanLocationMap: React.FC = () => {
     if (!map) return;
 
     // Clear previous markers
-    Object.values(markersRef.current).forEach(m => m.remove());
+    Object.values(markersRef.current).forEach(m => {
+      try {
+        m.remove();
+      } catch (_) {}
+    });
     markersRef.current = {};
 
     filteredPoints.forEach(pt => {

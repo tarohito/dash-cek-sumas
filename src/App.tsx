@@ -69,6 +69,7 @@ import { ScanLocationMap } from './components/ScanLocationMap';
 import { ScanActivityChart } from './components/ScanActivityChart';
 import { CustomTooltipProvider } from './components/CustomTooltip';
 import { CategoryManager } from './components/CategoryManager';
+import { generateA3PlusStickersPdf, generateTagsCsv, saveFileWithNativePicker } from './utils/pdfGenerator';
 
 // ==========================================
 // RESILIENT OFFLINE FALLBACK AVATARS & LOGOS
@@ -212,7 +213,7 @@ const CustomSelect = ({
   placeholder,
   className = '',
   buttonClassName,
-  searchable = false,
+  searchable = true,
   minDropdownWidth
 }: { 
   value: any; 
@@ -229,6 +230,24 @@ const CustomSelect = ({
   const [direction, setDirection] = useState<'up' | 'down'>('down');
   const [searchQuery, setSearchQuery] = useState('');
   const buttonRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const calculatePosition = () => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const minW = minDropdownWidth ?? 220;
+    const dropdownW = Math.max(rect.width, minW);
+    const estimatedHeight = Math.min(options.length * 44 + 68, 320);
+    
+    if (spaceBelow < estimatedHeight && rect.top > estimatedHeight) {
+      setDirection('up');
+      setPos({ top: rect.top - 6, left: rect.left, width: dropdownW });
+    } else {
+      setDirection('down');
+      setPos({ top: rect.bottom + 6, left: rect.left, width: dropdownW });
+    }
+  };
 
   const toggleDropdown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -238,33 +257,45 @@ const CustomSelect = ({
       return;
     }
     
-    if (!buttonRef.current) return;
-    const rect = buttonRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const dropdownHeight = Math.min(options.length * 48 + 60, 320); 
-    const minW = minDropdownWidth ?? (searchable ? 220 : 160);
-    const dropdownW = Math.max(rect.width, minW);
-    
-    if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
-      setDirection('up');
-      setPos({ top: rect.top - 4, left: rect.left, width: dropdownW });
-    } else {
-      setDirection('down');
-      setPos({ top: rect.bottom + 4, left: rect.left, width: dropdownW });
-    }
+    calculatePosition();
     setSearchQuery('');
     setIsOpen(true);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleUpdate = () => calculatePosition();
+    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('scroll', handleUpdate, true);
+    return () => {
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('scroll', handleUpdate, true);
+    };
+  }, [isOpen, options.length, minDropdownWidth]);
+
+  useEffect(() => {
+    if (isOpen && searchable) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, searchable]);
 
   const selectedOpt = options.find(o => o.value === value);
 
   const filteredOptions = options.filter(opt => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
-    return opt.label.toLowerCase().includes(q) ||
+    return (opt.label && opt.label.toLowerCase().includes(q)) ||
            (opt.sublabel && opt.sublabel.toLowerCase().includes(q)) ||
            (opt.badge && opt.badge.toLowerCase().includes(q));
   });
+
+  const cleanPlaceholder = (placeholder || '')
+    .replace(/^(Pilih|Semua|Urutkan)\s+/i, '')
+    .trim();
+  const searchPlaceholder = cleanPlaceholder ? `Cari ${cleanPlaceholder}...` : 'Cari pilihan...';
 
   return (
     <div className={className || 'w-full'}>
@@ -304,45 +335,58 @@ const CustomSelect = ({
 
       {isOpen && createPortal(
         <>
-          <div className="fixed inset-0 z-[100098]" onClick={(e) => { e.stopPropagation(); setIsOpen(false); setSearchQuery(''); }}></div>
+          {/* BACKDROP PALING ATAS */}
           <div 
-            className={`fixed z-[100099] bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 overflow-y-auto max-h-80 flex flex-col ${
+            className="fixed inset-0 z-[999990]" 
+            onClick={(e) => { e.stopPropagation(); setIsOpen(false); setSearchQuery(''); }}
+          />
+          {/* MENU DROPDOWN PALING ATAS DENGAN SHADOW & MAX-H */}
+          <div 
+            className={`fixed z-[999991] bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-80 flex flex-col shadow-2xl ${
               direction === 'up' ? '-translate-y-full origin-bottom' : 'origin-top'
             }`}
             style={{ 
               top: pos.top, 
-              left: Math.max(8, Math.min(pos.left, window.innerWidth - pos.width - 12)), 
+              left: Math.max(10, Math.min(pos.left, window.innerWidth - pos.width - 14)), 
               width: pos.width 
             }}
           >
+            {/* FITUR PENCARIAN DI DALAM MENU DROPDOWN */}
             {searchable && (
-              <div className="p-1 pb-1.5 border-b border-slate-100 dark:border-zinc-700/80 mb-1 sticky top-0 bg-white dark:bg-zinc-800 z-20">
+              <div className="p-1.5 pb-2 border-b border-slate-100 dark:border-zinc-700/80 mb-1 sticky top-0 bg-white dark:bg-zinc-800 z-30 shadow-xs">
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onClick={(e) => e.stopPropagation()}
-                    placeholder="Cari akun..."
-                    className="w-full pl-8 pr-7 py-1.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#cd9a6f]"
-                    autoFocus
+                    placeholder={searchPlaceholder}
+                    className="w-full pl-8 pr-7 py-1.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#cd9a6f] focus:ring-1 focus:ring-[#cd9a6f]/30"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setSearchQuery(''); }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 cursor-pointer p-0.5"
+                      title="Hapus pencarian"
                     >
                       <X size={12} />
                     </button>
                   )}
                 </div>
+                {searchQuery && (
+                  <div className="mt-1 px-1 flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500">
+                    <span>{filteredOptions.length} opsi ditemukan</span>
+                  </div>
+                )}
               </div>
             )}
+            
             {filteredOptions.length === 0 ? (
-              <div className="p-3 text-center text-xs text-slate-400 dark:text-zinc-500">
-                {searchQuery ? `Tidak ada akun "${searchQuery}"` : 'Tidak ada pilihan data.'}
+              <div className="p-4 text-center text-xs text-slate-400 dark:text-zinc-500">
+                {searchQuery ? `Tidak ada pilihan "${searchQuery}"` : 'Tidak ada pilihan data.'}
               </div>
             ) : (
               filteredOptions.map((opt) => (
@@ -688,7 +732,7 @@ export default function App() {
   
   const [formQty, setFormQty] = useState('');
   const [formQrType, setFormQrType] = useState<'dynamic' | 'static'>('dynamic');
-  const [formRedirectUrl, setFormRedirectUrl] = useState('https://cek.sumas.id/verify');
+  const [formRedirectUrl, setFormRedirectUrl] = useState('https://cek.sumas.id/');
   const [formRequirePin, setFormRequirePin] = useState(true);
   const [formEnableGps, setFormEnableGps] = useState(true);
   const [isCreateBatchModalOpen, setIsCreateBatchModalOpen] = useState(false);
@@ -791,6 +835,11 @@ export default function App() {
       });
       const res = await fetch(`/api/batches/${batchId}/tags?${q.toString()}`);
       if (!res.ok) throw new Error('Gagal memuat tags');
+      return res.json();
+    },
+    async getAllBatchTags(batchId: string) {
+      const res = await fetch(`/api/batches/${batchId}/all-tags`);
+      if (!res.ok) throw new Error('Gagal memuat seluruh data tag batch');
       return res.json();
     },
     async getBatchSummary(batchId: string) {
@@ -2491,7 +2540,7 @@ export default function App() {
       pinLength: Number(selectedPinLength),
       status: 'Aktif', // Status batch aktif normal
       isB2B: isB2B,
-      redirectUrl: (formRedirectUrl && formRedirectUrl.trim()) || 'https://cek.sumas.id/verify',
+      redirectUrl: (formRedirectUrl && formRedirectUrl.trim()) || 'https://cek.sumas.id/',
       qrType: formQrType || 'dynamic',
       requirePin: Boolean(formRequirePin),
       enableGps: Boolean(formEnableGps),
@@ -2526,7 +2575,7 @@ export default function App() {
 
   const openEditUrlModal = (batch: any) => {
     setBatchToEditUrl(batch);
-    setEditRedirectUrlInput(batch.redirectUrl || 'https://cek.sumas.id/verify');
+    setEditRedirectUrlInput(batch.redirectUrl || 'https://cek.sumas.id/');
     setEditQrTypeInput(batch.qrType || 'dynamic');
     setEditRequirePinInput(batch.requirePin !== false);
     setEditEnableGpsInput(batch.enableGps !== false);
@@ -3192,24 +3241,95 @@ export default function App() {
     setIsDownloadModalOpen(true);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+    if (!batchToDownload) return;
+    const batch = batchToDownload;
     setIsDownloadModalOpen(false);
     setIsDownloadingLayout(true);
-    triggerAlert('Menyiapkan Lembar Cetak', 'Proses render PDF layout QR Code sedang disiapkan...', 'info');
-    setTimeout(() => {
+    triggerAlert('Menyiapkan Lembar Cetak A3+', `Mengambil seluruh data tag untuk batch "${batch.batchId}"...`, 'info');
+
+    try {
+      // 1. Ambil seluruh data tag dari database
+      const data = await api.getAllBatchTags(batch.id);
+      const tags = (data && data.tags) ? data.tags : [];
+      if (tags.length === 0) {
+        triggerAlert('Data Tag Kosong', 'Tidak ada data tag yang ditemukan untuk batch ini.', 'error');
+        setIsDownloadingLayout(false);
+        return;
+      }
+
+      triggerAlert('Merender Layout PDF A3+', `Menata ${tags.length} stiker gosok pada kertas A3+ (31x47 cm) dengan Barcode vertikal & PIN...`, 'info');
+
+      // 2. Render PDF A3+ 31 x 47 cm dengan barcode vertikal & PIN di bawahnya
+      const pdfBlob = await generateA3PlusStickersPdf(batch, tags);
+
+      // 3. Nama file default
+      const cleanBatchId = String(batch.batchId).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const defaultFileName = `Stiker-Gosok-A3Plus-31x47cm-${cleanBatchId}.pdf`;
+
+      // 4. Buka dialog native file picker OS untuk memilih lokasi folder dan nama file
+      const result = await saveFileWithNativePicker(
+        pdfBlob,
+        defaultFileName,
+        'application/pdf',
+        'pdf'
+      );
+
+      if (result.aborted) {
+        triggerAlert('Batal Menyimpan', 'Penyimpanan file dibatalkan pengguna.', 'info');
+      } else {
+        triggerAlert(
+          'Unduh Layout Selesai',
+          `File "${result.fileName}" berhasil disimpan. Siap dicetak di kertas A3+ (31x47 cm).`,
+          'success'
+        );
+      }
+    } catch (err) {
+      console.error('Gagal membuat file PDF A3+:', err);
+      triggerAlert('Gagal Mengunduh PDF', 'Terjadi kesalahan saat memproses layout PDF A3+.', 'error');
+    } finally {
       setIsDownloadingLayout(false);
-      triggerAlert('Unduh Layout Selesai', 'File PDF lembar cetak QR Code siap dicetak.', 'success');
-    }, 3000);
+    }
   };
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
+    if (!batchToDownload) return;
+    const batch = batchToDownload;
     setIsDownloadModalOpen(false);
     setIsDownloadingExcel(true);
-    triggerAlert('Menyiapkan File Excel', 'Mengekspor seluruh nomor tag dan PIN ke file spreadsheet...', 'info');
-    setTimeout(() => {
+    triggerAlert('Menyiapkan Data Spreadsheet', `Mengambil data tag batch "${batch.batchId}"...`, 'info');
+
+    try {
+      const data = await api.getAllBatchTags(batch.id);
+      const tags = (data && data.tags) ? data.tags : [];
+      if (tags.length === 0) {
+        triggerAlert('Data Tag Kosong', 'Tidak ada data tag yang ditemukan untuk batch ini.', 'error');
+        setIsDownloadingExcel(false);
+        return;
+      }
+
+      const csvBlob = generateTagsCsv(batch, tags);
+      const cleanBatchId = String(batch.batchId).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const defaultFileName = `Data-Tag-Batch-${cleanBatchId}.csv`;
+
+      const result = await saveFileWithNativePicker(
+        csvBlob,
+        defaultFileName,
+        'text/csv',
+        'csv'
+      );
+
+      if (result.aborted) {
+        triggerAlert('Batal Menyimpan', 'Penyimpanan file dibatalkan pengguna.', 'info');
+      } else {
+        triggerAlert('Ekspor Berhasil', `File "${result.fileName}" berhasil disimpan.`, 'success');
+      }
+    } catch (err) {
+      console.error('Gagal ekspor data tag:', err);
+      triggerAlert('Gagal Ekspor Data', 'Terjadi kesalahan saat mengekspor data tag.', 'error');
+    } finally {
       setIsDownloadingExcel(false);
-      triggerAlert('Ekspor Excel Selesai', 'File data tag (.xlsx) berhasil diunduh.', 'success');
-    }, 2000);
+    }
   };
 
   const renderSidebarContent = (isMobile = false) => {
@@ -3367,15 +3487,69 @@ export default function App() {
   // Helper mendapatkan properti menu aktif untuk header dan konten
   const getActiveMenuDetails = () => {
     switch (activeMenu) {
-      case 'dashboard': return { title: 'Dashboard', icon: LayoutDashboard };
-      case 'brand': return { title: 'Brand / Merk', icon: Building2 };
-      case 'category': return { title: 'Kategori Produk', icon: Layers };
-      case 'sku': return { title: 'SKU Produk', icon: Box };
-      case 'tag-qr': return { title: 'Tag / QRCode', icon: QrCode };
-      case 'scan': return { title: 'Aktivitas Scan', icon: Scan };
-      case 'users': return { title: 'Akun Pengguna', icon: Users };
-      case 'settings': return { title: 'Pengaturan', icon: Settings };
-      default: return { title: 'Tag / QRCode', icon: QrCode };
+      case 'dashboard': 
+        return { 
+          title: 'Dashboard',
+          pageTitle: 'Monitoring Geolokasi & Scan',
+          subtitle: 'Live Telemetri Pemindaian & Sebaran Tag',
+          icon: LayoutDashboard 
+        };
+      case 'brand': 
+        return { 
+          title: 'Brand / Merk',
+          pageTitle: 'Katalog Brand & Kepemilikan Tag',
+          subtitle: 'Profil Brand Mitra & Sertifikasi Hak Milik',
+          icon: Building2 
+        };
+      case 'category': 
+        return { 
+          title: 'Kategori Produk',
+          pageTitle: 'Struktur Kategori Produk 3 Level',
+          subtitle: 'Kategori Utama, Sub Kategori & Varian',
+          icon: Layers 
+        };
+      case 'sku': 
+        return { 
+          title: 'SKU Produk',
+          pageTitle: 'Master Katalog SKU Produk',
+          subtitle: 'Registrasi Kode Barang & Spesifikasi',
+          icon: Box 
+        };
+      case 'tag-qr': 
+        return { 
+          title: 'Tag / QRCode',
+          pageTitle: 'Penerbitan Batch Tag & Serial QR',
+          subtitle: 'Generasi Batch, Alokasi & Verifikasi',
+          icon: QrCode 
+        };
+      case 'scan': 
+        return { 
+          title: 'Aktivitas Scan',
+          pageTitle: 'Log Pemantauan Aktivitas Scan',
+          subtitle: 'Telemetri Scan & Deteksi Anomali',
+          icon: Scan 
+        };
+      case 'users': 
+        return { 
+          title: 'Akun Pengguna',
+          pageTitle: 'Kelola Akun & Hak Akses Pengguna',
+          subtitle: 'Daftar Pengguna & Pembagian Peran',
+          icon: Users 
+        };
+      case 'settings': 
+        return { 
+          title: 'Pengaturan',
+          pageTitle: 'Konfigurasi Sistem & Keamanan',
+          subtitle: 'Preferensi Aplikasi & Kebijakan Proteksi',
+          icon: Settings 
+        };
+      default: 
+        return { 
+          title: 'Tag / QRCode',
+          pageTitle: 'Penerbitan Batch Tag & Serial QR',
+          subtitle: 'Manajemen Batch Tag Fisik & Serial QR',
+          icon: QrCode 
+        };
     }
   };
 
@@ -3388,8 +3562,16 @@ export default function App() {
         className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300"
         onScroll={() => { if(openDropdownId) setOpenDropdownId(null); }}
       >
-        <div className="w-full max-w-[1720px] mx-auto space-y-6 pb-8 sm:pb-12">
-
+        <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
+          {/* TOP STATUS BAR DI BAWAH HEADER */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+              <LayoutDashboard size={16} />
+            </div>
+            <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+              Monitoring Geolokasi & Scan
+            </span>
+          </div>
 
           {/* 1. BAGIAN 1: 4 KOLOM CARD (KPI STATS) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -3495,11 +3677,7 @@ export default function App() {
                 <Building2 size={16} />
               </div>
               <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                Master Brand & Kepemilikan
-              </span>
-              <span className="text-slate-300 dark:text-zinc-700 hidden sm:inline">•</span>
-              <span className="text-[11px] text-slate-400 dark:text-zinc-500 hidden sm:inline">
-                {brands.length} Merk Terdaftar ({brands.filter(b => b.status === 'Aktif').length} Aktif)
+                Katalog Brand & Kepemilikan Tag
               </span>
             </div>
 
@@ -3802,11 +3980,7 @@ export default function App() {
                 <Users size={16} />
               </div>
               <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                Kelola Pengguna & Hak Akses
-              </span>
-              <span className="text-slate-300 dark:text-zinc-700 hidden sm:inline">•</span>
-              <span className="text-[11px] text-slate-400 dark:text-zinc-500 hidden sm:inline">
-                {users.length} Akun Pengguna Terdaftar
+                Kelola Akun & Hak Akses Pengguna
               </span>
             </div>
 
@@ -4203,7 +4377,7 @@ export default function App() {
                   <QrCode size={16} />
                 </div>
                 <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                  Tag / QRCode
+                  Penerbitan Batch Tag & Serial QR
                 </span>
               </div>
 
@@ -4345,6 +4519,19 @@ export default function App() {
                             <NewBadge date={batch.createdAt || batch.date} id={batch.id} />
                           </div>
                           <div className="text-[11px] sm:text-xs text-slate-400 dark:text-zinc-500 mt-0.5">{batch.date}</div>
+                          <div className="mt-1.5 flex items-center">
+                            {batch.qrType === 'static' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700 select-none">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                QR Statis
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800/60 select-none">
+                                <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                QR Dinamis
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 sm:px-6 py-4">
                           <div className="font-semibold">{batch.sku}</div>
@@ -4521,17 +4708,31 @@ export default function App() {
           renderUsersContent()
         ) : (
           /* KONTEN KOSONG (PLACEHOLDER) UNTUK MENU LAIN */
-          <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex items-center justify-center">
-            <div className="text-center p-8 rounded-3xl border border-dashed border-slate-300 dark:border-zinc-700 bg-slate-50/50 dark:bg-zinc-800/50 max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
-              <div className="w-16 h-16 mx-auto bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-slate-400 dark:text-zinc-500 border border-slate-100 dark:border-zinc-700">
-                <ActiveIcon size={28} />
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300">
+            <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
+              {/* TOP STATUS BAR DI BAWAH HEADER */}
+              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+                    <ActiveIcon size={16} />
+                  </div>
+                  <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                    {activeDetails.pageTitle}
+                  </span>
+                </div>
               </div>
-              <h2 className="text-lg sm:text-xl font-bold text-slate-700 dark:text-zinc-200 mb-2">
-                Halaman {activeDetails.title}
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400">
-                Konten untuk halaman ini masih kosong dan sedang dalam tahap pengembangan.
-              </p>
+
+              <div className="p-8 sm:p-12 rounded-3xl border border-dashed border-slate-300 dark:border-zinc-700 bg-white/60 dark:bg-zinc-900/40 flex flex-col items-center justify-center text-center max-w-xl mx-auto my-8">
+                <div className="w-16 h-16 mx-auto bg-slate-50 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4 text-[#c28e62] border border-slate-200 dark:border-zinc-700">
+                  <ActiveIcon size={28} />
+                </div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-100 mb-2">
+                  {activeDetails.pageTitle}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md">
+                  {activeDetails.subtitle}. Modul ini terhubung secara terpusat dengan sistem manajemen tag fisik & otentikasi Shieldtag MKI.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -4939,7 +5140,7 @@ export default function App() {
                         : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
                     }`}
                   >
-                    Dinamis (Bisa Diubah Kapan Saja)
+                    Dinamis
                   </button>
                   <button
                     type="button"
@@ -4950,7 +5151,7 @@ export default function App() {
                         : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
                     }`}
                   >
-                    Statis (Permanen)
+                    Statis
                   </button>
                 </div>
               </div>
@@ -4962,7 +5163,7 @@ export default function App() {
                 </label>
                 <input 
                   type="url"
-                  placeholder="https://cek.sumas.id/verify"
+                  placeholder="https://cek.sumas.id/"
                   value={formRedirectUrl}
                   onChange={(e) => setFormRedirectUrl(e.target.value)}
                   className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors font-mono"
@@ -5052,7 +5253,7 @@ export default function App() {
                     type="url"
                     value={editRedirectUrlInput}
                     onChange={(e) => setEditRedirectUrlInput(e.target.value)}
-                    placeholder="https://cek.sumas.id/verify"
+                    placeholder="https://cek.sumas.id/"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-xs sm:text-sm focus:outline-none focus:border-[#c28e62]"
                   />
                 </div>
@@ -5578,6 +5779,53 @@ export default function App() {
                 );
               })()}
 
+              {/* QR CONFIGURATION & MODE BANNER */}
+              <div className="bg-slate-50 dark:bg-zinc-800/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-700 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    activeBatch?.qrType === 'static'
+                      ? 'bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300'
+                      : 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300'
+                  }`}>
+                    <QrCode size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-800 dark:text-zinc-100">
+                        Mode: {activeBatch?.qrType === 'static' ? 'QR Code Statis' : 'QR Code Dinamis'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        activeBatch?.qrType === 'static'
+                          ? 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+                          : 'bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 border border-sky-300 dark:border-sky-700'
+                      }`}>
+                        {activeBatch?.qrType === 'static' ? 'QR Statis' : 'QR Dinamis'}
+                      </span>
+                    </div>
+                    <div className="text-slate-500 dark:text-zinc-400 text-[11px] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span>{activeBatch?.qrType === 'static' ? 'Scan buka portal web → gosok & ketik PIN manual' : 'Scan langsung cocokkan ID & PIN otomatis tanpa ketik PIN'}</span>
+                      <span>•</span>
+                      <span>Redirect: <strong className="font-mono text-slate-700 dark:text-zinc-300">{activeBatch?.redirectUrl || 'https://cek.sumas.id/'}</strong></span>
+                      <span>•</span>
+                      <span>PIN: <strong>{activeBatch?.requirePin !== 0 ? 'Wajib PIN' : 'Tanpa PIN'}</strong></span>
+                      <span>•</span>
+                      <span>GPS: <strong>{activeBatch?.enableGps !== 0 ? 'Aktif' : 'Nonaktif'}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                {activeBatch?.qrType !== 'static' && (
+                  <button
+                    type="button"
+                    onClick={() => openEditUrlModal(activeBatch)}
+                    className="px-3.5 py-1.5 rounded-full bg-white dark:bg-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-600 border border-slate-200 dark:border-zinc-600 text-[#c28e62] dark:text-[#cd9a6f] font-semibold text-xs transition-colors flex items-center gap-1.5 self-start sm:self-center cursor-pointer shadow-xs"
+                  >
+                    <Globe size={13} />
+                    <span>Edit URL & Keamanan</span>
+                  </button>
+                )}
+              </div>
+
               {/* TAB 1: DAFTAR TAG & PIN */}
               {activeTab === 'tags' && (
                 <div className="flex flex-col min-h-0 relative space-y-2.5">
@@ -6029,135 +6277,143 @@ export default function App() {
 
       {/* DROPDOWN PORTAL KEMBALI DI SINI (UNBLOCKED SCROLLING & NATIVE BEHAVIOR) */}
       {openDropdownId && activeDropdownBatch && createPortal(
-        <div 
-          data-dropdown-menu="true"
-          className={`fixed z-[9999] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-xl ${
-            dropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
-          }`}
-          style={{ 
-            top: dropdownPos.top, 
-            left: Math.max(12, Math.min(dropdownPos.left - 192, window.innerWidth - 204)), 
-          }}
-        >
-          <button 
-            onClick={() => { setOpenDropdownId(null); openDetailModal(activeDropdownBatch, 'tags'); }}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-          >
-            <List size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Detail Batch ID
-          </button>
-          
-          <button 
-            onClick={() => openDownloadModal(activeDropdownBatch)}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-          >
-            <Download size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Unduh
-          </button>
-
-          <button 
-            onClick={() => {
-              const b = activeDropdownBatch;
-              setOpenDropdownId(null);
-              openEditUrlModal(b);
+        <>
+          <div className="fixed inset-0 z-[999990]" onClick={(e) => { e.stopPropagation(); setOpenDropdownId(null); }} />
+          <div 
+            data-dropdown-menu="true"
+            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-2xl ${
+              dropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
+            }`}
+            style={{ 
+              top: dropdownPos.top, 
+              left: Math.max(12, Math.min(dropdownPos.left - 192, window.innerWidth - 204)), 
             }}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
           >
-            <Globe size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit URL Dinamis
-          </button>
-          {activeDropdownBatch.status !== 'Disuspend' ? (
             <button 
-              onClick={() => openSuspendModal(activeDropdownBatch)}
-              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+              onClick={() => { setOpenDropdownId(null); openDetailModal(activeDropdownBatch, 'tags'); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
             >
-              <Ban size={16} className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors" /> Suspend Batch
+              <List size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Detail Batch ID
             </button>
-          ) : (
+            
             <button 
-              onClick={() => openUnsuspendModal(activeDropdownBatch)}
-              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+              onClick={() => openDownloadModal(activeDropdownBatch)}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
             >
-              <RotateCcw size={16} className="text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors" /> Pulihkan Batch
+              <Download size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Unduh
             </button>
-          )}
 
-          <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
-          
-          <button 
-            onClick={() => confirmDelete(activeDropdownBatch.id)}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-          >
-            <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus Batch
-          </button>
-        </div>,
+            <button 
+              onClick={() => {
+                const b = activeDropdownBatch;
+                setOpenDropdownId(null);
+                openEditUrlModal(b);
+              }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Globe size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit URL Dinamis
+            </button>
+            {activeDropdownBatch.status !== 'Disuspend' ? (
+              <button 
+                onClick={() => openSuspendModal(activeDropdownBatch)}
+                className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+              >
+                <Ban size={16} className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors" /> Suspend Batch
+              </button>
+            ) : (
+              <button 
+                onClick={() => openUnsuspendModal(activeDropdownBatch)}
+                className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+              >
+                <RotateCcw size={16} className="text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors" /> Pulihkan Batch
+              </button>
+            )}
+
+            <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
+            
+            <button 
+              onClick={() => confirmDelete(activeDropdownBatch.id)}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus Batch
+            </button>
+          </div>
+        </>,
         document.body
       )}
 
       {/* BRAND DROPDOWN MENU PORTAL (SAMA SEPERTI DI HALAMAN TAG/QRCODE) */}
       {openBrandDropdownId && activeDropdownBrand && createPortal(
-        <div 
-          data-dropdown-menu="true"
-          className={`fixed z-[9999] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-xl ${
-            brandDropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
-          }`}
-          style={{ 
-            top: brandDropdownPos.top, 
-            left: Math.max(12, Math.min(brandDropdownPos.left - 192, window.innerWidth - 204)), 
-          }}
-        >
-          <button 
-            onClick={() => { setOpenBrandDropdownId(null); handleOpenDetailBrand(activeDropdownBrand); }}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+        <>
+          <div className="fixed inset-0 z-[999990]" onClick={(e) => { e.stopPropagation(); setOpenBrandDropdownId(null); }} />
+          <div 
+            data-dropdown-menu="true"
+            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-2xl ${
+              brandDropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
+            }`}
+            style={{ 
+              top: brandDropdownPos.top, 
+              left: Math.max(12, Math.min(brandDropdownPos.left - 192, window.innerWidth - 204)), 
+            }}
           >
-            <Eye size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Detail Brand
-          </button>
-          
-          <button 
-            onClick={() => { setOpenBrandDropdownId(null); handleOpenEditBrand(activeDropdownBrand); }}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-          >
-            <Edit3 size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit Data Brand
-          </button>
+            <button 
+              onClick={() => { setOpenBrandDropdownId(null); handleOpenDetailBrand(activeDropdownBrand); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Eye size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Detail Brand
+            </button>
+            
+            <button 
+              onClick={() => { setOpenBrandDropdownId(null); handleOpenEditBrand(activeDropdownBrand); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Edit3 size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit Data Brand
+            </button>
 
-          <button 
-            onClick={() => { setOpenBrandDropdownId(null); handleToggleBrandStatus(activeDropdownBrand); }}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-700/60"
-          >
-            {(activeDropdownBrand.status || 'Aktif') === 'Aktif' ? (
-              <>
-                <Ban size={16} className="text-rose-500 dark:text-rose-400 group-hover:text-rose-600 transition-colors" />
-                <span className="text-rose-600 dark:text-rose-400">Nonaktifkan Brand</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 size={16} className="text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 transition-colors" />
-                <span className="text-emerald-600 dark:text-emerald-400">Aktifkan Brand</span>
-              </>
-            )}
-          </button>
+            <button 
+              onClick={() => { setOpenBrandDropdownId(null); handleToggleBrandStatus(activeDropdownBrand); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-700/60"
+            >
+              {(activeDropdownBrand.status || 'Aktif') === 'Aktif' ? (
+                <>
+                  <Ban size={16} className="text-rose-500 dark:text-rose-400 group-hover:text-rose-600 transition-colors" />
+                  <span className="text-rose-600 dark:text-rose-400">Nonaktifkan Brand</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={16} className="text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 transition-colors" />
+                  <span className="text-emerald-600 dark:text-emerald-400">Aktifkan Brand</span>
+                </>
+              )}
+            </button>
 
-          <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
-          
-          <button 
-            onClick={() => { setOpenBrandDropdownId(null); handleOpenDeleteBrand(activeDropdownBrand); }}
-            className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-          >
-            <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus Brand
-          </button>
-        </div>,
+            <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
+            
+            <button 
+              onClick={() => { setOpenBrandDropdownId(null); handleOpenDeleteBrand(activeDropdownBrand); }}
+              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+            >
+              <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus Brand
+            </button>
+          </div>
+        </>,
         document.body
       )}
 
       {/* PORTAL DROPDOWN MENU AKSI USER */}
       {openUserDropdownId && activeDropdownUser && createPortal(
-        <div 
-          data-dropdown-menu="true"
-          className={`fixed z-[9999] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-xl ${
-            userDropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
-          }`}
-          style={{ 
-            top: userDropdownPos.top, 
-            left: Math.max(12, Math.min(userDropdownPos.left - 192, window.innerWidth - 204)), 
-          }}
-        >
+        <>
+          <div className="fixed inset-0 z-[999990]" onClick={(e) => { e.stopPropagation(); setOpenUserDropdownId(null); }} />
+          <div 
+            data-dropdown-menu="true"
+            className={`fixed z-[999991] w-48 bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-200 shadow-2xl ${
+              userDropdownDirection === 'up' ? '-translate-y-full origin-bottom-right' : 'origin-top-right'
+            }`}
+            style={{ 
+              top: userDropdownPos.top, 
+              left: Math.max(12, Math.min(userDropdownPos.left - 192, window.innerWidth - 204)), 
+            }}
+          >
           {currentRole === 'Administrator' ? (
             <>
               <button 
@@ -6205,9 +6461,10 @@ export default function App() {
               Akses terbatas Administrator
             </div>
           )}
-        </div>,
-        document.body
-      )}
+        </div>
+      </>,
+      document.body
+    )}
 
       {/* MODAL KONFIRMASI HAPUS */}
       {isDeleteModalOpen && (
@@ -6407,10 +6664,10 @@ export default function App() {
                     <Printer size={18} />
                   </div>
                   <h4 className="font-bold text-slate-700 dark:text-zinc-200 text-xs sm:text-sm mb-1 group-hover:text-[#c28e62] transition-colors">
-                    Layout Cetak (PDF)
+                    Layout Cetak PDF (A3+ 31x47 cm)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Stiker tag siap cetak berformat vektor dengan ukuran A3+ dan gap 4mm.
+                    Lembar cetak stiker A3+ (31x47 cm) dengan Barcode vertikal dan kotak PIN di bawahnya. Mendukung opsi simpan lokasi & penamaan native OS.
                   </p>
                 </button>
 
@@ -6423,10 +6680,10 @@ export default function App() {
                     <FileSpreadsheet size={18} />
                   </div>
                   <h4 className="font-bold text-slate-700 dark:text-zinc-200 text-xs sm:text-sm mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    Data Tabular (Excel)
+                    Data Tabular (Spreadsheet CSV)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Daftar mentah Nomor Tag dan PIN dalam format baris/kolom (.xlsx).
+                    Daftar mentah Nomor Tag, PIN, dan status dalam format tabel spreadsheet dengan opsi simpan lokasi native OS.
                   </p>
                 </button>
               </div>

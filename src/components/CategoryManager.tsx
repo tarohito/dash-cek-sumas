@@ -398,7 +398,24 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
       <div className="w-full max-w-[1720px] mx-auto space-y-4 sm:space-y-5">
+        {/* TOP STATUS BAR DI BAWAH HEADER */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+              <Layers size={16} />
+            </div>
+            <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+              Struktur Kategori Produk 3 Level
+            </span>
+          </div>
 
+          <button
+            onClick={() => handleOpenCreate(1)}
+            className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer shadow-xs"
+          >
+            <span>+ Kategori Utama</span>
+          </button>
+        </div>
 
         {/* 3 COLUMN GRID: KATEGORI UTAMA, SUB KATEGORI, VARIAN / JENIS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 items-start">
