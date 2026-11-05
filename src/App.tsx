@@ -3325,14 +3325,14 @@ export default function App() {
         return;
       }
 
-      triggerAlert('Merender Layout PDF A3+', `Menata ${tags.length} stiker gosok pada kertas A3+ (31x47 cm) dengan QR Code & PIN...`, 'info');
+      triggerAlert('Merender Layout PDF A3+', `Menata ${tags.length} label pada lembar A3+ (31x47 cm) dengan QR Code & PIN...`, 'info');
 
       // 2. Render PDF A3+ 31 x 47 cm dengan QR Code & PIN di bawahnya
       const pdfBlob = await generateA3PlusStickersPdf(batch, tags);
 
-      // 3. Nama file default
-      const cleanBatchId = String(batch.batchId).replace(/[^a-zA-Z0-9_-]/g, '_');
-      const defaultFileName = `Stiker-Gosok-A3Plus-31x47cm-${cleanBatchId}.pdf`;
+      // 3. Nama file default: diawali "Batch" dan dipisahkan underscore
+      const cleanBatchId = String(batch.batchId).trim().replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+      const defaultFileName = `Batch_${cleanBatchId}_Label_A3Plus.pdf`;
 
       // 4. Buka dialog native file picker OS untuk memilih lokasi folder dan nama file
       const result = await saveFileWithNativePicker(
@@ -3376,8 +3376,8 @@ export default function App() {
       }
 
       const csvBlob = generateTagsCsv(batch, tags);
-      const cleanBatchId = String(batch.batchId).replace(/[^a-zA-Z0-9_-]/g, '_');
-      const defaultFileName = `Data-Tag-Batch-${cleanBatchId}.csv`;
+      const cleanBatchId = String(batch.batchId).trim().replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+      const defaultFileName = `Batch_${cleanBatchId}_Data_Tag.csv`;
 
       const result = await saveFileWithNativePicker(
         csvBlob,
@@ -5281,14 +5281,14 @@ export default function App() {
                 />
               </div>
 
-              {/* INFO FORMAT ID TAG OTOMATIS */}
-              <div className="px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/70 rounded-full flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
+              {/* INFO FORMAT ID TAG & PIN OTOMATIS */}
+              <div className="px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/70 rounded-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>Format PIN Acak Unik:</span>
+                  <span>Format ID & PIN:</span>
                 </span>
-                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 px-3 py-1 rounded-full border border-slate-200 dark:border-zinc-700">
-                  {selectedPinLength} Digit (Otomatis)
+                <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 px-3 py-1 rounded-full border border-slate-200 dark:border-zinc-700">
+                  ID: 8 Karakter Alfanumerik • PIN: {selectedPinLength} Digit Angka
                 </span>
               </div>
             </div>
@@ -6153,8 +6153,8 @@ export default function App() {
                                 }
                               `}
                             >
-                              <span className="font-bold text-xs sm:text-[13px] tracking-wider truncate w-full">{tag.pin}</span>
-                              <span className={`text-[10px] font-sans font-normal truncate w-full mt-0.5 ${isSelected ? 'text-white/80' : 'text-slate-400 dark:text-zinc-500'}`}>{tag.tagNumber}</span>
+                              <span className="font-kode-mono font-bold text-xs sm:text-[13px] tracking-normal truncate w-full">{tag.pin}</span>
+                              <span className={`text-[10px] font-mono font-medium truncate w-full mt-0.5 ${isSelected ? 'text-white/80' : 'text-slate-400 dark:text-zinc-500'}`}>{tag.tagNumber}</span>
                             </div>
                           );
                         })}
@@ -8062,7 +8062,7 @@ export default function App() {
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400 text-[11px]">Digit PIN:</span>
-                  <span className="font-mono font-bold text-white tracking-widest">{hoveredTagInfo.tag.pin}</span>
+                  <span className="font-kode-mono font-bold text-white tracking-widest">{hoveredTagInfo.tag.pin}</span>
                 </div>
                 {activeBatch?.isB2B && hoveredTagInfo.tag.project ? (
                   <>

@@ -250,24 +250,6 @@ try {
   updateUserStmt.run('Siti Rahma', 'siti.rahma', 'siti.r@mki.co.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30', 'u4');
 } catch (_) {}
 
-// Migration: Ensure all tags and batches have strictly 8-digit PIN
-try {
-  const shortPins = db.prepare("SELECT id, pin FROM tags WHERE LENGTH(pin) < 8").all() as { id: string; pin: string }[];
-  if (shortPins && shortPins.length > 0) {
-    const updatePinStmt = db.prepare("UPDATE tags SET pin = ? WHERE id = ?");
-    const updateAllPins = db.transaction(() => {
-      for (const t of shortPins) {
-        let newPin = t.pin;
-        while (newPin.length < 8) {
-          newPin += Math.floor(Math.random() * 10).toString();
-        }
-        updatePinStmt.run(newPin, t.id);
-      }
-    });
-    updateAllPins();
-  }
-} catch (_) {}
-
 // Seed password_reset_requests if empty
 const resetRequestsCountRow = db.prepare('SELECT COUNT(*) as count FROM password_reset_requests').get() as { count: number };
 if (resetRequestsCountRow && resetRequestsCountRow.count === 0) {
@@ -766,25 +748,42 @@ if (scanActivitiesCountRow && scanActivitiesCountRow.count === 0) {
   insertAllActivities(initialActivities);
 }
 
-// Generate permanent tags helper with 8-digit random ID format and configurable PIN length (default 8 digit)
+// Generate permanent tags helper: ID format campuran angka dan huruf (8 karakter alfanumerik unik) & PIN angka saja (default 8 digit)
 function generateTagsForBatch(batchId: string, brand: string, count: number, pinLen = 8, allocatedCount = 0, projectName = '', specs = 'Phenolic Board 12mm') {
-  const chars = '0123456789';
+  const pinDigits = '0123456789';
+  const idChars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   const tags = [];
   const usedTagNumbers = new Set<string>();
   const targetPinLen = Math.min(12, Math.max(4, Number(pinLen) || 8));
 
+  // Ambil tagNumber yang sudah ada di database untuk mencegah tabrakan ID
+  try {
+    const existing = db.prepare('SELECT tagNumber FROM tags').all() as { tagNumber: string }[];
+    for (const row of existing) {
+      if (row.tagNumber) usedTagNumbers.add(row.tagNumber);
+    }
+  } catch (_) {}
+
   for (let i = 1; i <= count; i++) {
+    // Format PIN: HANYA ANGKA SAJA (0-9)
     let pin = '';
     for (let p = 0; p < targetPinLen; p++) {
-      pin += chars.charAt(Math.floor(Math.random() * chars.length));
+      pin += pinDigits.charAt(Math.floor(Math.random() * pinDigits.length));
     }
     const isAllocated = i <= allocatedCount;
 
-    // Format ID 8 Digit Acak Unik (10000000 - 99999999)
+    // Format ID Tag: CAMPURAN ANGKA DAN HURUF (8 Karakter Alfanumerik Unik)
     let tagNumber = '';
     do {
-      tagNumber = Math.floor(10000000 + Math.random() * 90000000).toString();
-    } while (usedTagNumbers.has(tagNumber));
+      let cand = '';
+      for (let c = 0; c < 8; c++) {
+        cand += idChars.charAt(Math.floor(Math.random() * idChars.length));
+      }
+      // Pastikan ada campuran huruf kapital dan angka
+      if (/[A-Z]/.test(cand) && /[0-9]/.test(cand)) {
+        tagNumber = cand;
+      }
+    } while (!tagNumber || usedTagNumbers.has(tagNumber));
     usedTagNumbers.add(tagNumber);
 
     tags.push({
@@ -933,6 +932,54 @@ try {
   }
 } catch (e) {
   console.error('Migration notice:', e);
+}
+
+// Migration: Ensure all tags across all batches have alphanumeric format ID (mixture of letters & numbers) and numeric-only PIN
+try {
+  const existingTags = db.prepare('SELECT rowid, id, batchId, tagNumber, pin FROM tags').all() as any[];
+  const idChars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const usedNumbers = new Set<string>();
+
+  for (const t of existingTags) {
+    if (/[A-Z]/.test(t.tagNumber) && /[0-9]/.test(t.tagNumber)) {
+      usedNumbers.add(t.tagNumber);
+    }
+  }
+
+  const updateTagFormatStmt = db.prepare('UPDATE tags SET tagNumber = ?, id = ?, pin = ? WHERE rowid = ?');
+  const runMigration = db.transaction(() => {
+    for (const t of existingTags) {
+      let changed = false;
+      let newTagNumber = t.tagNumber;
+      // If tagNumber doesn't have both letters and digits or length !== 8, generate an 8-character alphanumeric ID
+      if (!/[A-Z]/.test(t.tagNumber) || !/[0-9]/.test(t.tagNumber) || t.tagNumber.length !== 8) {
+        do {
+          let cand = '';
+          for (let c = 0; c < 8; c++) {
+            cand += idChars.charAt(Math.floor(Math.random() * idChars.length));
+          }
+          if (/[A-Z]/.test(cand) && /[0-9]/.test(cand)) {
+            newTagNumber = cand;
+          }
+        } while (!newTagNumber || usedNumbers.has(newTagNumber));
+        usedNumbers.add(newTagNumber);
+        changed = true;
+      }
+
+      // Ensure PIN is strictly digits (0-9)
+      let cleanPin = String(t.pin).replace(/[^0-9]/g, '');
+      if (cleanPin.length < 4) cleanPin = (cleanPin + '12345678').slice(0, 8);
+      if (cleanPin !== t.pin) changed = true;
+
+      if (changed) {
+        const newId = `tag-${t.batchId}-${newTagNumber}`;
+        updateTagFormatStmt.run(newTagNumber, newId, cleanPin, t.rowid);
+      }
+    }
+  });
+  runMigration();
+} catch (err) {
+  console.warn('Migration for alphanumeric tag numbers error:', err);
 }
 
 // ==========================================
@@ -2278,6 +2325,7 @@ app.delete('/api/categories/:id', (req, res) => {
 // Vite dev server or static files handler
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
+  app.use(express.static(path.join(__dirname, 'public')));
 
   if (!isProd) {
     const vite = await createViteServer({

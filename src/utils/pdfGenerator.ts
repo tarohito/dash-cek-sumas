@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { KODE_MONO_BOLD_BASE64 } from './kodeMonoFont';
 
 export interface TagItem {
   id: string;
@@ -128,6 +129,14 @@ export async function generateA3PlusStickersPdf(
     format: [PAGE_WIDTH, PAGE_HEIGHT]
   });
 
+  // Register Kode Mono Bold TrueType Font
+  try {
+    doc.addFileToVFS('KodeMono-Bold.ttf', KODE_MONO_BOLD_BASE64);
+    doc.addFont('KodeMono-Bold.ttf', 'KodeMono', 'bold');
+  } catch (err) {
+    console.warn('Could not register KodeMono font in jsPDF:', err);
+  }
+
   // Dimensi Label & Grid Layout
   const STICKER_WIDTH = 25; // 25 mm
   const STICKER_HEIGHT = 62; // 62 mm (proporsional untuk logo 23mm, teks, QR 25x25mm, dan PIN 2 baris)
@@ -189,12 +198,12 @@ export async function generateA3PlusStickersPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(30, 41, 59);
-    doc.text('LEMBAR CETAK LABEL STIKER GOSOK (A3+ 310 x 470 mm)', 16.5, 14);
+    doc.text('LEMBAR CETAK LABEL (A3+ 310 x 470 mm)', 16.5, 14);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    const infoText = `Batch ID: ${batch.batchId}  |  Brand: ${batch.brand}  |  SKU: ${batch.sku}  |  Label: 25 x 60 mm (Area Gosok 25x25 mm)  |  Hal ${pageIdx + 1}/${totalPages} (${pageTags.length} Label)`;
+    const infoText = `Batch ID: ${batch.batchId}  |  Brand: ${batch.brand}  |  SKU: ${batch.sku}  |  Label: 25 x 62 mm  |  Hal ${pageIdx + 1}/${totalPages} (${pageTags.length} Label)`;
     doc.text(infoText, 16.5, 19.5);
 
     // Color Calibration Bars (CMYK simulation for printing press)
@@ -278,7 +287,7 @@ export async function generateA3PlusStickersPdf(
       }
 
       // ==========================================
-      // BAGIAN 4: PIN DISUSUN 2 BARIS (RAPAT / TANPA RENGGANG)
+      // BAGIAN 4: PIN DISUSUN 2 BARIS (FONT KODE MONO, RAPAT / TANPA RENGGANG)
       // ==========================================
       const rawPin = String(tag.pin || '00000000').replace(/\s+/g, '');
       const half = Math.ceil(rawPin.length / 2);
@@ -287,7 +296,11 @@ export async function generateA3PlusStickersPdf(
       const pinPart1 = isMultiLine ? rawPin.slice(0, half) : rawPin;
       const pinPart2 = isMultiLine ? rawPin.slice(half) : '';
 
-      doc.setFont('courier', 'bold');
+      try {
+        doc.setFont('KodeMono', 'bold');
+      } catch (_) {
+        doc.setFont('courier', 'bold');
+      }
       doc.setTextColor(15, 23, 42);
 
       if (isMultiLine && pinPart2) {
@@ -319,7 +332,7 @@ export async function generateA3PlusStickersPdf(
     doc.setFontSize(5.5);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Format Kertas: A3+ (310 x 470 mm) • Ukuran Label: 25 x 62 mm (Full Putih, Outline Cutting Merah) • Logo: 23 mm • QR Code: 25 x 25 mm • PIN: 2 Baris Normal • Grid: 10 x 6 = 60 label/lembar`,
+      `Format Kertas: A3+ (310 x 470 mm) • Ukuran Label: 25 x 62 mm (Full Putih, Outline Cutting Merah) • Logo: 23 mm • QR Code: 25 x 25 mm • Font PIN: Kode Mono • Grid: 10 x 6 = 60 label/lembar`,
       16.5,
       PAGE_HEIGHT - 6
     );

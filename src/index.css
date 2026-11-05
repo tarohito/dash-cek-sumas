@@ -21,6 +21,11 @@ body {
   font-family: inherit;
 }
 
+/* Kode Mono typography for PIN numbers */
+.font-kode-mono, .font-pin {
+  font-family: 'Kode Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
 /* Leaflet Custom Popup & Marker Styles */
 .leaflet-popup-content-wrapper {
   background: transparent !important;
