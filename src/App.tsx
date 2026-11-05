@@ -501,6 +501,7 @@ const TablePagination: React.FC<TablePaginationProps> = ({
               }}
               placeholder={String(itemsPerPage)}
               className="w-auto"
+              searchable={false}
               minDropdownWidth={84}
               buttonClassName="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-2.5 py-1 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex items-center justify-between gap-1.5 transition-colors select-none font-semibold"
               options={[
@@ -1246,6 +1247,7 @@ export default function App() {
   // STATE KHUSUS BRAND MANAGEMENT (CRUD)
   // ==========================================
   const [brandSearch, setBrandSearch] = useState('');
+  const [brandSortBy, setBrandSortBy] = useState('newest');
   const [brandFilterCategory, setBrandFilterCategory] = useState('all');
   const [brandFilterStatus, setBrandFilterStatus] = useState('all');
 
@@ -1272,6 +1274,7 @@ export default function App() {
   // STATE KHUSUS USER MANAGEMENT (CRUD)
   // ==========================================
   const [userSearch, setUserSearch] = useState('');
+  const [userSortBy, setUserSortBy] = useState('newest');
   const [userFilterRole, setUserFilterRole] = useState('all');
 
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
@@ -3163,15 +3166,31 @@ export default function App() {
       return matchSearch && matchCat && matchStatus;
     });
 
-    // Posisikan brand yang baru dibuat paling atas
+    // Pengurutan brand sesuai pilihan
     return [...matched].sort((a, b) => {
-      const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
-      const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
-      if (aRecent && !bRecent) return -1;
-      if (!aRecent && bRecent) return 1;
+      if (brandSortBy === 'newest') {
+        const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
+        const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
+        if (aRecent && !bRecent) return -1;
+        if (!aRecent && bRecent) return 1;
+        const dtA = parseFlexibleDate(a.createdAt, a.id)?.getTime() || 0;
+        const dtB = parseFlexibleDate(b.createdAt, b.id)?.getTime() || 0;
+        return dtB - dtA;
+      }
+      if (brandSortBy === 'oldest') {
+        const dtA = parseFlexibleDate(a.createdAt, a.id)?.getTime() || 0;
+        const dtB = parseFlexibleDate(b.createdAt, b.id)?.getTime() || 0;
+        return dtA - dtB;
+      }
+      if (brandSortBy === 'name-asc') {
+        return a.name.localeCompare(b.name);
+      }
+      if (brandSortBy === 'name-desc') {
+        return b.name.localeCompare(a.name);
+      }
       return 0;
     });
-  }, [brands, brandSearch, brandFilterCategory, brandFilterStatus]);
+  }, [brands, brandSearch, brandFilterCategory, brandFilterStatus, brandSortBy]);
 
   const totalBrandPages = Math.ceil(filteredBrands.length / brandPerPage) || 1;
   const currentBrands = React.useMemo(() => {
@@ -3203,27 +3222,37 @@ export default function App() {
       return matchSearch && matchRole;
     });
 
-    // Posisikan akun yang sedang aktif (Anda) di baris pertama, kemudian data yang baru dibuat di atas
-    if (!currentUser) {
-      return [...matched].sort((a, b) => {
+    return [...matched].sort((a, b) => {
+      if (currentUser) {
+        if (a.id === currentUser.id) return -1;
+        if (b.id === currentUser.id) return 1;
+      }
+      if (userSortBy === 'newest') {
         const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
         const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
         if (aRecent && !bRecent) return -1;
         if (!aRecent && bRecent) return 1;
-        return 0;
-      });
-    }
-
-    return [...matched].sort((a, b) => {
-      if (a.id === currentUser.id) return -1;
-      if (b.id === currentUser.id) return 1;
-      const aRecent = isRecentlyCreated(a.createdAt, a.id, 5);
-      const bRecent = isRecentlyCreated(b.createdAt, b.id, 5);
-      if (aRecent && !bRecent) return -1;
-      if (!aRecent && bRecent) return 1;
+        const dtA = parseFlexibleDate(a.createdAt, a.id)?.getTime() || 0;
+        const dtB = parseFlexibleDate(b.createdAt, b.id)?.getTime() || 0;
+        return dtB - dtA;
+      }
+      if (userSortBy === 'oldest') {
+        const dtA = parseFlexibleDate(a.createdAt, a.id)?.getTime() || 0;
+        const dtB = parseFlexibleDate(b.createdAt, b.id)?.getTime() || 0;
+        return dtA - dtB;
+      }
+      if (userSortBy === 'name-asc') {
+        return a.name.localeCompare(b.name);
+      }
+      if (userSortBy === 'name-desc') {
+        return b.name.localeCompare(a.name);
+      }
+      if (userSortBy === 'role-asc') {
+        return a.role.localeCompare(b.role);
+      }
       return 0;
     });
-  }, [users, userSearch, userFilterRole, currentUser]);
+  }, [users, userSearch, userFilterRole, userSortBy, currentUser]);
 
   const totalUserPages = Math.ceil(filteredUsers.length / userPerPage) || 1;
   const currentUsers = React.useMemo(() => {
@@ -3258,9 +3287,9 @@ export default function App() {
         return;
       }
 
-      triggerAlert('Merender Layout PDF A3+', `Menata ${tags.length} stiker gosok pada kertas A3+ (31x47 cm) dengan Barcode vertikal & PIN...`, 'info');
+      triggerAlert('Merender Layout PDF A3+', `Menata ${tags.length} stiker gosok pada kertas A3+ (31x47 cm) dengan QR Code & PIN...`, 'info');
 
-      // 2. Render PDF A3+ 31 x 47 cm dengan barcode vertikal & PIN di bawahnya
+      // 2. Render PDF A3+ 31 x 47 cm dengan QR Code & PIN di bawahnya
       const pdfBlob = await generateA3PlusStickersPdf(batch, tags);
 
       // 3. Nama file default
@@ -3717,8 +3746,35 @@ export default function App() {
                 )}
               </div>
 
-              {/* Filter Kategori & Status dengan CustomSelect Konsisten */}
+              {/* Controls Pengurutan & Filter dengan Icon ArrowUpDown Konsisten */}
               <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <ArrowUpDown size={14} className="hidden sm:block flex-shrink-0" />
+                  <span className="hidden md:inline font-medium text-slate-500 dark:text-zinc-400">Urutkan:</span>
+                </div>
+
+                {/* Dropdown Sort By Brand (Tanpa Pencarian) */}
+                <div className="w-full sm:w-auto min-w-[150px] sm:min-w-[170px]">
+                  <CustomSelect
+                    value={brandSortBy}
+                    onChange={(val) => {
+                      setBrandSortBy(val);
+                      setBrandPage(1);
+                    }}
+                    placeholder="Urutkan Brand"
+                    searchable={false}
+                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                    options={[
+                      { value: 'newest', label: 'Terbaru' },
+                      { value: 'oldest', label: 'Terlama' },
+                      { value: 'name-asc', label: 'Nama Brand (A - Z)' },
+                      { value: 'name-desc', label: 'Nama Brand (Z - A)' },
+                    ]}
+                  />
+                </div>
+
+                <div className="h-4 w-[1px] bg-slate-200 dark:bg-zinc-700 hidden sm:block"></div>
+
                 <Filter size={14} className="text-slate-400 hidden sm:block flex-shrink-0" />
                 
                 {/* Dropdown Custom Semua Kategori */}
@@ -3738,7 +3794,7 @@ export default function App() {
                   />
                 </div>
 
-                {/* Dropdown Custom Semua Status */}
+                {/* Dropdown Custom Semua Status (Tanpa Pencarian) */}
                 <div className="w-full sm:w-auto min-w-[130px] sm:min-w-[150px]">
                   <CustomSelect
                     value={brandFilterStatus}
@@ -3747,6 +3803,7 @@ export default function App() {
                       setBrandPage(1);
                     }}
                     placeholder="Semua Status"
+                    searchable={false}
                     buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
                     options={[
                       { value: 'all', label: 'Semua Status' },
@@ -3939,7 +3996,7 @@ export default function App() {
             </p>
             {brandSearch ? (
               <button
-                onClick={() => { setBrandSearch(''); setBrandFilterCategory('all'); setBrandFilterStatus('all'); }}
+                onClick={() => { setBrandSearch(''); setBrandFilterCategory('all'); setBrandFilterStatus('all'); setBrandSortBy('newest'); }}
                 className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-full text-xs font-semibold transition-colors cursor-pointer"
               >
                 Reset Pencarian & Filter
@@ -4027,10 +4084,38 @@ export default function App() {
                 )}
               </div>
 
-              {/* Filter Peran / Role */}
+              {/* Controls Pengurutan & Filter Peran dengan Icon ArrowUpDown Konsisten */}
               <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <ArrowUpDown size={14} className="hidden sm:block flex-shrink-0" />
+                  <span className="hidden md:inline font-medium text-slate-500 dark:text-zinc-400">Urutkan:</span>
+                </div>
+
+                {/* Dropdown Sort By User (Tanpa Pencarian) */}
+                <div className="w-full sm:w-auto min-w-[150px] sm:min-w-[170px]">
+                  <CustomSelect
+                    value={userSortBy}
+                    onChange={(val) => {
+                      setUserSortBy(val);
+                      setUserPage(1);
+                    }}
+                    placeholder="Urutkan Pengguna"
+                    searchable={false}
+                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                    options={[
+                      { value: 'newest', label: 'Terbaru' },
+                      { value: 'oldest', label: 'Terlama' },
+                      { value: 'name-asc', label: 'Nama (A - Z)' },
+                      { value: 'name-desc', label: 'Nama (Z - A)' },
+                      { value: 'role-asc', label: 'Hak Akses (A - Z)' },
+                    ]}
+                  />
+                </div>
+
+                <div className="h-4 w-[1px] bg-slate-200 dark:bg-zinc-700 hidden sm:block"></div>
+
                 <Filter size={14} className="text-slate-400 hidden sm:block flex-shrink-0" />
-                <div className="w-full sm:w-auto min-w-[180px] sm:min-w-[210px]">
+                <div className="w-full sm:w-auto min-w-[160px] sm:min-w-[180px]">
                   <CustomSelect
                     value={userFilterRole}
                     onChange={(val) => {
@@ -4038,6 +4123,7 @@ export default function App() {
                       setUserPage(1);
                     }}
                     placeholder="Semua Role"
+                    searchable={false}
                     buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
                     options={[
                       { value: 'all', label: `Semua Role (${users.length})` },
@@ -4228,7 +4314,7 @@ export default function App() {
             </p>
             {userSearch ? (
               <button
-                onClick={() => { setUserSearch(''); setUserFilterRole('all'); }}
+                onClick={() => { setUserSearch(''); setUserFilterRole('all'); setUserSortBy('newest'); }}
                 className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-full text-xs font-semibold transition-colors cursor-pointer"
               >
                 Reset Pencarian & Filter
@@ -4426,7 +4512,7 @@ export default function App() {
                     <span className="hidden md:inline font-medium text-slate-500 dark:text-zinc-400">Urutkan:</span>
                   </div>
 
-                  {/* Dropdown Sort By */}
+                  {/* Dropdown Sort By (Tanpa Pencarian) */}
                   <div className="w-full sm:w-auto min-w-[170px] sm:min-w-[195px]">
                     <CustomSelect
                       value={batchSortBy}
@@ -4435,7 +4521,8 @@ export default function App() {
                         setCurrentPage(1);
                       }}
                       placeholder="Urutkan Batch"
-                      buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                      searchable={false}
+                      buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
                       options={[
                         { value: 'newest', label: 'Terbaru (Tanggal Dibuat)' },
                         { value: 'oldest', label: 'Terlama (Tanggal Dibuat)' },
@@ -4450,7 +4537,7 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Dropdown Filter Status */}
+                  {/* Dropdown Filter Status (Tanpa Pencarian) */}
                   <div className="w-full sm:w-auto min-w-[130px] sm:min-w-[150px]">
                     <CustomSelect
                       value={batchFilterStatus}
@@ -4459,6 +4546,7 @@ export default function App() {
                         setCurrentPage(1);
                       }}
                       placeholder="Semua Status"
+                      searchable={false}
                       buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
                       options={[
                         { value: 'all', label: `Semua Status (${batches.length})` },
@@ -4730,7 +4818,7 @@ export default function App() {
                   {activeDetails.pageTitle}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md">
-                  {activeDetails.subtitle}. Modul ini terhubung secara terpusat dengan sistem manajemen tag fisik & otentikasi Shieldtag MKI.
+                  {activeDetails.subtitle}. Modul ini terhubung secara terpusat dengan sistem manajemen tag fisik & otentikasi MKI.
                 </p>
               </div>
             </div>
@@ -5060,9 +5148,6 @@ export default function App() {
                   <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">
                     Generate Batch Baru
                   </h3>
-                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-                    Konfigurasi batch tag dan tautan QR Code
-                  </p>
                 </div>
               </div>
               <button 
@@ -5103,7 +5188,7 @@ export default function App() {
                     placeholder="Contoh: 100" 
                     value={formQty}
                     onChange={(e) => setFormQty(e.target.value)}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
                   />
                 </div>
 
@@ -5130,11 +5215,11 @@ export default function App() {
                 <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
                   Tipe QR Code
                 </label>
-                <div className="grid grid-cols-2 gap-2 h-[42px] p-1 bg-slate-100 dark:bg-zinc-800 rounded-xl">
+                <div className="grid grid-cols-2 gap-2 h-[42px] p-1 bg-slate-100 dark:bg-zinc-800 rounded-full">
                   <button
                     type="button"
                     onClick={() => setFormQrType('dynamic')}
-                    className={`text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    className={`text-xs font-semibold rounded-full transition-colors cursor-pointer ${
                       formQrType === 'dynamic'
                         ? 'bg-white dark:bg-zinc-900 text-[#c28e62] shadow-xs'
                         : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
@@ -5145,7 +5230,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setFormQrType('static')}
-                    className={`text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    className={`text-xs font-semibold rounded-full transition-colors cursor-pointer ${
                       formQrType === 'static'
                         ? 'bg-white dark:bg-zinc-900 text-[#c28e62] shadow-xs'
                         : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
@@ -5166,17 +5251,17 @@ export default function App() {
                   placeholder="https://cek.sumas.id/"
                   value={formRedirectUrl}
                   onChange={(e) => setFormRedirectUrl(e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors font-mono"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors font-mono"
                 />
               </div>
 
               {/* INFO FORMAT ID TAG OTOMATIS */}
-              <div className="p-3 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/70 rounded-xl flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
+              <div className="px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/70 rounded-full flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   <span>Format ID Tag Unik:</span>
                 </span>
-                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 px-2.5 py-0.5 rounded border border-slate-200 dark:border-zinc-700">
+                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200 bg-white dark:bg-zinc-900 px-3 py-1 rounded-full border border-slate-200 dark:border-zinc-700">
                   8 Digit Acak (Otomatis)
                 </span>
               </div>
@@ -5221,9 +5306,6 @@ export default function App() {
                   <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">
                     Edit URL QR Dinamis
                   </h3>
-                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-                    Batch: <span className="font-mono font-semibold text-slate-700 dark:text-zinc-300">{batchToEditUrl.batchId}</span>
-                  </p>
                 </div>
               </div>
               <button 
@@ -5254,7 +5336,7 @@ export default function App() {
                     value={editRedirectUrlInput}
                     onChange={(e) => setEditRedirectUrlInput(e.target.value)}
                     placeholder="https://cek.sumas.id/"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-xs sm:text-sm focus:outline-none focus:border-[#c28e62]"
+                    className="w-full pl-10 pr-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-xs sm:text-sm focus:outline-none focus:border-[#c28e62]"
                   />
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
@@ -5346,7 +5428,7 @@ export default function App() {
                   value={editProjectForm.name} 
                   onChange={(e) => setEditProjectForm({ ...editProjectForm, name: e.target.value })}
                   placeholder="Contoh: RSUD Kediri / RS Islam Surabaya"
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                 />
               </div>
 
@@ -5361,7 +5443,7 @@ export default function App() {
                     value={editProjectForm.specs} 
                     onChange={(e) => setEditProjectForm({ ...editProjectForm, specs: e.target.value })}
                     placeholder="Contoh: Phenolic Board 12mm Standard"
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
 
@@ -5374,7 +5456,7 @@ export default function App() {
                     value={editProjectForm.codeType} 
                     onChange={(e) => setEditProjectForm({ ...editProjectForm, codeType: e.target.value })}
                     placeholder="Contoh: SUMAS-CUB-2026"
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
               </div>
@@ -5390,7 +5472,7 @@ export default function App() {
                     value={editProjectForm.warranty} 
                     onChange={(e) => setEditProjectForm({ ...editProjectForm, warranty: e.target.value })}
                     placeholder="Contoh: 5 Tahun / 10 Tahun"
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
 
@@ -5403,7 +5485,7 @@ export default function App() {
                     value={editProjectForm.prodCode} 
                     onChange={(e) => setEditProjectForm({ ...editProjectForm, prodCode: e.target.value })}
                     placeholder="Contoh: PRD-SBY-002"
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
               </div>
@@ -5577,7 +5659,7 @@ export default function App() {
                     placeholder="Contoh: RSUD Kediri, Hotel Aston" 
                     value={allocationForm.project}
                     onChange={(e) => setAllocationForm({...allocationForm, project: e.target.value})}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
                 <div>
@@ -5589,7 +5671,7 @@ export default function App() {
                     placeholder="Contoh: Phenolic Board 12mm" 
                     value={allocationForm.specs}
                     onChange={(e) => setAllocationForm({...allocationForm, specs: e.target.value})}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
                 <div>
@@ -5601,7 +5683,7 @@ export default function App() {
                     placeholder="Contoh: PVC-12mm-T2" 
                     value={allocationForm.codeType}
                     onChange={(e) => setAllocationForm({...allocationForm, codeType: e.target.value})}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
                 <div>
@@ -5613,7 +5695,7 @@ export default function App() {
                     placeholder="Contoh: 1 Tahun Pemasangan" 
                     value={allocationForm.warranty}
                     onChange={(e) => setAllocationForm({...allocationForm, warranty: e.target.value})}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
                 <div>
@@ -5625,7 +5707,7 @@ export default function App() {
                     placeholder="Contoh: PRD-2026-10-A" 
                     value={allocationForm.prodCode}
                     onChange={(e) => setAllocationForm({...allocationForm, prodCode: e.target.value})}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
                 <div>
@@ -5637,7 +5719,7 @@ export default function App() {
                     placeholder="Catatan pengerjaan lapangan..." 
                     value={allocationForm.note}
                     onChange={(e) => setAllocationForm({...allocationForm, note: e.target.value})}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                   />
                 </div>
               </div>
@@ -5698,13 +5780,28 @@ export default function App() {
                     </span>
                   )}
                 </div>
-                <button 
-                  onClick={closeDetailModal} 
-                  data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
-                  className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 bg-white dark:bg-zinc-900 rounded-full p-1.5 border border-slate-200 dark:border-zinc-600 cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (activeBatch) {
+                        openDownloadModal(activeBatch);
+                      }
+                    }}
+                    className="px-3.5 py-1.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    title="Unduh Data Batch Langsung"
+                  >
+                    <Download size={14} />
+                    <span>Unduh</span>
+                  </button>
+                  <button 
+                    onClick={closeDetailModal} 
+                    data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
+                    className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 bg-white dark:bg-zinc-900 rounded-full p-1.5 border border-slate-200 dark:border-zinc-600 cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm font-medium -mb-[1px] overflow-x-auto">
@@ -5779,49 +5876,29 @@ export default function App() {
                 );
               })()}
 
-              {/* QR CONFIGURATION & MODE BANNER */}
-              <div className="bg-slate-50 dark:bg-zinc-800/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-700 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs flex-shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              {/* QR CONFIGURATION & MODE BANNER (CLEAN & MINIMALIS) */}
+              <div className="bg-slate-50 dark:bg-zinc-800/70 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-700/80 mb-3 flex items-center justify-between gap-3 text-xs flex-shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
                     activeBatch?.qrType === 'static'
-                      ? 'bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300'
-                      : 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300'
+                      ? 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+                      : 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60'
                   }`}>
-                    <QrCode size={18} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-800 dark:text-zinc-100">
-                        Mode: {activeBatch?.qrType === 'static' ? 'QR Code Statis' : 'QR Code Dinamis'}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        activeBatch?.qrType === 'static'
-                          ? 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
-                          : 'bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 border border-sky-300 dark:border-sky-700'
-                      }`}>
-                        {activeBatch?.qrType === 'static' ? 'QR Statis' : 'QR Dinamis'}
-                      </span>
-                    </div>
-                    <div className="text-slate-500 dark:text-zinc-400 text-[11px] mt-0.5 flex items-center gap-1.5 flex-wrap">
-                      <span>{activeBatch?.qrType === 'static' ? 'Scan buka portal web → gosok & ketik PIN manual' : 'Scan langsung cocokkan ID & PIN otomatis tanpa ketik PIN'}</span>
-                      <span>•</span>
-                      <span>Redirect: <strong className="font-mono text-slate-700 dark:text-zinc-300">{activeBatch?.redirectUrl || 'https://cek.sumas.id/'}</strong></span>
-                      <span>•</span>
-                      <span>PIN: <strong>{activeBatch?.requirePin !== 0 ? 'Wajib PIN' : 'Tanpa PIN'}</strong></span>
-                      <span>•</span>
-                      <span>GPS: <strong>{activeBatch?.enableGps !== 0 ? 'Aktif' : 'Nonaktif'}</strong></span>
-                    </div>
-                  </div>
+                    {activeBatch?.qrType === 'static' ? 'QR Statis' : 'QR Dinamis'}
+                  </span>
+                  <span className="font-mono text-xs text-slate-600 dark:text-zinc-300 truncate">
+                    {activeBatch?.redirectUrl || 'https://cek.sumas.id/'}
+                  </span>
                 </div>
 
                 {activeBatch?.qrType !== 'static' && (
                   <button
                     type="button"
                     onClick={() => openEditUrlModal(activeBatch)}
-                    className="px-3.5 py-1.5 rounded-full bg-white dark:bg-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-600 border border-slate-200 dark:border-zinc-600 text-[#c28e62] dark:text-[#cd9a6f] font-semibold text-xs transition-colors flex items-center gap-1.5 self-start sm:self-center cursor-pointer shadow-xs"
+                    className="px-4 py-1.5 rounded-full bg-white dark:bg-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-600 border border-slate-200 dark:border-zinc-600 text-[#c28e62] dark:text-[#cd9a6f] font-semibold text-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
                   >
                     <Globe size={13} />
-                    <span>Edit URL & Keamanan</span>
+                    <span>Edit URL</span>
                   </button>
                 )}
               </div>
@@ -6667,7 +6744,7 @@ export default function App() {
                     Layout Cetak PDF (A3+ 31x47 cm)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Lembar cetak stiker A3+ (31x47 cm) dengan Barcode vertikal dan kotak PIN di bawahnya. Mendukung opsi simpan lokasi & penamaan native OS.
+                    Lembar cetak stiker A3+ (31x47 cm) dengan QR Code dan kotak PIN di bawahnya. Mendukung opsi simpan lokasi & penamaan native OS.
                   </p>
                 </button>
 
@@ -6850,7 +6927,7 @@ export default function App() {
                       placeholder="Contoh: SUMAS, ASSC, BLIMEY!" 
                       value={brandForm.name}
                       onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
-                      className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-semibold transition-all" 
+                      className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-semibold transition-all" 
                     />
                   </div>
 
@@ -6874,7 +6951,7 @@ export default function App() {
                       onChange={(val) => setBrandForm({ ...brandForm, ownerId: val })}
                       placeholder="-- Pilih Akun Pengguna --"
                       searchable={true}
-                      buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium truncate"
+                      buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium truncate"
                       options={users.map((u) => ({
                         value: u.id,
                         label: u.name,
@@ -7045,7 +7122,7 @@ export default function App() {
                             username: slugifyUsername(val)
                           }));
                         }}
-                        className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none transition-all" 
+                        className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none transition-all" 
                       />
                     </div>
                   </div>
@@ -7065,7 +7142,7 @@ export default function App() {
                         placeholder="email@perusahaan.com" 
                         value={userForm.email}
                         onChange={(e) => setUserForm(prev => ({ ...prev, email: e.target.value }))}
-                        className={`w-full bg-white dark:bg-zinc-800 border rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none transition-all ${
+                        className={`w-full bg-white dark:bg-zinc-800 border rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none transition-all ${
                           userForm.email.trim().length > 0 && !isValidEmail(userForm.email)
                             ? 'border-rose-400 dark:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                             : 'border-slate-200 dark:border-zinc-700 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20'
@@ -7087,7 +7164,7 @@ export default function App() {
                     value={userForm.role}
                     onChange={(val) => setUserForm({ ...userForm, role: val })}
                     placeholder="Pilih Peran"
-                    buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
+                    buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
                     options={userRolesList.map(r => ({
                       value: r,
                       label: r
@@ -7257,12 +7334,12 @@ export default function App() {
                             placeholder="Masukkan kata sandi baru" 
                             value={userForm.password}
                             onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
-                            className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-mono transition-all" 
+                            className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-mono transition-all" 
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
                           >
                             {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                           </button>
@@ -7290,7 +7367,7 @@ export default function App() {
                             placeholder="Konfirmasi kata sandi baru" 
                             value={userForm.confirmPassword}
                             onChange={(e) => setUserForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                            className={`w-full bg-white dark:bg-zinc-800 border rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none font-mono transition-all ${
+                            className={`w-full bg-white dark:bg-zinc-800 border rounded-full pl-10 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none font-mono transition-all ${
                               userForm.password && userForm.confirmPassword && userForm.password !== userForm.confirmPassword
                                 ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                                 : 'border-slate-200 dark:border-zinc-700 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20'
@@ -7299,7 +7376,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
                           >
                             {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                           </button>
@@ -7332,12 +7409,12 @@ export default function App() {
                           placeholder="Masukkan sandi" 
                           value={userForm.password}
                           onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
-                          className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-mono transition-all" 
+                          className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-mono transition-all" 
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
                         >
                           {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                         </button>
@@ -7365,7 +7442,7 @@ export default function App() {
                           placeholder="Tulis ulang sandi" 
                           value={userForm.confirmPassword}
                           onChange={(e) => setUserForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                          className={`w-full bg-white dark:bg-zinc-800 border rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none font-mono transition-all ${
+                          className={`w-full bg-white dark:bg-zinc-800 border rounded-full pl-10 pr-10 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none font-mono transition-all ${
                             userForm.password && userForm.confirmPassword && userForm.password !== userForm.confirmPassword
                               ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                               : 'border-slate-200 dark:border-zinc-700 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20'
@@ -7374,7 +7451,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
                         >
                           {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                         </button>
@@ -7570,7 +7647,7 @@ export default function App() {
                       placeholder="Cth: Kalingga Jeandy" 
                       value={userForm.name}
                       onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                      className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
+                      className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all" 
                     />
                   </div>
                 </div>
@@ -7589,7 +7666,7 @@ export default function App() {
                       placeholder="Cth: kalingga@mki.co.id" 
                       value={userForm.email}
                       onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                      className={`w-full bg-white dark:bg-zinc-800 border rounded-xl pl-9 pr-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none font-medium transition-all ${
+                      className={`w-full bg-white dark:bg-zinc-800 border rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none font-medium transition-all ${
                         userForm.email.trim().length > 0 && !isValidEmail(userForm.email)
                           ? 'border-rose-400 dark:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                           : 'border-slate-200 dark:border-zinc-700 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20'
@@ -7612,7 +7689,7 @@ export default function App() {
                   value={userForm.role}
                   onChange={(val) => setUserForm({ ...userForm, role: val })}
                   placeholder="Pilih Hak Akses"
-                  buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
+                  buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
                   options={userRolesList.map(r => ({
                     value: r,
                     label: r,

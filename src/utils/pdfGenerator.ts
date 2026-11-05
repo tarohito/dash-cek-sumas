@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import JsBarcode from 'jsbarcode';
+import QRCode from 'qrcode';
 
 export interface TagItem {
   id: string;
@@ -70,38 +70,50 @@ export async function saveFileWithNativePicker(
 }
 
 /**
- * Menghasilkan image data URL untuk barcode Code128 menggunakan canvas
+ * Menghasilkan image data URL untuk QR Code menggunakan qrcode library
  */
-function createBarcodeDataUrl(text: string): string {
+async function createQrCodeDataUrl(payload: string): Promise<string> {
   try {
-    const canvas = document.createElement('canvas');
-    JsBarcode(canvas, text, {
-      format: 'CODE128',
-      width: 2,
-      height: 70,
-      displayValue: false,
-      margin: 0,
-      background: '#ffffff',
-      lineColor: '#000000'
+    return await QRCode.toDataURL(payload, {
+      width: 280,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
     });
-    return canvas.toDataURL('image/png');
   } catch (err) {
-    console.error('Gagal generate barcode canvas:', err);
-    // Fallback simple 1x1 white pixel
+    console.error('Gagal generate QR Code:', err);
+    // Fallback 1x1 white pixel
     return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   }
 }
 
 /**
+ * Menentukan isi payload QR Code berdasarkan tipe batch (Statis / Dinamis)
+ */
+function getQrCodePayload(batch: BatchItem, tag: TagItem): string {
+  const base = (batch.redirectUrl || 'https://cek.sumas.id/').trim();
+  if (batch.qrType === 'static') {
+    return base;
+  }
+  // Dinamis: langsung menyematkan ID & PIN agar saat di-scan langsung verifikasi
+  const cleanBase = base.replace(/\/+$/, '');
+  const separator = cleanBase.includes('?') ? '&' : '/?';
+  return `${cleanBase}${separator}id=${encodeURIComponent(tag.tagNumber)}&pin=${encodeURIComponent(tag.pin)}`;
+}
+
+/**
  * Render PDF Layout Cetak Stiker Gosok pada format A3+ (31 x 47 cm = 310 x 470 mm)
- * dengan Barcode vertikal di atas dan kotak PIN di bawahnya.
+ * dengan QR CODE di atas dan kotak PIN di bawahnya.
  */
 export async function generateA3PlusStickersPdf(
   batch: BatchItem,
   tags: TagItem[],
   onProgress?: (current: number, total: number) => void
 ): Promise<Blob> {
-  // Ukuran kertas A3+: 310 mm x 470 mm
+  // Ukuran kertas A3+: 310 mm x 470 mm (31 x 47 cm)
   const PAGE_WIDTH = 310;
   const PAGE_HEIGHT = 470;
 
@@ -115,7 +127,7 @@ export async function generateA3PlusStickersPdf(
   // Kolom: 11 stiker per baris, Baris: 10 stiker per kolom = 110 stiker per lembar A3+
   const COLS = 11;
   const ROWS = 10;
-  const STICKERS_PER_PAGE = COLS * ROWS; // 110
+  const STICKERS_PER_PAGE = COLS * ROWS; // 110 stiker
 
   const STICKER_WIDTH = 24; // mm
   const STICKER_HEIGHT = 40; // mm
@@ -125,12 +137,21 @@ export async function generateA3PlusStickersPdf(
   // Hitung offset agar grid terpusat (center alignment) di lembar A3+
   const totalGridWidth = COLS * STICKER_WIDTH + (COLS - 1) * GAP_X; // 24*11 + 10*2.5 = 289 mm
   const startX = (PAGE_WIDTH - totalGridWidth) / 2; // (310 - 289)/2 = 10.5 mm
-  const startY = 22; // mm dari atas (memberikan ruang untuk header sheet & registration marks)
+  const startY = 22; // mm dari atas
 
   const totalPages = Math.max(1, Math.ceil(tags.length / STICKERS_PER_PAGE));
 
-  // Pre-generate barcode data URLs
-  const barcodeCache = new Map<string, string>();
+  // Pre-generate QR Code data URLs
+  const qrCache = new Map<string, string>();
+  for (let idx = 0; idx < tags.length; idx++) {
+    const t = tags[idx];
+    const payload = getQrCodePayload(batch, t);
+    const dataUrl = await createQrCodeDataUrl(payload);
+    qrCache.set(t.tagNumber, dataUrl);
+    if (onProgress && idx % 20 === 0) {
+      onProgress(idx + 1, tags.length);
+    }
+  }
 
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
     if (pageIdx > 0) {
@@ -139,11 +160,10 @@ export async function generateA3PlusStickersPdf(
 
     const pageTags = tags.slice(pageIdx * STICKERS_PER_PAGE, (pageIdx + 1) * STICKERS_PER_PAGE);
 
-    // 1. Gambar Sheet Header & Tanda Registrasi Percetakan (Registration Marks)
+    // 1. Gambar Sheet Header & Tanda Registrasi Percetakan (Crosshair marks)
     doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.3);
 
-    // Crosshair marks di 4 sudut lembar A3+
     const markLen = 6;
     const corners = [
       { x: 6, y: 6 },
@@ -161,7 +181,7 @@ export async function generateA3PlusStickersPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(30, 41, 59);
-    doc.text('MKI SHIELDTAG - LEMBAR CETAK STIKER GOSOK (A3+ 31 x 47 cm)', 12, 10);
+    doc.text('MKI - LEMBAR CETAK STIKER GOSOK (A3+ 31 x 47 cm)', 12, 10);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
@@ -196,24 +216,22 @@ export async function generateA3PlusStickersPdf(
       doc.setFont('courier', 'bold');
       doc.setFontSize(4.5);
       doc.setTextColor(100, 116, 139);
-      doc.text(tag.tagNumber, x + STICKER_WIDTH / 2, y + 5.8, { align: 'center' });
+      doc.text(tag.tagNumber, x + STICKER_WIDTH / 2, y + 5.6, { align: 'center' });
 
-      // b. Barcode Vertikal (Code128)
-      let barcodeUrl = barcodeCache.get(tag.tagNumber);
-      if (!barcodeUrl) {
-        barcodeUrl = createBarcodeDataUrl(tag.tagNumber);
-        barcodeCache.set(tag.tagNumber, barcodeUrl);
+      // b. QR CODE (Presisi & Tajam)
+      const qrDataUrl = qrCache.get(tag.tagNumber);
+      const qrSize = 16.5; // mm (persegi)
+      const qrX = x + (STICKER_WIDTH - qrSize) / 2;
+      const qrY = y + 6.6; // mm
+      if (qrDataUrl) {
+        doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
       }
-      // Render Barcode di tengah sticker
-      const barcodeW = 20; // mm
-      const barcodeH = 13.5; // mm
-      doc.addImage(barcodeUrl, 'PNG', x + (STICKER_WIDTH - barcodeW) / 2, y + 7.2, barcodeW, barcodeH);
 
-      // c. Kotak Area Gosok PIN di Bawah Barcode
+      // c. Kotak Area Gosok PIN di Bawah QR Code
       const pinBoxW = 20;
       const pinBoxH = 10.5;
       const pinBoxX = x + (STICKER_WIDTH - pinBoxW) / 2;
-      const pinBoxY = y + 22;
+      const pinBoxY = y + 24;
 
       // Background kotak area gosok (simulasi foil perak)
       doc.setFillColor(248, 250, 252);
@@ -227,7 +245,7 @@ export async function generateA3PlusStickersPdf(
       doc.setTextColor(148, 163, 184);
       doc.text('GOSOK PIN DI SINI', x + STICKER_WIDTH / 2, pinBoxY + 3.2, { align: 'center' });
 
-      // Digit PIN di bawah barcode (format besar, jelas & tegas)
+      // Digit PIN di bawah QR Code (format besar, jelas & tegas)
       doc.setFont('courier', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(15, 23, 42);
@@ -237,7 +255,7 @@ export async function generateA3PlusStickersPdf(
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(3.5);
       doc.setTextColor(148, 163, 184);
-      doc.text('cek.sumas.id', x + STICKER_WIDTH / 2, y + 36.5, { align: 'center' });
+      doc.text('cek.sumas.id', x + STICKER_WIDTH / 2, y + 37.8, { align: 'center' });
 
       if (onProgress) {
         const overallIdx = pageIdx * STICKERS_PER_PAGE + i + 1;
@@ -250,7 +268,7 @@ export async function generateA3PlusStickersPdf(
     doc.setFontSize(5);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Format Cetak: A3+ (310 x 470 mm) • Stiker: 24 x 40 mm • Grid: 11 x 10 = 110 stiker/lembar • Dicetak dari Shieldtag MKI System`,
+      `Format Cetak: A3+ (310 x 470 mm) • Stiker: 24 x 40 mm • Grid: 11 x 10 = 110 stiker/lembar • Dicetak dari Sistem Verifikasi MKI`,
       12,
       PAGE_HEIGHT - 6
     );

@@ -398,25 +398,6 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
       <div className="w-full max-w-[1720px] mx-auto space-y-4 sm:space-y-5">
-        {/* TOP STATUS BAR DI BAWAH HEADER */}
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
-              <Layers size={16} />
-            </div>
-            <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-              Struktur Kategori Produk 3 Level
-            </span>
-          </div>
-
-          <button
-            onClick={() => handleOpenCreate(1)}
-            className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer shadow-xs"
-          >
-            <span>+ Kategori Utama</span>
-          </button>
-        </div>
-
         {/* 3 COLUMN GRID: KATEGORI UTAMA, SUB KATEGORI, VARIAN / JENIS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 items-start">
 
@@ -443,7 +424,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                   value={searchLevel1}
                   onChange={(e) => setSearchLevel1(e.target.value)}
                   placeholder="Cari kategori utama..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62]"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62]"
                 />
               </div>
             </div>
@@ -483,7 +464,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                                 handleCancelInlineEdit();
                               }
                             }}
-                            className="flex-1 bg-white dark:bg-zinc-900 border border-[#c28e62] rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-zinc-100 font-medium focus:outline-none min-w-0"
+                            className="flex-1 bg-white dark:bg-zinc-900 border border-[#c28e62] rounded-full px-3 py-1 text-xs text-slate-800 dark:text-zinc-100 font-medium focus:outline-none min-w-0"
                             placeholder="Nama kategori..."
                           />
                           <button
@@ -575,7 +556,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                   disabled={!selectedLevel1Id}
                   onChange={(e) => setSearchLevel2(e.target.value)}
                   placeholder="Cari sub kategori..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
                 />
               </div>
             </div>
@@ -617,7 +598,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                                 handleCancelInlineEdit();
                               }
                             }}
-                            className="flex-1 bg-white dark:bg-zinc-900 border border-[#c28e62] rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-zinc-100 font-medium focus:outline-none min-w-0"
+                            className="flex-1 bg-white dark:bg-zinc-900 border border-[#c28e62] rounded-full px-3 py-1 text-xs text-slate-800 dark:text-zinc-100 font-medium focus:outline-none min-w-0"
                             placeholder="Nama sub kategori..."
                           />
                           <button
@@ -709,7 +690,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                   disabled={!selectedLevel2Id}
                   onChange={(e) => setSearchLevel3(e.target.value)}
                   placeholder="Cari varian / jenis..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
                 />
               </div>
             </div>
@@ -749,7 +730,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                                 handleCancelInlineEdit();
                               }
                             }}
-                            className="flex-1 bg-white dark:bg-zinc-900 border border-[#c28e62] rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-zinc-100 font-medium focus:outline-none min-w-0"
+                            className="flex-1 bg-white dark:bg-zinc-900 border border-[#c28e62] rounded-full px-3 py-1 text-xs text-slate-800 dark:text-zinc-100 font-medium focus:outline-none min-w-0"
                             placeholder="Nama varian / jenis..."
                           />
                           <button
@@ -886,7 +867,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                           ? 'Contoh: Partisi Cubicle Toilet, Pakaian Pria, Outerwear...'
                           : 'Contoh: Phenolic Board 12mm Standard, Heavy Duty, Nylon Set...'
                     }
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all"
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all"
                   />
                 </div>
 

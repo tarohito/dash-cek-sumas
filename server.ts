@@ -1316,7 +1316,7 @@ app.get('/q/:tagNumber', (req, res) => {
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Tag Tidak Ditemukan - Shieldtag MKI</title>
+            <title>Tag Tidak Ditemukan - Sistem Verifikasi MKI</title>
             <style>
               body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
               .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 32px 24px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
@@ -1328,7 +1328,7 @@ app.get('/q/:tagNumber', (req, res) => {
           <body>
             <div class="card">
               <h2>Tag Tidak Terdaftar</h2>
-              <p>Nomor tag fisik berikut tidak terdata pada sistem keamanan Shieldtag MKI:</p>
+              <p>Nomor tag fisik berikut tidak terdata pada sistem keamanan MKI:</p>
               <div class="badge">${tagNumber}</div>
             </div>
           </body>
@@ -1354,7 +1354,7 @@ app.get('/q/:tagNumber', (req, res) => {
         'Mobile Consumer QR Scan',
         -6.2088,
         106.8456,
-        batch?.brand || 'Shieldtag',
+        batch?.brand || 'MKI',
         batch?.sku || 'Material MKI',
         batch?.batchId || tag.batchId,
         tag.tagNumber,
