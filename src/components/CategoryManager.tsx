@@ -398,6 +398,32 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
       <div className="w-full max-w-[1720px] mx-auto space-y-4 sm:space-y-5">
+        {/* TOP STATUS BAR KATEGORI DENGAN RESET FILTER */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+              <Layers size={16} />
+            </div>
+            <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+              Struktur Hierarki Kategori Produk (3 Level)
+            </span>
+          </div>
+
+          {(searchLevel1 || searchLevel2 || searchLevel3) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchLevel1('');
+                setSearchLevel2('');
+                setSearchLevel3('');
+              }}
+              className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+            >
+              Reset Filter
+            </button>
+          )}
+        </div>
+
         {/* 3 COLUMN GRID: KATEGORI UTAMA, SUB KATEGORI, VARIAN / JENIS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 items-start">
 
@@ -424,14 +450,34 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                   value={searchLevel1}
                   onChange={(e) => setSearchLevel1(e.target.value)}
                   placeholder="Cari kategori utama..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62]"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62]"
                 />
+                {searchLevel1 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchLevel1('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {level1List.length === 0 ? (
-                <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs">Belum ada kategori utama</div>
+                <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs flex flex-col items-center gap-2">
+                  <span>{searchLevel1 ? 'Tidak ada kategori utama yang cocok' : 'Belum ada kategori utama'}</span>
+                  {searchLevel1 && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchLevel1('')}
+                      className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                    >
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
               ) : (
                 level1List.map(item => {
                   const isSelected = item.id === selectedLevel1Id;
@@ -556,8 +602,17 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                   disabled={!selectedLevel1Id}
                   onChange={(e) => setSearchLevel2(e.target.value)}
                   placeholder="Cari sub kategori..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
                 />
+                {searchLevel2 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchLevel2('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -565,7 +620,18 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
               {!selectedLevel1Id ? (
                 <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs">Pilih kategori utama terlebih dahulu</div>
               ) : level2List.length === 0 ? (
-                <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs">Belum ada sub kategori</div>
+                <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs flex flex-col items-center gap-2">
+                  <span>{searchLevel2 ? 'Tidak ada sub kategori yang cocok' : 'Belum ada sub kategori'}</span>
+                  {searchLevel2 && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchLevel2('')}
+                      className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                    >
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
               ) : (
                 level2List.map(item => {
                   const isSelected = item.id === selectedLevel2Id;
@@ -690,8 +756,17 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                   disabled={!selectedLevel2Id}
                   onChange={(e) => setSearchLevel3(e.target.value)}
                   placeholder="Cari varian / jenis..."
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-8 pr-8 py-1.5 text-xs text-slate-800 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] disabled:opacity-50"
                 />
+                {searchLevel3 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchLevel3('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -699,7 +774,18 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
               {!selectedLevel2Id ? (
                 <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs">Pilih sub kategori terlebih dahulu</div>
               ) : level3List.length === 0 ? (
-                <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs">Belum ada varian / jenis</div>
+                <div className="p-6 text-center text-slate-400 dark:text-zinc-500 text-xs flex flex-col items-center gap-2">
+                  <span>{searchLevel3 ? 'Tidak ada varian / jenis yang cocok' : 'Belum ada varian / jenis'}</span>
+                  {searchLevel3 && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchLevel3('')}
+                      className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                    >
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
               ) : (
                 level3List.map(item => {
                   const isSelected = item.id === selectedLevel3Id;

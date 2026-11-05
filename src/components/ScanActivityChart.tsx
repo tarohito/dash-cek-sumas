@@ -103,37 +103,50 @@ export const ScanActivityChart: React.FC = () => {
         </div>
 
         {/* Time Range Selector (7 Hari, 30 Hari, 12 Bulan) */}
-        <div className="flex items-center p-1 bg-slate-100 dark:bg-zinc-800 rounded-full text-xs font-semibold self-start sm:self-auto">
-          <button
-            onClick={() => setTimeRange('7d')}
-            className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
-              timeRange === '7d' 
-                ? 'bg-white dark:bg-zinc-700 text-[#c28e62] dark:text-zinc-100 font-bold' 
-                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-            }`}
-          >
-            7 Hari
-          </button>
-          <button
-            onClick={() => setTimeRange('30d')}
-            className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
-              timeRange === '30d' 
-                ? 'bg-white dark:bg-zinc-700 text-[#c28e62] dark:text-zinc-100 font-bold' 
-                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-            }`}
-          >
-            30 Hari
-          </button>
-          <button
-            onClick={() => setTimeRange('12m')}
-            className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
-              timeRange === '12m' 
-                ? 'bg-white dark:bg-zinc-700 text-[#c28e62] dark:text-zinc-100 font-bold' 
-                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-            }`}
-          >
-            12 Bulan
-          </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-zinc-800 rounded-full text-xs font-semibold">
+            <button
+              onClick={() => setTimeRange('7d')}
+              className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+                timeRange === '7d' 
+                  ? 'bg-white dark:bg-zinc-700 text-[#c28e62] dark:text-zinc-100 font-bold' 
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              7 Hari
+            </button>
+            <button
+              onClick={() => setTimeRange('30d')}
+              className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+                timeRange === '30d' 
+                  ? 'bg-white dark:bg-zinc-700 text-[#c28e62] dark:text-zinc-100 font-bold' 
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              30 Hari
+            </button>
+            <button
+              onClick={() => setTimeRange('12m')}
+              className={`px-3.5 py-1.5 rounded-full transition-all cursor-pointer ${
+                timeRange === '12m' 
+                  ? 'bg-white dark:bg-zinc-700 text-[#c28e62] dark:text-zinc-100 font-bold' 
+                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              12 Bulan
+            </button>
+          </div>
+
+          {/* Reset filter button if active (seperti di halaman tag qrcode) */}
+          {timeRange !== '7d' && (
+            <button
+              type="button"
+              onClick={() => setTimeRange('7d')}
+              className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+            >
+              Reset Filter
+            </button>
+          )}
         </div>
       </div>
 

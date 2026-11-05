@@ -1245,7 +1245,6 @@ export default function App() {
   // ==========================================
   const [brandSearch, setBrandSearch] = useState('');
   const [brandSortBy, setBrandSortBy] = useState('newest');
-  const [brandFilterCategory, setBrandFilterCategory] = useState('all');
   const [brandFilterStatus, setBrandFilterStatus] = useState('all');
 
   const [isCreateBrandModalOpen, setIsCreateBrandModalOpen] = useState(false);
@@ -1389,6 +1388,7 @@ export default function App() {
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false); 
   const [batchToDownload, setBatchToDownload] = useState<any>(null); 
   const [batchToDelete, setBatchToDelete] = useState<any>(null); 
+  const [showLabelGuide, setShowLabelGuide] = useState(false);
   const [activeTab, setActiveTab] = useState('tags'); 
   const [currentTags, setCurrentTags] = useState<any[]>([]); 
   const [tagSearch, setTagSearch] = useState(''); 
@@ -3198,10 +3198,9 @@ export default function App() {
         (b.description && b.description.toLowerCase().includes(q)) ||
         (b.category && b.category.toLowerCase().includes(q));
       
-      const matchCat = brandFilterCategory === 'all' || b.category === brandFilterCategory;
       const matchStatus = brandFilterStatus === 'all' || b.status === brandFilterStatus;
 
-      return matchSearch && matchCat && matchStatus;
+      return matchSearch && matchStatus;
     });
 
     // Pengurutan brand sesuai pilihan
@@ -3228,7 +3227,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [brands, brandSearch, brandFilterCategory, brandFilterStatus, brandSortBy]);
+  }, [brands, brandSearch, brandFilterStatus, brandSortBy]);
 
   const totalBrandPages = Math.ceil(filteredBrands.length / brandPerPage) || 1;
   const currentBrands = React.useMemo(() => {
@@ -3806,22 +3805,6 @@ export default function App() {
                   />
                 </div>
 
-                {/* Dropdown Custom Semua Kategori */}
-                <div className="w-full sm:w-auto min-w-[170px] sm:min-w-[190px]">
-                  <CustomSelect
-                    value={brandFilterCategory}
-                    onChange={(val) => {
-                      setBrandFilterCategory(val);
-                      setBrandPage(1);
-                    }}
-                    placeholder="Semua Kategori"
-                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
-                    options={[
-                      { value: 'all', label: `Semua Kategori (${brands.length})` },
-                      ...availableCategories.map(cat => ({ value: cat, label: cat }))
-                    ]}
-                  />
-                </div>
 
                 {/* Dropdown Custom Semua Status (Tanpa Pencarian) */}
                 <div className="w-full sm:w-auto min-w-[130px] sm:min-w-[150px]">
@@ -3844,6 +3827,21 @@ export default function App() {
               </div>
             </div>
 
+            {/* Reset filter button if active (seperti di halaman tag qrcode) */}
+            {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBrandSearch('');
+                  setBrandFilterStatus('all');
+                  setBrandSortBy('newest');
+                  setBrandPage(1);
+                }}
+                className="text-xs text-[#c28e62] hover:underline font-semibold self-center sm:self-auto cursor-pointer"
+              >
+                Reset Filter
+              </button>
+            )}
           </div>
 
           {/* BRAND TABLE DISPLAY */}
@@ -4016,19 +4014,20 @@ export default function App() {
               <Building2 size={32} />
             </div>
             <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-200 mb-1">
-              {brandSearch ? 'Tidak Ada Brand yang Cocok' : 'Belum Ada Brand Terdaftar'}
+              {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') ? 'Tidak Ada Brand yang Cocok' : 'Belum Ada Brand Terdaftar'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-400 dark:text-zinc-500 max-w-sm mb-5">
-              {brandSearch
-                ? `Tidak ditemukan merk dengan kata kunci "${brandSearch}". Coba ubah kata kunci atau reset filter.`
+              {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest')
+                ? 'Tidak ditemukan merk dengan filter atau kata kunci saat ini. Coba ubah kata kunci atau reset filter.'
                 : 'Mulai dengan menambahkan merk pertama Anda beserta foto logo dan PIC pemilik akun.'}
             </p>
-            {brandSearch ? (
+            {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') ? (
               <button
-                onClick={() => { setBrandSearch(''); setBrandFilterCategory('all'); setBrandFilterStatus('all'); setBrandSortBy('newest'); }}
-                className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-full text-xs font-semibold transition-colors cursor-pointer"
+                type="button"
+                onClick={() => { setBrandSearch(''); setBrandFilterStatus('all'); setBrandSortBy('newest'); setBrandPage(1); }}
+                className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
               >
-                Reset Pencarian & Filter
+                Reset Filter
               </button>
             ) : (
               <button
@@ -4154,6 +4153,22 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* Reset filter button if active (seperti di halaman tag qrcode) */}
+            {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUserSearch('');
+                  setUserFilterRole('all');
+                  setUserSortBy('newest');
+                  setUserPage(1);
+                }}
+                className="text-xs text-[#c28e62] hover:underline font-semibold self-center sm:self-auto cursor-pointer"
+              >
+                Reset Filter
+              </button>
+            )}
           </div>
 
           {/* USERS TABLE */}
@@ -4326,19 +4341,20 @@ export default function App() {
               <Users size={32} />
             </div>
             <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-200 mb-1">
-              {userSearch ? 'Tidak Ada Pengguna yang Cocok' : 'Belum Ada Pengguna'}
+              {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') ? 'Tidak Ada Pengguna yang Cocok' : 'Belum Ada Pengguna'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-400 dark:text-zinc-500 max-w-sm mb-5">
-              {userSearch
-                ? `Tidak ditemukan akun dengan kata kunci "${userSearch}". Coba ubah kata kunci atau reset filter.`
+              {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest')
+                ? 'Tidak ditemukan akun dengan filter atau kata kunci saat ini. Coba ubah kata kunci atau reset filter.'
                 : 'Mulai dengan menambahkan akun pengguna pertama untuk mengelola brand dan sistem.'}
             </p>
-            {userSearch ? (
+            {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') ? (
               <button
-                onClick={() => { setUserSearch(''); setUserFilterRole('all'); setUserSortBy('newest'); }}
-                className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded-full text-xs font-semibold transition-colors cursor-pointer"
+                type="button"
+                onClick={() => { setUserSearch(''); setUserFilterRole('all'); setUserSortBy('newest'); setUserPage(1); }}
+                className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
               >
-                Reset Pencarian & Filter
+                Reset Filter
               </button>
             ) : (
               <button
@@ -5936,9 +5952,31 @@ export default function App() {
                         placeholder={activeBatch?.isB2B ? "Cari Digit PIN, No. Tag, atau Nama Proyek..." : "Cari Nomor Tag atau Digit PIN..."} 
                         value={tagSearch}
                         onChange={(e) => handleTagSearchChange(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-600 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#cd9a6f]/20 focus:border-[#cd9a6f] dark:focus:border-[#cd9a6f] transition-all"
+                        className="w-full pl-10 pr-9 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-600 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#cd9a6f]/20 focus:border-[#cd9a6f] dark:focus:border-[#cd9a6f] transition-all"
                       />
+                      {tagSearch && (
+                        <button
+                          type="button"
+                          onClick={() => handleTagSearchChange('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
                     </div>
+                    {(tagSearch || tagProjectFilter !== 'all') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTagSearch('');
+                          setTagProjectFilter('all');
+                          if (activeBatch) loadBatchDetailData(activeBatch.id, 1, '', 'all');
+                        }}
+                        className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer whitespace-nowrap self-center"
+                      >
+                        Reset Filter
+                      </button>
+                    )}
                   </div>
 
                   {/* FILTER PILLS KHUSUS BRAND SUMAS (B2B) */}
@@ -6160,8 +6198,19 @@ export default function App() {
                         })}
                       </div>
                     ) : (
-                      <div className="py-8 px-6 flex items-center justify-center text-slate-400 dark:text-zinc-500 text-xs sm:text-sm">
-                        Tidak ada PIN yang cocok dengan filter atau pencarian "{tagSearch}".
+                      <div className="py-8 px-6 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-zinc-500 text-xs sm:text-sm">
+                        <span>Tidak ada PIN yang cocok dengan filter atau pencarian "{tagSearch}".</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTagSearch('');
+                            setTagProjectFilter('all');
+                            if (activeBatch) loadBatchDetailData(activeBatch.id, 1, '', 'all');
+                          }}
+                          className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                        >
+                          Reset Filter
+                        </button>
                       </div>
                     )}
                   </div>
@@ -6781,7 +6830,7 @@ export default function App() {
                     Cetak Stiker (PDF A3+)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Label 25 x 62 mm (Full Putih, Outline Cutting Merah, QR 25x25 mm & PIN 2 baris). Format lembar cetak A3+ isi 60 label.
+                    Layout cetak presisi lembar A3+ (isi 60 label) siap produksi percetakan.
                   </p>
                 </button>
 
@@ -6797,9 +6846,104 @@ export default function App() {
                     Data Tag (Excel / CSV)
                   </h4>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                    Daftar nomor seri tag, PIN acak, status pemakaian, dan link verifikasi.
+                    Data tabular nomor seri tag, PIN autentikasi, status, dan URL verifikasi.
                   </p>
                 </button>
+              </div>
+
+              {/* Panduan Ukuran & Pratinjau Desain Label Tag (25 x 60 mm) */}
+              <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowLabelGuide(!showLabelGuide)}
+                  className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <Tag size={14} className="text-[#c28e62]" />
+                    <span>Panduan Ukuran & Pratinjau Label Tag (25 x 60 mm)</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1">
+                    {showLabelGuide ? 'Sembunyikan' : 'Lihat Desain'}
+                    <ChevronDown size={14} className={`transform transition-transform ${showLabelGuide ? 'rotate-180' : ''}`} />
+                  </span>
+                </button>
+
+                {showLabelGuide && (
+                  <div className="mt-3 p-3.5 bg-slate-50 dark:bg-zinc-950/60 rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row items-center gap-4">
+                    {/* Visual Tag Mockup at 25:60 aspect ratio */}
+                    <div className="relative shrink-0 flex items-center justify-center p-2 bg-slate-100 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
+                      <div className="relative w-[105px] h-[252px] bg-white rounded-[6px] border-2 border-red-500 flex flex-col items-center justify-between overflow-hidden select-none">
+                        {/* Section 1: Top 25mm x 23mm (23/60 = 38.3% -> ~96px) - Vertically Centered */}
+                        <div className="w-full h-[96px] flex flex-col items-center justify-center px-1.5 py-1 border-b border-dashed border-red-200 bg-white">
+                          <div className="w-6 h-6 rounded-full border border-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-900 font-serif mb-1">
+                            S
+                          </div>
+                          <span className="font-serif font-black text-[11px] tracking-wider text-slate-900 uppercase">
+                            {batchToDownload?.brand || 'SUMAS'}
+                          </span>
+                          <div className="flex flex-col items-center justify-center mt-1 space-y-[0.5px]">
+                            <span className="font-sans font-black text-[7.5px] tracking-wider text-slate-900 leading-tight">
+                              ORIGINAL PRODUCT
+                            </span>
+                            <span className="font-sans font-bold text-[6.5px] tracking-wider text-slate-600 leading-tight">
+                              PRODUK ASLI
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Section 2: QR Code 25mm x 25mm (25/60 = 41.7% -> ~105px) - Vertically Centered */}
+                        <div className="w-full h-[105px] flex items-center justify-center p-1 border-b border-dashed border-red-200 bg-white">
+                          <div className="w-[90px] h-[90px] flex items-center justify-center bg-white">
+                            <QrCode size={86} className="text-black" />
+                          </div>
+                        </div>
+
+                        {/* Section 3: PIN Area 25mm x 12mm / slot 9.6mm (~51px) - Vertically Centered */}
+                        <div className="w-full h-[51px] flex flex-col items-center justify-center bg-white px-1">
+                          <div className="font-kode-mono font-bold text-[17px] leading-[1.0] text-slate-900 text-center tracking-normal">
+                            <div>0123</div>
+                            <div className="mt-[1px]">4567</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Specifications List */}
+                    <div className="flex-1 text-left space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0"></span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">Total Ukuran Label: 25 mm x 60 mm</div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400">Background full putih, sudut rounded R2 mm, dan garis potong die-cut merah. Semua objek center vertikal.</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0"></span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">Bagian Atas: 25 mm x 23 mm (Center Vertikal)</div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400">Emblem Wreath, brand SUMAS, dan tulisan <span className="font-semibold">ORIGINAL PRODUCT & PRODUK ASLI</span> lebih besar dengan jarak rapat.</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">Bagian Tengah: 25 mm x 25 mm (Center Vertikal)</div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400">QR Code presisi 25x25 mm terpusat sempurna.</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0"></span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">Bagian Bawah: 25 mm x 12 mm / slot 9.6 mm (Center Vertikal)</div>
+                          <div className="text-[11px] text-slate-500 dark:text-zinc-400">PIN 2 baris (4 digit atas & 4 digit bawah) <span className="font-semibold">tanpa spasi antar digit</span> (misal: 0123 / 4567) dengan font <span className="font-kode-mono font-bold">Kode Mono Bold (18 pt)</span> dan gap rapat.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -7763,217 +7907,336 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 3: DETAIL BRAND */}
+      {/* MODAL 3: DETAIL BRAND (CLEAN, DATABASE-RELATIONAL & PROFESSIONAL) */}
       {isDetailBrandModalOpen && brandToView && (
         <div 
           onClick={(e) => { if (e.target === e.currentTarget) { setIsDetailBrandModalOpen(false); setBrandToView(null); } }}
           className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-700 w-full max-w-2xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            {/* DETAIL HEADER IMAGE BANNER */}
-            <div className="relative h-48 bg-slate-100 dark:bg-zinc-800 flex-shrink-0 flex items-center justify-center overflow-hidden">
-              {brandToView.logo ? (
-                <img 
-                  src={brandToView.name.toLowerCase() === 'sumas' && (!brandToView.logo || brandToView.logo.includes('541888946425') || brandToView.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : brandToView.logo} 
-                  alt={brandToView.name} 
-                  onError={(e) => {
-                    const el = e.currentTarget;
-                    el.onerror = null;
-                    el.src = getBrandInitialsLogo(brandToView.name);
-                  }}
-                  className={`w-full h-full ${brandToView.name.toLowerCase() === 'sumas' ? 'object-contain p-8 bg-white dark:bg-zinc-800' : 'object-cover'}`} 
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-r from-[#c28e62] to-[#b37f54] flex items-center justify-center text-white text-5xl font-black tracking-widest">
-                  {brandToView.name}
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 w-full max-w-2xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* CLEAN BRAND HEADER */}
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-zinc-800 flex items-start justify-between gap-4 bg-white dark:bg-zinc-900 flex-shrink-0">
+              <div className="flex items-center gap-4">
+                {/* BRAND LOGO */}
+                <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-2 flex items-center justify-center shrink-0">
+                  {brandToView.logo ? (
+                    <img 
+                      src={brandToView.name.toLowerCase() === 'sumas' && (!brandToView.logo || brandToView.logo.includes('541888946425') || brandToView.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : brandToView.logo} 
+                      alt={brandToView.name} 
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        el.onerror = null;
+                        el.src = getBrandInitialsLogo(brandToView.name);
+                      }}
+                      className="w-full h-full object-contain" 
+                    />
+                  ) : (
+                    <span className="font-bold text-lg text-[#c28e62]">
+                      {brandToView.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
                 </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-              
+
+                {/* BRAND IDENTIFIERS */}
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-zinc-100">
+                      {brandToView.name}
+                    </h3>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                      brandToView.status === 'Aktif'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                        : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                    }`}>
+                      {brandToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
+                      <span>{brandToView.status}</span>
+                    </span>
+                    {brandToView.category && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700">
+                        {brandToView.category}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
+                    ID Brand: {brandToView.id}
+                  </p>
+                </div>
+              </div>
+
+              {/* CLOSE BUTTON */}
               <button 
                 onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); }} 
                 data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
-                className="absolute top-4 right-4 text-white hover:text-slate-200 bg-black/40 hover:bg-black/60 rounded-full p-2 backdrop-blur-md cursor-pointer transition-colors"
+                className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
               >
                 <X size={18} />
               </button>
-
-              <div className="absolute bottom-4 left-5 right-5 flex items-end justify-between">
-                <div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#c28e62] text-white uppercase tracking-wider mb-1.5 inline-block">
-                    {brandToView.category}
-                  </span>
-                  <h2 className="text-2xl font-black text-white flex items-center gap-2">
-                    <span>{brandToView.name}</span>
-                    <CheckCircle2 size={20} className="text-emerald-400" />
-                  </h2>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
-                  brandToView.status === 'Aktif' 
-                    ? 'bg-emerald-500 text-white' 
-                    : 'bg-rose-500 text-white'
-                }`}>
-                  {brandToView.status === 'Aktif' ? (
-                    <CheckCircle2 size={12} className="shrink-0" />
-                  ) : (
-                    <Ban size={12} className="shrink-0" />
-                  )}
-                  <span>{brandToView.status}</span>
-                </span>
-              </div>
             </div>
 
-            {/* DETAIL BODY */}
-            <div className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
-              
-              {/* OWNER CARD */}
+            {/* DETAIL MODAL BODY */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* METRIC STRIP (RELASI DATABASE: PRODUCTS & BATCHES) */}
+              {(() => {
+                const brandProducts = products.filter(p => (p.brandId && p.brandId === brandToView.id) || (p.brandName && p.brandName.toLowerCase() === brandToView.name.toLowerCase()));
+                const brandBatches = batches.filter(b => (b.brand || '').toLowerCase() === brandToView.name.toLowerCase());
+                const totalTags = brandBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
+                const activeBatches = brandBatches.filter(b => b.status === 'Aktif').length;
+
+                return (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                      <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                        <Box size={14} className="text-[#c28e62]" />
+                        <span>Katalog Produk</span>
+                      </div>
+                      <div className="text-lg font-bold text-slate-800 dark:text-zinc-100">
+                        {brandProducts.length} <span className="text-xs font-normal text-slate-400">SKU Terdaftar</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                      <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                        <Layers size={14} className="text-indigo-500" />
+                        <span>Batch Produksi</span>
+                      </div>
+                      <div className="text-lg font-bold text-slate-800 dark:text-zinc-100">
+                        {brandBatches.length} <span className="text-xs font-normal text-slate-400">Batch ({activeBatches} Aktif)</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                      <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                        <Tag size={14} className="text-emerald-500" />
+                        <span>Total Tag Fisik</span>
+                      </div>
+                      <div className="text-lg font-bold text-slate-800 dark:text-zinc-100">
+                        {totalTags.toLocaleString()} <span className="text-xs font-normal text-slate-400">Tag Diterbitkan</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* SEKSI 1: PIC / PEMILIK AKUN TERHUBUNG (RELASI TABEL USERS) */}
               {(() => {
                 const linkedUser = users.find(u => u.id === brandToView.ownerId);
                 const ownerDisplayName = linkedUser ? linkedUser.name : brandToView.ownerName;
                 const ownerDisplayRole = linkedUser ? linkedUser.role : (brandToView.ownerRole || 'PIC Brand');
                 const ownerDisplayEmail = linkedUser ? linkedUser.email : (brandToView.ownerEmail || '-');
+                const ownerDisplayPhone = linkedUser?.phone || '-';
+                const ownerDisplayStatus = linkedUser?.status || 'Aktif';
                 const ownerAvatar = linkedUser?.avatar;
 
                 return (
-                  <div className="bg-[#fcf7f3] dark:bg-zinc-800/80 p-4 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-700">
-                    <span className="text-[10px] font-bold text-[#c28e62] uppercase tracking-wider block mb-2">
-                      Akun Pemilik / PIC Otorisasi
-                    </span>
-                    <div className="flex items-center gap-3">
-                      {ownerAvatar ? (
-                        <img 
-                          src={ownerAvatar} 
-                          alt={ownerDisplayName} 
-                          onError={(e) => {
-                            const el = e.currentTarget;
-                            el.onerror = null;
-                            el.src = getInitialsAvatar(ownerDisplayName);
-                          }}
-                          className="w-11 h-11 rounded-2xl object-cover border border-[#c28e62] flex-shrink-0" 
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-2xl bg-[#c28e62] text-white flex items-center justify-center text-base font-bold flex-shrink-0">
-                          {ownerDisplayName ? ownerDisplayName.charAt(0).toUpperCase() : 'U'}
+                  <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <User size={13} className="text-[#c28e62]" />
+                        <span>Pemilik Akun / PIC Otorisasi (Tabel Users)</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400">ID: {brandToView.ownerId}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        {ownerAvatar ? (
+                          <img 
+                            src={ownerAvatar} 
+                            alt={ownerDisplayName} 
+                            onError={(e) => {
+                              const el = e.currentTarget;
+                              el.onerror = null;
+                              el.src = getInitialsAvatar(ownerDisplayName);
+                            }}
+                            className="w-11 h-11 rounded-full object-cover border-2 border-white dark:border-zinc-700 shrink-0" 
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-full bg-[#c28e62] text-white flex items-center justify-center font-bold text-sm shrink-0">
+                            {ownerDisplayName ? ownerDisplayName.charAt(0).toUpperCase() : 'U'}
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-800 dark:text-zinc-100 text-sm">
+                              {ownerDisplayName}
+                            </span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300">
+                              {ownerDisplayRole}
+                            </span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                              {ownerDisplayStatus}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                            <span className="flex items-center gap-1.5">
+                              <Mail size={12} className="text-slate-400" />
+                              <span>{ownerDisplayEmail}</span>
+                            </span>
+                            {ownerDisplayPhone !== '-' && (
+                              <span className="flex items-center gap-1.5">
+                                <Phone size={12} className="text-slate-400" />
+                                <span>{ownerDisplayPhone}</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div>
-                        <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-sm flex items-center gap-2">
-                          <span>{ownerDisplayName}</span>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                            {ownerDisplayRole}
-                          </span>
-                        </h4>
-                        <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                          {ownerDisplayEmail}
-                        </p>
                       </div>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* DESKRIPSI LENGKAP */}
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Deskripsi & Profil Merk
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-700 dark:text-zinc-300 leading-relaxed bg-slate-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-slate-100 dark:border-zinc-700/60">
-                  {brandToView.description || 'Tidak ada catatan deskripsi tambahan untuk brand ini.'}
-                </p>
-              </div>
-
-              {/* DAFTAR SKU PRODUK TERDAFTAR */}
-              {(() => {
-                const productList = getBrandProductList(brandToView.name);
-                return (
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                      <Box size={14} className="text-[#c28e62]" />
-                      <span>SKU Produk Terdaftar ({productList.length})</span>
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {productList.map((sku, idx) => (
-                        <span 
-                          key={idx} 
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs font-medium border border-slate-200 dark:border-zinc-700 flex items-center gap-1.5"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#c28e62]"></span>
-                          <span>{sku}</span>
-                        </span>
-                      ))}
-                    </div>
+              {/* SEKSI 2: DESKRIPSI & PROFIL BISNIS */}
+              {brandToView.description && (
+                <div>
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Deskripsi & Profil Brand
                   </div>
-                );
-              })()}
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-300 leading-relaxed bg-slate-50 dark:bg-zinc-800/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-800">
+                    {brandToView.description}
+                  </p>
+                </div>
+              )}
 
-              {/* DAFTAR BATCH TERKAIT BRAND INI */}
+              {/* SEKSI 3: KATALOG PRODUK & SKU (RELASI TABEL PRODUCTS) */}
               {(() => {
-                const associatedBatches = batches.filter(b => b.brand.toLowerCase() === brandToView.name.toLowerCase());
+                const brandProducts = products.filter(p => (p.brandId && p.brandId === brandToView.id) || (p.brandName && p.brandName.toLowerCase() === brandToView.name.toLowerCase()));
+
                 return (
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Batch Terdaftar ({associatedBatches.length})
-                      </h4>
-                      <button
-                        onClick={() => {
-                          setIsDetailBrandModalOpen(false);
-                          setActiveMenu('tag-qr');
-                        }}
-                        className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
-                      >
-                        Buka di Menu Tag / QRCode →
-                      </button>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Box size={13} className="text-[#c28e62]" />
+                        <span>Katalog Produk Terdaftar ({brandProducts.length})</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">Relasi: Tabel Products</span>
                     </div>
 
-                    {associatedBatches.length > 0 ? (
-                      <div className="space-y-2">
-                        {associatedBatches.map(b => (
-                          <div key={b.id} className="p-3 bg-slate-50 dark:bg-zinc-800 rounded-xl border border-slate-100 dark:border-zinc-700 flex items-center justify-between text-xs">
-                            <div>
-                              <div className="font-mono font-bold text-slate-800 dark:text-zinc-200">{b.batchId}</div>
-                              <div className="text-[11px] text-slate-400 mt-0.5">{b.sku} • {b.qty} Tag</div>
+                    {brandProducts.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {brandProducts.map((p) => (
+                          <div 
+                            key={p.id}
+                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
+                                <Box size={14} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate">
+                                  {p.sku}
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate">
+                                  {p.category || brandToView.category || 'Umum'}
+                                </div>
+                              </div>
                             </div>
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium inline-flex items-center gap-1 ${
-                              b.status === 'Disuspend'
-                                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
-                                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
+                              p.isB2B 
+                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60' 
+                                : 'bg-slate-200 text-slate-700 dark:bg-zinc-700 dark:text-zinc-300'
                             }`}>
-                              {b.status === 'Disuspend' ? <Ban size={10} className="shrink-0" /> : <CheckCircle2 size={10} className="shrink-0" />}
-                              <span>{b.status}</span>
+                              {p.isB2B ? 'B2B' : 'Retail'}
                             </span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="py-6 text-center text-xs text-slate-400 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700">
-                        Belum ada batch yang digenerate dengan merk ini.
+                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
+                        Belum ada SKU produk yang terhubung untuk merk ini.
                       </div>
                     )}
                   </div>
                 );
               })()}
 
+              {/* SEKSI 4: RIWAYAT BATCH PRODUKSI (RELASI TABEL BATCHES) */}
+              {(() => {
+                const brandBatches = batches.filter(b => (b.brand || '').toLowerCase() === brandToView.name.toLowerCase());
+
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Layers size={13} className="text-indigo-500" />
+                        <span>Riwayat Batch Produksi ({brandBatches.length})</span>
+                      </div>
+                      {brandBatches.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDetailBrandModalOpen(false);
+                            setActiveMenu('tag-qr');
+                          }}
+                          className="text-[11px] text-[#c28e62] hover:underline font-semibold cursor-pointer"
+                        >
+                          Buka di Menu Tag / QR Code →
+                        </button>
+                      )}
+                    </div>
+
+                    {brandBatches.length > 0 ? (
+                      <div className="space-y-2">
+                        {brandBatches.map(b => (
+                          <div 
+                            key={b.id} 
+                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs"
+                          >
+                            <div>
+                              <div className="font-mono font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                                <span>{b.batchId}</span>
+                                {b.project && (
+                                  <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                    {b.project}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5">
+                                SKU: {b.sku} • {b.qty?.toLocaleString()} Tag • {b.date}
+                              </div>
+                            </div>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium inline-flex items-center gap-1 shrink-0 ${
+                              b.status === 'Disuspend'
+                                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                            }`}>
+                              {b.status === 'Disuspend' ? <Ban size={10} /> : <CheckCircle2 size={10} />}
+                              <span>{b.status}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
+                        Belum ada batch produksi yang digenerate untuk merk ini.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* DETAIL FOOTER */}
-            <div className="px-5 sm:px-6 py-4 bg-slate-50 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex justify-between items-center flex-shrink-0">
-              <span className="text-[11px] text-slate-400">
-                Terdaftar sejak: {brandToView.createdAt}
+            {/* DETAIL MODAL FOOTER */}
+            <div className="px-6 py-4 bg-slate-50 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+              <span className="text-xs text-slate-400 dark:text-zinc-500">
+                Terdaftar sejak: <span className="font-semibold text-slate-600 dark:text-zinc-300">{brandToView.createdAt}</span>
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
                 <button
+                  type="button"
                   onClick={() => {
                     setIsDetailBrandModalOpen(false);
                     handleOpenEditBrand(brandToView);
                   }}
-                  className="px-4 py-2 bg-[#c28e62] text-white rounded-full text-xs font-semibold hover:bg-[#b37f54] transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold transition-colors cursor-pointer shadow-xs"
                 >
                   Edit Data Brand
                 </button>
                 <button
+                  type="button"
                   onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); }}
-                  className="px-4 py-2 bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 rounded-full text-xs font-semibold hover:bg-slate-300 dark:hover:bg-zinc-600 transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-slate-700 dark:text-zinc-200 rounded-full text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Tutup
                 </button>

@@ -300,54 +300,69 @@ export const ScanLocationMap: React.FC = () => {
 
       {/* FILTER BAR 3 WARNA STATUS (FULL ROUNDED) */}
       <div className="pt-1">
-        {/* Filter Segmented Controls */}
-        <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-800 rounded-full text-xs font-medium overflow-x-auto max-w-full">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-              statusFilter === 'all'
-                ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 font-bold'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            Semua Titik ({stats.total})
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-800 rounded-full text-xs font-medium overflow-x-auto max-w-full">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
+                statusFilter === 'all'
+                  ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 font-bold'
+                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+              }`}
+            >
+              Semua Titik ({stats.total})
+            </button>
 
-          <button
-            onClick={() => setStatusFilter('valid')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-              statusFilter === 'valid'
-                ? 'bg-emerald-600 text-white font-bold'
-                : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span>Asli ({stats.valid})</span>
-          </button>
+            <button
+              onClick={() => setStatusFilter('valid')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
+                statusFilter === 'valid'
+                  ? 'bg-emerald-600 text-white font-bold'
+                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Asli ({stats.valid})</span>
+            </button>
 
-          <button
-            onClick={() => setStatusFilter('repeated')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-              statusFilter === 'repeated'
-                ? 'bg-amber-600 text-white font-bold'
-                : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-            <span>Berulang ({stats.repeated})</span>
-          </button>
+            <button
+              onClick={() => setStatusFilter('repeated')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
+                statusFilter === 'repeated'
+                  ? 'bg-amber-600 text-white font-bold'
+                  : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span>Berulang ({stats.repeated})</span>
+            </button>
 
-          <button
-            onClick={() => setStatusFilter('suspicious')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-              statusFilter === 'suspicious'
-                ? 'bg-red-600 text-white font-bold'
-                : 'text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
-            <span>Curiga ({stats.suspicious})</span>
-          </button>
+            <button
+              onClick={() => setStatusFilter('suspicious')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
+                statusFilter === 'suspicious'
+                  ? 'bg-red-600 text-white font-bold'
+                  : 'text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
+              <span>Curiga ({stats.suspicious})</span>
+            </button>
+          </div>
+
+          {/* Reset filter button if active (seperti di halaman tag qrcode) */}
+          {(statusFilter !== 'all' || activePointId !== null) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('all');
+                handleResetView();
+              }}
+              className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+            >
+              Reset Filter
+            </button>
+          )}
         </div>
       </div>
 

@@ -107,12 +107,12 @@ function getQrCodePayload(batch: BatchItem, tag: TagItem): string {
 
 /**
  * Render PDF Layout Cetak Stiker Gosok pada format A3+ (310 x 470 mm)
- * Sesuai Spesifikasi:
- * - Ukuran Label Vertikal: 25 mm x 60 mm dengan sudut rounded
- * - Header Brand & Garansi Produk di bagian atas (0 - 18 mm)
- * - QR CODE di bagian tengah (18 - 35 mm)
- * - Area Gosok PIN: 25 mm x 25 mm rata dari bawah (35 - 60 mm)
- * - Layout PIN: 2 baris (4 digit atas & 4 digit bawah)
+ * Sesuai Panduan Ukuran Resmi:
+ * - Total Ukuran Label: 25 mm x 60 mm (sudut rounded halus R2.0 mm, outline cutting merah)
+ * - Bagian 1 (Atas): Header Brand & Logo (w: 25 mm, h: 23 mm)
+ * - Bagian 2 (Tengah): QR Code (w: 25 mm, h: 25 mm)
+ * - Bagian 3 (Bawah): Area Gosok PIN (w: 25 mm, h: 9.6 mm) disusun 2 baris (4 digit atas & 4 digit bawah)
+ *   Font: Kode Mono Bold, ukuran pas (13.5 pt), jarak baris atas & bawah rapat (~1.3 mm gap visual)
  */
 export async function generateA3PlusStickersPdf(
   batch: BatchItem,
@@ -137,9 +137,9 @@ export async function generateA3PlusStickersPdf(
     console.warn('Could not register KodeMono font in jsPDF:', err);
   }
 
-  // Dimensi Label & Grid Layout
+  // Dimensi Label & Grid Layout Sesuai Panduan Ukuran: 25 mm x 60 mm
   const STICKER_WIDTH = 25; // 25 mm
-  const STICKER_HEIGHT = 62; // 62 mm (proporsional untuk logo 23mm, teks, QR 25x25mm, dan PIN 2 baris)
+  const STICKER_HEIGHT = 60; // 60 mm (total keseluruhan label tag: 25 mm x 60 mm)
   const CORNER_RADIUS = 2.0; // mm (ujung sudut rounded)
 
   // Grid layout pada lembar A3+: 10 kolom x 6 baris = 60 stiker per lembar
@@ -148,13 +148,13 @@ export async function generateA3PlusStickersPdf(
   const STICKERS_PER_PAGE = COLS * ROWS; // 60 stiker per lembar A3+
 
   const GAP_X = 3.0; // mm
-  const GAP_Y = 3.5; // mm
+  const GAP_Y = 4.0; // mm
 
-  // Hitung offset agar grid simetris dan terpusat di lembar A3+
+  // Hitung offset agar grid simetris dan terpusat di lembar A3+ (Header & Footer dihapus, hanya marking sensor sudut)
   const totalGridWidth = COLS * STICKER_WIDTH + (COLS - 1) * GAP_X; // 10*25 + 9*3 = 277 mm
-  const totalGridHeight = ROWS * STICKER_HEIGHT + (ROWS - 1) * GAP_Y; // 6*62 + 5*3.5 = 389.5 mm
+  const totalGridHeight = ROWS * STICKER_HEIGHT + (ROWS - 1) * GAP_Y; // 6*60 + 5*4 = 380 mm
   const startX = (PAGE_WIDTH - totalGridWidth) / 2; // (310 - 277) / 2 = 16.5 mm
-  const startY = (PAGE_HEIGHT - totalGridHeight) / 2 + 5; // mm dari atas
+  const startY = (PAGE_HEIGHT - totalGridHeight) / 2; // (470 - 380) / 2 = 45 mm (simetris di tengah lembar A3+)
 
   const totalPages = Math.max(1, Math.ceil(tags.length / STICKERS_PER_PAGE));
 
@@ -177,7 +177,7 @@ export async function generateA3PlusStickersPdf(
 
     const pageTags = tags.slice(pageIdx * STICKERS_PER_PAGE, (pageIdx + 1) * STICKERS_PER_PAGE);
 
-    // 1. Gambar Tanda Registrasi Percetakan (Crosshair registration marks di 4 sudut)
+    // 1. Gambar Tanda Registrasi Percetakan (Crosshair sensor registration marks di 4 sudut lembar A3+)
     doc.setDrawColor(160, 165, 175);
     doc.setLineWidth(0.25);
 
@@ -194,36 +194,7 @@ export async function generateA3PlusStickersPdf(
       doc.circle(c.x, c.y, 2.2);
     });
 
-    // Sheet Header & Info Bar
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(30, 41, 59);
-    doc.text('LEMBAR CETAK LABEL (A3+ 310 x 470 mm)', 16.5, 14);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 116, 139);
-    const infoText = `Batch ID: ${batch.batchId}  |  Brand: ${batch.brand}  |  SKU: ${batch.sku}  |  Label: 25 x 62 mm  |  Hal ${pageIdx + 1}/${totalPages} (${pageTags.length} Label)`;
-    doc.text(infoText, 16.5, 19.5);
-
-    // Color Calibration Bars (CMYK simulation for printing press)
-    const calColors = [
-      [56, 59, 130],   // Brand Royal Navy
-      [194, 142, 98],  // Sumas Gold Accent
-      [0, 160, 230],   // Cyan
-      [230, 0, 120],   // Magenta
-      [255, 210, 0],   // Yellow
-      [30, 30, 30]     // Black
-    ];
-    calColors.forEach((rgb, cIdx) => {
-      doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-      doc.rect(16.5 + cIdx * 6, 23, 5, 2.5, 'F');
-    });
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(16.5, 28, PAGE_WIDTH - 16.5, 28);
-
-    // 2. Render Setiap Sel Label Stiker pada Grid (25 mm x 62 mm, Polosan Full Putih, Outline Cutting Merah)
+    // 2. Render Setiap Sel Label Stiker pada Grid (25 mm x 60 mm, Polosan Full Putih, Outline Cutting Merah)
     for (let i = 0; i < pageTags.length; i++) {
       const tag = pageTags[i];
       const col = i % COLS;
@@ -240,59 +211,65 @@ export async function generateA3PlusStickersPdf(
       doc.roundedRect(x, y, STICKER_WIDTH, STICKER_HEIGHT, CORNER_RADIUS, CORNER_RADIUS, 'F');
 
       // ==========================================
-      // BAGIAN 1: LOGO DI ATAS (UKURAN LEBAR 23 MM)
+      // BAGIAN 1: HEADER & LOGO (w: 25 mm, h: 23 mm)
+      // Rentang vertikal: y s/d y + 23 mm
+      // Semua objek terpusat secara vertikal (vertical center: y + 11.5 mm)
       // ==========================================
-      // Laurel Wreath Emblem
-      doc.setDrawColor(194, 152, 107); // Gold #c2986b
-      doc.setLineWidth(0.24);
-      doc.circle(cx, y + 4.2, 2.2);
+      // Laurel Wreath Emblem & Monogram (Center: y + 6.0 mm, radius 2.5 mm)
+      doc.setDrawColor(36, 33, 86); // Navy / Dark slate
+      doc.setLineWidth(0.25);
+      doc.circle(cx, y + 6.0, 2.5);
 
       doc.setFont('times', 'bold');
-      doc.setFontSize(3.8);
-      doc.setTextColor(36, 33, 86); // Royal navy
-      doc.text('S', cx, y + 5.2, { align: 'center' });
-
-      // Brand Name di bawah emblem (lebar total area logo 23 mm)
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5.2);
+      doc.setFontSize(4.4);
       doc.setTextColor(36, 33, 86);
+      doc.text('S', cx, y + 7.3, { align: 'center' });
+
+      // Brand Name di bawah emblem (e.g. SUMAS)
+      doc.setFont('times', 'bold');
+      doc.setFontSize(5.8);
+      doc.setTextColor(24, 24, 27);
       const brandClean = (batch.brand || 'SUMAS').toUpperCase().slice(0, 14);
-      doc.text(brandClean, cx, y + 9.0, { align: 'center' });
+      doc.text(brandClean, cx, y + 12.0, { align: 'center' });
 
-      // ==========================================
-      // BAGIAN 2: TEKS ORIGINAL PRODUCT & PRODUK ASLI
-      // ==========================================
-      // Original Product (kapital bold)
+      // Teks Subtitle 1: ORIGINAL PRODUCT (Ukuran Font: 5)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(3.2);
+      doc.setFontSize(5.0);
       doc.setTextColor(15, 23, 42); // Black/Slate-900
-      doc.text('ORIGINAL PRODUCT', cx, y + 12.5, { align: 'center' });
+      doc.text('ORIGINAL PRODUCT', cx, y + 15.6, { align: 'center' });
 
-      // produk asli (regular kapital)
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(2.6);
-      doc.setTextColor(100, 116, 139); // Slate-500
-      doc.text('PRODUK ASLI', cx, y + 15.3, { align: 'center' });
+      // Teks Subtitle 2: PRODUK ASLI (Ukuran Font: 5, Gap rapat dengan baris atas)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.0);
+      doc.setTextColor(71, 85, 105); // Slate-600
+      doc.text('PRODUK ASLI', cx, y + 18.0, { align: 'center' });
 
       // ==========================================
-      // BAGIAN 3: QR CODE UKURAN 25 mm x 25 mm
-      // (Sudah termasuk area putih di sekeliling QR Code)
+      // BAGIAN 2: QR CODE UKURAN 25 mm x 25 mm
+      // Rentang vertikal: y + 23 mm s/d y + 48 mm
+      // Terpusat vertikal dan horizontal (Center: y + 35.5 mm)
       // ==========================================
       const qrDataUrl = qrCache.get(tag.tagNumber);
-      const qrSize = 25.0; // 25 mm x 25 mm
+      const qrSize = 25.0; // 25 mm x 25 mm persis sesuai panduan
       const qrX = x; // Pas selebar stiker 25 mm
-      const qrY = y + 17.0; // y + 17.0 s/d y + 42.0 mm
+      const qrY = y + 23.0; // y + 23.0 s/d y + 48.0 mm
       if (qrDataUrl) {
         doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
       }
 
       // ==========================================
-      // BAGIAN 4: PIN DISUSUN 2 BARIS (FONT KODE MONO, RAPAT / TANPA RENGGANG)
+      // BAGIAN 3: PIN AREA (w: 25 mm, h: 12 mm / slot 9.6 mm)
+      // Rentang vertikal: y + 48.0 s/d y + 60.0 mm
+      // Terpusat secara vertikal (Center: y + 54.0 mm)
+      // PIN 2 baris (4 digit atas & 4 digit bawah)
+      // Digit PIN PADAT TANPA SPASI (misal: "0123" dan "4567")
+      // Font: Kode Mono Bold, ukuran font: 14 & gap baris rapat
       // ==========================================
       const rawPin = String(tag.pin || '00000000').replace(/\s+/g, '');
       const half = Math.ceil(rawPin.length / 2);
       const isMultiLine = rawPin.length > 4;
-      // Tidak renggang (tanpa spasi antar digit)
+
+      // Penulisan digit PIN padat TANPA SPASI tiap digitnya
       const pinPart1 = isMultiLine ? rawPin.slice(0, half) : rawPin;
       const pinPart2 = isMultiLine ? rawPin.slice(half) : '';
 
@@ -301,17 +278,19 @@ export async function generateA3PlusStickersPdf(
       } catch (_) {
         doc.setFont('courier', 'bold');
       }
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(15, 23, 42); // Black/Slate-900
 
       if (isMultiLine && pinPart2) {
-        doc.setFontSize(12.5);
-        // Baris 1: digit atas (terpusat secara vertikal di area bawah QR)
-        doc.text(pinPart1, cx, y + 50.0, { align: 'center' });
-        // Baris 2: digit bawah
-        doc.text(pinPart2, cx, y + 56.5, { align: 'center' });
+        // Ukuran font PIN 14.0
+        doc.setFontSize(14.0);
+        // Baris 1: digit atas (baseline y + 53.2 mm)
+        doc.text(pinPart1, cx, y + 53.2, { align: 'center' });
+        // Baris 2: digit bawah (baseline y + 57.5 mm, jarak baseline 4.3 mm, gap rapat & center vertikal)
+        doc.text(pinPart2, cx, y + 57.5, { align: 'center' });
       } else {
-        doc.setFontSize(13.0);
-        doc.text(pinPart1, cx, y + 53.0, { align: 'center' });
+        doc.setFontSize(14.0);
+        // Single line terpusat vertikal pada y + 55.0 mm
+        doc.text(pinPart1, cx, y + 55.0, { align: 'center' });
       }
 
       // ==========================================
@@ -326,16 +305,6 @@ export async function generateA3PlusStickersPdf(
         onProgress(overallIdx, tags.length);
       }
     }
-
-    // Sheet Footer Info
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text(
-      `Format Kertas: A3+ (310 x 470 mm) • Ukuran Label: 25 x 62 mm (Full Putih, Outline Cutting Merah) • Logo: 23 mm • QR Code: 25 x 25 mm • Font PIN: Kode Mono • Grid: 10 x 6 = 60 label/lembar`,
-      16.5,
-      PAGE_HEIGHT - 6
-    );
   }
 
   return doc.output('blob');
