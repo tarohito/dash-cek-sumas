@@ -7458,26 +7458,28 @@ export default function App() {
       {isDeleteModalOpen && (
         <div 
           onClick={(e) => { if (e.target === e.currentTarget) { setIsDeleteModalOpen(false); setBatchToDelete(null); } }}
-          className="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 w-full max-w-sm overflow-hidden text-center p-6 mx-4">
-            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
-              <AlertCircle size={24} />
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-sm overflow-hidden text-center p-6 mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={24} />
             </div>
             <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-base sm:text-lg mb-2">Hapus Batch Ini?</h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-6">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-6 leading-relaxed">
               Apakah Anda yakin ingin menghapus data batch ini? Seluruh data Tag, PIN, dan Riwayat Perubahan akan ikut terhapus secara permanen.
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center items-center">
               <button 
+                type="button"
                 onClick={() => { setIsDeleteModalOpen(false); setBatchToDelete(null); }} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
+                type="button"
                 onClick={handleDeleteBatch} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
               >
                 Ya, Hapus
               </button>
@@ -8508,32 +8510,34 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) { setIsDeleteUserModalOpen(false); setUserToDelete(null); } }}
           className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-700 w-full max-w-sm overflow-hidden text-center p-6 mx-4">
-            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
-              <AlertCircle size={24} />
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-sm overflow-hidden text-center p-6 mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={24} />
             </div>
             <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-base sm:text-lg mb-2">Hapus Pengguna Ini?</h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-4">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-4 leading-relaxed">
               Apakah Anda yakin ingin menghapus akun pengguna <strong>{userToDelete.name}</strong> ({userToDelete.email})?
             </p>
             {(() => {
               const ownedCount = brands.filter(b => b.ownerId === userToDelete.id).length;
               return ownedCount > 0 ? (
-                <div className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3 mb-5 text-[11px] text-left leading-relaxed">
-                  ⚠️ Perhatian: Pengguna ini tercatat sebagai pemilik dari {ownedCount} brand.
+                <div className="bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-3 mb-4 text-xs text-left leading-relaxed">
+                  ⚠️ <strong>Perhatian:</strong> Pengguna ini tercatat sebagai pemilik dari {ownedCount} brand.
                 </div>
               ) : null;
             })()}
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center items-center">
               <button 
+                type="button"
                 onClick={() => { setIsDeleteUserModalOpen(false); setUserToDelete(null); }} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
+                type="button"
                 onClick={handleConfirmDeleteUser} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
               >
                 Ya, Hapus
               </button>
@@ -9054,8 +9058,8 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) { setIsDeleteBrandModalOpen(false); setBrandToDelete(null); } }}
           className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-700 w-full max-w-sm overflow-hidden text-center p-6 mx-4 animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-sm overflow-hidden text-center p-6 mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4">
               <Trash2 size={24} />
             </div>
             <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-base sm:text-lg mb-2">
@@ -9066,30 +9070,30 @@ export default function App() {
               const batchCount = batches.filter(b => b.brand.toLowerCase() === brandToDelete.name.toLowerCase()).length;
               return (
                 <div>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-3">
-                    Apakah Anda yakin ingin menghapus data brand ini? Tindakan ini akan menghapus katalog merk dari sistem database SQLite.
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-4 leading-relaxed">
+                    Apakah Anda yakin ingin menghapus data brand ini? Tindakan ini akan menghapus katalog merk dari master sistem.
                   </p>
                   {batchCount > 0 && (
-                    <div className="mb-5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 text-xs text-left">
-                      <strong>Perhatian:</strong> Terdapat <strong>{batchCount} batch</strong> yang saat ini menggunakan merk ini. Riwayat batch tetap ada namun katalog brand akan dihapus.
+                    <div className="mb-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 text-xs text-left leading-relaxed">
+                      ⚠️ <strong>Perhatian:</strong> Terdapat <strong>{batchCount} batch</strong> yang saat ini menggunakan merk ini. Riwayat batch tetap ada namun katalog brand akan dihapus.
                     </div>
                   )}
                 </div>
               );
             })()}
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center items-center">
               <button 
                 type="button"
                 onClick={() => { setIsDeleteBrandModalOpen(false); setBrandToDelete(null); }} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
                 type="button"
                 onClick={handleConfirmDeleteBrand} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
               >
                 Ya, Hapus
               </button>
@@ -9732,16 +9736,16 @@ export default function App() {
               setSkuToDelete(null); 
             } 
           }}
-          className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-md overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200 p-5 sm:p-6 text-center">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-sm overflow-hidden text-center p-6 mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-4">
               <Trash2 size={24} />
             </div>
-            <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-base mb-1">
+            <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-base sm:text-lg mb-2">
               Hapus SKU Produk?
             </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-4">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-4 leading-relaxed">
               Anda akan menghapus SKU <span className="font-semibold text-slate-700 dark:text-zinc-200">"{skuToDelete.sku}"</span> ({skuToDelete.brandName}) dari master katalog.
             </p>
 
@@ -9749,7 +9753,7 @@ export default function App() {
               const linkedBatches = getSkuBatches(skuToDelete.sku, skuToDelete.brandName);
               if (linkedBatches.length > 0) {
                 return (
-                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl p-3 text-left mb-4 text-xs text-amber-800 dark:text-amber-300">
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-3 text-left mb-4 text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                     <p className="font-bold flex items-center gap-1.5 mb-1">
                       <AlertTriangle size={14} /> Perhatian Relasi Data
                     </p>
@@ -9762,20 +9766,20 @@ export default function App() {
               return null;
             })()}
 
-            <div className="flex items-center justify-center gap-2.5">
+            <div className="flex gap-3 justify-center items-center">
               <button
                 type="button"
                 onClick={() => { setIsDeleteSkuModalOpen(false); setSkuToDelete(null); }}
-                className="px-5 py-2.5 rounded-full text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDeleteSku}
-                className="px-5 py-2.5 rounded-full text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
               >
-                Ya, Hapus SKU
+                Ya, Hapus
               </button>
             </div>
           </div>

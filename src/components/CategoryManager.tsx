@@ -957,24 +957,24 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
           onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) setDeleteModalOpen(false); }}
           className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-sm overflow-hidden text-center p-6 mx-4 animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-600 dark:text-red-400">
-              <AlertTriangle size={24} />
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-sm overflow-hidden text-center p-6 mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={24} />
             </div>
             <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-base sm:text-lg mb-2">
               Hapus {getLevelLabel(categoryToDelete.level)}?
             </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-4 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mb-6 leading-relaxed">
               Apakah Anda yakin ingin menghapus <strong>"{categoryToDelete.name}"</strong>?
               {categoryToDelete.level < 3 && ' Seluruh sub-kategori di bawahnya juga akan ikut terhapus.'}
             </p>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center items-center">
               <button
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setDeleteModalOpen(false)}
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -982,7 +982,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleConfirmDelete}
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs disabled:opacity-50"
               >
                 {isSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
               </button>
