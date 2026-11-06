@@ -852,7 +852,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
                       onChange={(val) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: val }))}
                       options={(field.options || []).map(opt => ({ value: opt, label: opt }))}
                       placeholder={`Pilih ${field.label}...`}
-                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100"
+                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 flex items-center justify-between cursor-pointer select-none"
                     />
                   ) : field.type === 'boolean' ? (
                     <CustomSelect
@@ -863,7 +863,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
                         { value: 'Tidak', label: 'Tidak (Nonaktif)' }
                       ]}
                       placeholder={`Pilih ${field.label}...`}
-                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100"
+                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 flex items-center justify-between cursor-pointer select-none"
                     />
                   ) : field.type === 'number' ? (
                     <div className="relative">

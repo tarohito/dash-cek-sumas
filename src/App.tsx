@@ -309,7 +309,9 @@ const CustomSelect = ({
       <div 
         ref={buttonRef}
         onClick={toggleDropdown}
-        className={buttonClassName || `w-full bg-white dark:bg-zinc-800 border ${isOpen ? 'border-[#cd9a6f]' : 'border-slate-300 dark:border-zinc-600'} rounded-full px-4 sm:px-5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f] transition-colors duration-200 select-none`}
+        className={`cursor-pointer flex items-center justify-between select-none transition-colors duration-200 ${
+          buttonClassName || `w-full bg-white dark:bg-zinc-800 border ${isOpen ? 'border-[#cd9a6f]' : 'border-slate-300 dark:border-zinc-600'} rounded-full px-4 sm:px-5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-zinc-200 hover:border-[#cd9a6f] dark:hover:border-[#cd9a6f]`
+        }`}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           {selectedOpt?.avatar ? (

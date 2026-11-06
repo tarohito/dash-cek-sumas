@@ -1126,9 +1126,9 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                     </div>
 
                     {/* TIPE DATA & WAJIB DIISI */}
-                    <div className="pl-7 grid grid-cols-2 gap-2 items-center">
+                    <div className="pl-7 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                       <div className="space-y-1">
-                        <span className="text-[11px] text-slate-400">Tipe Input</span>
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">Tipe Input</span>
                         <CustomSelect
                           value={field.type}
                           onChange={(val) => handleUpdateField(field.id, { type: val as any })}
@@ -1139,13 +1139,14 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             { value: 'boolean', label: 'Ya / Tidak' }
                           ]}
                           placeholder="Pilih tipe input..."
-                          buttonClassName="w-full h-8 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-700 dark:text-zinc-300"
+                          minDropdownWidth={180}
+                          buttonClassName="w-full h-9 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs text-slate-700 dark:text-zinc-300 flex items-center justify-between cursor-pointer select-none"
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <span className="text-[11px] text-slate-400">Wajib Diisi</span>
-                        <div className="flex items-center gap-2 pt-1">
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">Wajib Diisi</span>
+                        <div className="flex items-center gap-2.5 h-9">
                           <label className="relative inline-flex items-center cursor-pointer">
                             <input
                               type="checkbox"
@@ -1155,7 +1156,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             />
                             <div className="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#c28e62]"></div>
                           </label>
-                          <span className="text-xs text-slate-600 dark:text-zinc-300">
+                          <span className="text-xs text-slate-600 dark:text-zinc-300 font-medium">
                             {field.required ? 'Ya' : 'Opsional'}
                           </span>
                         </div>
