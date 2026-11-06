@@ -118,9 +118,10 @@ const SelectOptionsEditor: React.FC<SelectOptionsEditorProps> = ({ options = [],
           type="button"
           onClick={() => handleAdd()}
           disabled={!inputValue.trim()}
-          className="h-9 px-4 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 text-white text-xs font-semibold transition-colors cursor-pointer shrink-0"
+          title="Tambah opsi"
+          className="w-9 h-9 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-2xs"
         >
-          + Tambah
+          <Plus size={16} />
         </button>
       </div>
     </div>
