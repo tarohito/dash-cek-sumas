@@ -821,23 +821,23 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               <Sliders size={16} className="text-[#c28e62]" />
               <span>Spesifikasi Produk</span>
             </h2>
-            <div className="flex items-center gap-2">
-              {activeCategorySchema.length > 0 && (
+            {activeCategorySchema.length > 0 && (
+              <div className="flex items-center gap-2">
                 <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold">
                   {activeCategorySchema.length} Parameter
                 </span>
-              )}
-              {matchedCategory && (
-                <button
-                  type="button"
-                  onClick={() => setIsSpecDrawerOpen(true)}
-                  className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] bg-slate-50 dark:bg-zinc-800/80 text-xs font-semibold text-slate-700 dark:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Sliders size={12} className="text-[#c28e62]" />
-                  <span>{activeCategorySchema.length > 0 ? 'Kelola Form Kategori' : 'Atur Spesifikasi Kategori'}</span>
-                </button>
-              )}
-            </div>
+                {matchedCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSpecDrawerOpen(true)}
+                    className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] bg-slate-50 dark:bg-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sliders size={12} className="text-[#c28e62]" />
+                    <span>Ubah Form Kategori</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {activeCategorySchema.length > 0 ? (
@@ -922,17 +922,17 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               ))}
             </div>
           ) : (
-            <div className="py-10 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-850/40 flex flex-col items-center justify-center space-y-3">
-              <div className="w-10 h-10 rounded-full bg-[#c28e62]/10 flex items-center justify-center text-[#c28e62]">
+            <div className="py-12 px-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 bg-transparent flex flex-col items-center justify-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
                 <Sliders size={18} />
               </div>
-              <div className="space-y-1 max-w-sm">
-                <h3 className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-200">
+              <div className="space-y-1 max-w-md">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
                   Spesifikasi Produk Kosong
                 </h3>
-                <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+                <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
                   {matchedCategory 
-                    ? `Kategori "${matchedCategory.name}" belum memiliki form spesifikasi khusus.` 
+                    ? `Kategori "${matchedCategory.name}" belum memiliki form spesifikasi khusus. Atur template kategori untuk menambahkan parameter seperti bahan, dimensi, garansi, dll.` 
                     : 'Pilih kategori terlebih dahulu untuk mengatur spesifikasi produk.'}
                 </p>
               </div>
@@ -940,16 +940,15 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsSpecDrawerOpen(true)}
-                  className="px-4 py-2 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  className="mt-1 px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
                 >
-                  <Plus size={14} />
-                  <span>Atur Spesifikasi Kategori</span>
+                  Atur Spesifikasi Kategori
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(true)}
-                  className="px-4 py-2 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] text-slate-700 dark:text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
+                  className="mt-1 px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] text-slate-700 dark:text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Pilih Kategori Produk
                 </button>
@@ -971,7 +970,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               <button
                 type="button"
                 onClick={handleAddCustomSpec}
-                className="px-3.5 py-1.5 rounded-full border border-dashed border-[#c28e62]/70 hover:border-[#c28e62] bg-[#c28e62]/5 hover:bg-[#c28e62]/10 text-xs font-semibold text-[#c28e62] transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] bg-white dark:bg-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer"
               >
                 + Tambah Spesifikasi
               </button>
