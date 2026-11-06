@@ -173,8 +173,27 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
   // Specifications state
   const [specMaterial, setSpecMaterial] = useState<string>(parsedInitial.material);
   const [specDimension, setSpecDimension] = useState<string>(parsedInitial.dimension);
+  const [specThickness, setSpecThickness] = useState<string>(parsedInitial.thickness);
+  const [specWeight, setSpecWeight] = useState<string>(parsedInitial.weight);
+  const [specCapacity, setSpecCapacity] = useState<string>(parsedInitial.capacity);
   const [specFinishing, setSpecFinishing] = useState<string>(parsedInitial.finishing);
+  const [specGrade, setSpecGrade] = useState<string>(parsedInitial.grade);
+  const [specCertification, setSpecCertification] = useState<string>(parsedInitial.certification);
   const [specWarranty, setSpecWarranty] = useState<string>(parsedInitial.warranty);
+  const [specOrigin, setSpecOrigin] = useState<string>(parsedInitial.origin);
+  const [customSpecs, setCustomSpecs] = useState<CustomSpecItem[]>(parsedInitial.customSpecs);
+
+  const handleAddCustomSpec = () => {
+    setCustomSpecs(prev => [...prev, { id: `cs-${Date.now()}`, key: '', value: '' }]);
+  };
+
+  const handleUpdateCustomSpec = (id: string, field: 'key' | 'value', val: string) => {
+    setCustomSpecs(prev => prev.map(item => item.id === id ? { ...item, [field]: val } : item));
+  };
+
+  const handleRemoveCustomSpec = (id: string) => {
+    setCustomSpecs(prev => prev.filter(item => item.id !== id));
+  };
 
   // Description state
   const [description, setDescription] = useState<string>(parsedInitial.desc);
@@ -191,8 +210,15 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       setProductImage(initialData.image || '');
       setSpecMaterial(parsedInitial.material);
       setSpecDimension(parsedInitial.dimension);
+      setSpecThickness(parsedInitial.thickness);
+      setSpecWeight(parsedInitial.weight);
+      setSpecCapacity(parsedInitial.capacity);
       setSpecFinishing(parsedInitial.finishing);
+      setSpecGrade(parsedInitial.grade);
+      setSpecCertification(parsedInitial.certification);
       setSpecWarranty(parsedInitial.warranty);
+      setSpecOrigin(parsedInitial.origin);
+      setCustomSpecs(parsedInitial.customSpecs);
       setDescription(parsedInitial.desc);
     }
   }, [initialData, mode]);
@@ -348,8 +374,15 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
     productImage !== (initialData.image || '') ||
     specMaterial.trim() !== parsedInitial.material.trim() ||
     specDimension.trim() !== parsedInitial.dimension.trim() ||
+    specThickness.trim() !== parsedInitial.thickness.trim() ||
+    specWeight.trim() !== parsedInitial.weight.trim() ||
+    specCapacity.trim() !== parsedInitial.capacity.trim() ||
     specFinishing.trim() !== parsedInitial.finishing.trim() ||
+    specGrade.trim() !== parsedInitial.grade.trim() ||
+    specCertification.trim() !== parsedInitial.certification.trim() ||
     specWarranty.trim() !== parsedInitial.warranty.trim() ||
+    specOrigin.trim() !== parsedInitial.origin.trim() ||
+    customSpecs.length !== parsedInitial.customSpecs.length ||
     description.trim() !== parsedInitial.desc.trim()
   ) : Boolean(
     skuName.trim() ||
@@ -357,8 +390,15 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
     productImage ||
     specMaterial.trim() ||
     specDimension.trim() ||
+    specThickness.trim() ||
+    specWeight.trim() ||
+    specCapacity.trim() ||
     specFinishing.trim() ||
+    specGrade.trim() ||
+    specCertification.trim() ||
     specWarranty.trim() ||
+    specOrigin.trim() ||
+    customSpecs.length > 0 ||
     description.trim()
   );
 
@@ -397,9 +437,16 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       // Gabungkan spesifikasi terstruktur ke dalam deskripsi produk jika diisi
       const specItems = [
         specMaterial.trim() ? `Material: ${specMaterial.trim()}` : '',
-        specDimension.trim() ? `Dimensi: ${specDimension.trim()}` : '',
         specFinishing.trim() ? `Finishing/Warna: ${specFinishing.trim()}` : '',
-        specWarranty.trim() ? `Garansi/Standar: ${specWarranty.trim()}` : ''
+        specDimension.trim() ? `Dimensi: ${specDimension.trim()}` : '',
+        specGrade.trim() ? `Ketahanan: ${specGrade.trim()}` : '',
+        specThickness.trim() ? `Ketebalan: ${specThickness.trim()}` : '',
+        specCertification.trim() ? `Sertifikasi: ${specCertification.trim()}` : '',
+        specWeight.trim() ? `Berat: ${specWeight.trim()}` : '',
+        specWarranty.trim() ? `Garansi: ${specWarranty.trim()}` : '',
+        specCapacity.trim() ? `Kapasitas: ${specCapacity.trim()}` : '',
+        specOrigin.trim() ? `Negara Asal: ${specOrigin.trim()}` : '',
+        ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
       ].filter(Boolean);
 
       const parts: string[] = [];
@@ -754,21 +801,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               />
             </div>
 
-            {/* 2. Dimensi / Ukuran */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Dimensi &amp; Ketebalan
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Tebal 12mm (1830 x 2440 mm), PxLxT"
-                value={specDimension}
-                onChange={(e) => setSpecDimension(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 3. Finishing / Warna */}
+            {/* 2. Finishing & Warna */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
                 Finishing &amp; Warna
@@ -782,19 +815,169 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               />
             </div>
 
-            {/* 4. Garansi / Standar */}
+            {/* 3. Dimensi / Ukuran */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Standar Mutu / Garansi
+                Dimensi &amp; Ukuran (PxLxT)
               </label>
               <input
                 type="text"
-                placeholder="Contoh: Water & Fire Resistant, Garansi 1 Tahun"
+                placeholder="Contoh: 1830 x 2440 mm, 200 x 90 x 4 cm"
+                value={specDimension}
+                onChange={(e) => setSpecDimension(e.target.value)}
+                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+              />
+            </div>
+
+            {/* 4. Grade Mutu & Ketahanan */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Grade Mutu &amp; Ketahanan
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Water &amp; Fire Resistant, Anti-Bakteri, Grade A"
+                value={specGrade}
+                onChange={(e) => setSpecGrade(e.target.value)}
+                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+              />
+            </div>
+
+            {/* 5. Ketebalan / Diameter */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Ketebalan / Diameter
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Tebal 12 mm, 18 mm, Ø 2.5 inch"
+                value={specThickness}
+                onChange={(e) => setSpecThickness(e.target.value)}
+                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+              />
+            </div>
+
+            {/* 6. Standar Mutu & Sertifikasi */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Standar Mutu &amp; Sertifikasi
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: SNI, ISO 9001, Green Label Indonesia, CE"
+                value={specCertification}
+                onChange={(e) => setSpecCertification(e.target.value)}
+                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+              />
+            </div>
+
+            {/* 7. Berat / Bobot Produk */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Berat / Bobot Produk
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: 14.5 kg / lembar, 850 gram / unit"
+                value={specWeight}
+                onChange={(e) => setSpecWeight(e.target.value)}
+                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+              />
+            </div>
+
+            {/* 8. Masa Garansi */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Masa Garansi
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Garansi Resmi 1 Tahun, Life span 10 Tahun"
                 value={specWarranty}
                 onChange={(e) => setSpecWarranty(e.target.value)}
                 className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
               />
             </div>
+
+            {/* 9. Kapasitas / Beban Maksimal */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Kapasitas / Beban Maksimal
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Beban statis maks 150 kg, volume 250 liter"
+                value={specCapacity}
+                onChange={(e) => setSpecCapacity(e.target.value)}
+                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+              />
+            </div>
+
+            {/* 10. Negara Asal / Manufaktur */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Negara Asal / Manufaktur
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Indonesia (TKDN 45%), Jerman, Jepang"
+                value={specOrigin}
+                onChange={(e) => setSpecOrigin(e.target.value)}
+                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Spesifikasi Kustom / Dinamis */}
+          <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block">
+                  Spesifikasi Tambahan / Kustom
+                </span>
+                <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                  Tambahkan parameter teknis khusus produk bila diperlukan
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddCustomSpec}
+                className="px-3.5 py-1.5 rounded-full border border-dashed border-[#c28e62]/70 hover:border-[#c28e62] bg-[#c28e62]/5 hover:bg-[#c28e62]/10 text-xs font-semibold text-[#c28e62] transition-colors cursor-pointer"
+              >
+                + Tambah Spesifikasi
+              </button>
+            </div>
+
+            {customSpecs.length > 0 && (
+              <div className="space-y-2.5">
+                {customSpecs.map((cs) => (
+                  <div key={cs.id} className="flex items-center gap-2 sm:gap-3">
+                    <input
+                      type="text"
+                      placeholder="Nama parameter (Contoh: Voltase)"
+                      value={cs.key}
+                      onChange={(e) => handleUpdateCustomSpec(cs.id, 'key', e.target.value)}
+                      className="w-1/3 px-4 py-2 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Nilai parameter (Contoh: 220V / 50Hz)"
+                      value={cs.value}
+                      onChange={(e) => handleUpdateCustomSpec(cs.id, 'value', e.target.value)}
+                      className="flex-1 px-4 py-2 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCustomSpec(cs.id)}
+                      className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/60 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                      title="Hapus parameter ini"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
