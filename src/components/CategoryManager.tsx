@@ -16,7 +16,7 @@ import {
 export interface CategorySpecField {
   id: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'boolean';
+  type: 'text' | 'number' | 'date' | 'select' | 'boolean' | 'textarea';
   options?: string[];
   unit?: string;
   required?: boolean;
@@ -1135,8 +1135,10 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                           options={[
                             { value: 'text', label: 'Teks Singkat' },
                             { value: 'number', label: 'Angka' },
+                            { value: 'date', label: 'Tanggal / Kalender' },
                             { value: 'select', label: 'Pilihan Dropdown' },
-                            { value: 'boolean', label: 'Ya / Tidak' }
+                            { value: 'boolean', label: 'Ya / Tidak' },
+                            { value: 'textarea', label: 'Teks Paragraf' }
                           ]}
                           placeholder="Pilih tipe input..."
                           minDropdownWidth={180}

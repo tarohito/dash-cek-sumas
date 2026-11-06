@@ -27,7 +27,7 @@ interface BrandRef {
 export interface CategorySpecField {
   id: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'boolean';
+  type: 'text' | 'number' | 'date' | 'select' | 'boolean' | 'textarea';
   options?: string[];
   unit?: string;
   required?: boolean;
@@ -864,6 +864,23 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
                       ]}
                       placeholder={`Pilih ${field.label}...`}
                       buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 flex items-center justify-between cursor-pointer select-none"
+                    />
+                  ) : field.type === 'date' ? (
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={categoryFieldValues[field.label] || ''}
+                        onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                        className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none [color-scheme:light] dark:[color-scheme:dark] transition-colors cursor-pointer"
+                      />
+                    </div>
+                  ) : field.type === 'textarea' ? (
+                    <textarea
+                      rows={2}
+                      placeholder={`Masukkan ${field.label.toLowerCase()}...`}
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                      className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-2xl text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none transition-colors resize-none"
                     />
                   ) : field.type === 'number' ? (
                     <div className="relative">
