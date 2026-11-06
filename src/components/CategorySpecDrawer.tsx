@@ -144,16 +144,19 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
   onAlert
 }) => {
   const [activeCategory, setActiveCategory] = useState(targetCategory);
+  const isClosingRef = useRef(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setActiveCategory(targetCategory);
+    if (!isClosingRef.current) {
+      setActiveCategory(targetCategory);
+    }
   }, [targetCategory]);
 
   const currentTargetCategory = activeCategory || targetCategory;
   const [fields, setFields] = useState<CategorySpecField[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -162,7 +165,16 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isOpen && currentTargetCategory) {
+    if (!isOpen) {
+      setIsVisible(false);
+      isClosingRef.current = false;
+      return;
+    }
+
+    // Jika sedang dalam proses animasi menutup, jangan re-open
+    if (isClosingRef.current) return;
+
+    if (currentTargetCategory) {
       if (closeTimerRef.current) {
         clearTimeout(closeTimerRef.current);
         closeTimerRef.current = null;
@@ -174,22 +186,29 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
         setFields([]);
       }
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setIsVisible(true);
-        });
+        if (!isClosingRef.current) {
+          requestAnimationFrame(() => {
+            if (!isClosingRef.current) {
+              setIsVisible(true);
+            }
+          });
+        }
       });
-    } else {
-      setIsVisible(false);
     }
   }, [isOpen, currentTargetCategory]);
 
-  const handleClose = () => {
+  const handleClose = (callback?: (() => void) | React.MouseEvent) => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    isClosingRef.current = true;
     setIsVisible(false);
     closeTimerRef.current = setTimeout(() => {
+      if (typeof callback === 'function') {
+        callback();
+      }
       onClose();
+      isClosingRef.current = false;
       closeTimerRef.current = null;
-    }, 300);
+    }, 280);
   };
 
   const handleAddField = () => {
@@ -227,24 +246,22 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
 
       if (res.ok) {
         const updated = await res.json();
-        onSaved({ id: updated.id, specSchema: updated.specSchema });
-        if (activeCategory && activeCategory.id === updated.id) {
-          setActiveCategory({ ...activeCategory, specSchema: updated.specSchema });
-        }
         onAlert?.(
           'Spesifikasi Disimpan',
           `Template spesifikasi untuk "${currentTargetCategory.name}" berhasil diperbarui.`,
           'success'
         );
-        handleClose();
+        handleClose(() => {
+          onSaved({ id: updated.id, specSchema: updated.specSchema });
+        });
       } else {
         const errData = await res.json().catch(() => ({}));
         onAlert?.('Gagal Menyimpan', errData.error || 'Terjadi kesalahan saat menyimpan spesifikasi ke server.', 'error');
+        setIsSaving(false);
       }
     } catch (err: any) {
       console.error('Error saving specs in drawer:', err);
       onAlert?.('Gagal Menyimpan', err.message || 'Koneksi ke server terputus. Pastikan server aktif.', 'error');
-    } finally {
       setIsSaving(false);
     }
   };
