@@ -13,7 +13,7 @@ export interface CategoryRef {
   name: string;
   level: number;
   parentId?: string | null;
-  code?: string;
+  code?: string | null;
 }
 
 interface CategoryPickerModalProps {

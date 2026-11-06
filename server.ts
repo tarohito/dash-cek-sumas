@@ -193,7 +193,8 @@ db.exec(`
     status TEXT DEFAULT 'Aktif',
     itemCount INTEGER DEFAULT 0,
     orderIndex INTEGER DEFAULT 0,
-    createdAt TEXT NOT NULL
+    createdAt TEXT NOT NULL,
+    specSchema TEXT
   );
 
   CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parentId);
@@ -257,6 +258,9 @@ try {
 } catch (_) {}
 try {
   db.prepare('ALTER TABLE products ADD COLUMN image TEXT').run();
+} catch (_) {}
+try {
+  db.prepare('ALTER TABLE categories ADD COLUMN specSchema TEXT').run();
 } catch (_) {}
 
 // Update existing users with full data matching Tambah Pengguna form
@@ -2341,23 +2345,42 @@ app.post('/api/categories', (req, res) => {
 app.put('/api/categories/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, description, status } = req.body;
-    if (!name || !name.trim()) {
+    const existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(id) as any;
+    if (!existing) {
+      return res.status(404).json({ error: 'Kategori tidak ditemukan' });
+    }
+    const { name, code, description, status, specSchema } = req.body;
+    const finalName = name !== undefined ? name.trim() : existing.name;
+    if (!finalName) {
       return res.status(400).json({ error: 'Nama kategori wajib diisi' });
     }
+    const finalCode = code !== undefined ? (code ? code.trim() : null) : existing.code;
+    const finalDesc = description !== undefined ? (description ? description.trim() : null) : existing.description;
+    const finalStatus = status !== undefined ? status : existing.status;
+    const finalSchema = specSchema !== undefined 
+      ? (typeof specSchema === 'string' ? specSchema : JSON.stringify(specSchema)) 
+      : existing.specSchema;
 
     db.prepare(`
       UPDATE categories 
-      SET name = ?, code = ?, description = ?, status = ?
+      SET name = ?, code = ?, description = ?, status = ?, specSchema = ?
       WHERE id = ?
-    `).run(
-      name.trim(),
-      code ? code.trim() : null,
-      description ? description.trim() : null,
-      status || 'Aktif',
-      id
-    );
+    `).run(finalName, finalCode, finalDesc, finalStatus, finalSchema, id);
 
+    const updated = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// Update category spec schema specifically
+app.put('/api/categories/:id/specs', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { specSchema } = req.body;
+    const finalSchema = typeof specSchema === 'string' ? specSchema : JSON.stringify(specSchema || []);
+    db.prepare('UPDATE categories SET specSchema = ? WHERE id = ?').run(finalSchema, id);
     const updated = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
     res.json(updated);
   } catch (error) {

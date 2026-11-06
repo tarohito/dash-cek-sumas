@@ -24,12 +24,22 @@ interface BrandRef {
   logo?: string | null;
 }
 
-interface CategoryRef {
+export interface CategorySpecField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'boolean';
+  options?: string[];
+  unit?: string;
+  required?: boolean;
+}
+
+export interface CategoryRef {
   id: string;
   name: string;
   level: number;
   parentId?: string | null;
-  code?: string;
+  code?: string | null;
+  specSchema?: string | null;
 }
 
 interface CreateSkuPageProps {
@@ -182,6 +192,23 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
   const [specWarranty, setSpecWarranty] = useState<string>(parsedInitial.warranty);
   const [specOrigin, setSpecOrigin] = useState<string>(parsedInitial.origin);
   const [customSpecs, setCustomSpecs] = useState<CustomSpecItem[]>(parsedInitial.customSpecs);
+  const [categoryFieldValues, setCategoryFieldValues] = useState<Record<string, string>>({});
+
+  // Deteksi skema spesifikasi dinamis dari kategori terpilih
+  const activeCategorySchema = useMemo<CategorySpecField[]>(() => {
+    if (!category || !categories.length) return [];
+    const parts = category.split('>').map(p => p.trim());
+    const leafName = parts[parts.length - 1];
+    const matched = categories.find(cat => cat.name.toLowerCase() === leafName?.toLowerCase())
+      || categories.find(cat => parts.some(p => p.toLowerCase() === cat.name.toLowerCase() && cat.specSchema));
+    if (matched?.specSchema) {
+      try {
+        const parsed = JSON.parse(matched.specSchema);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return [];
+  }, [category, categories]);
 
   const handleAddCustomSpec = () => {
     setCustomSpecs(prev => [...prev, { id: `cs-${Date.now()}`, key: '', value: '' }]);
@@ -435,19 +462,31 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
     setIsSubmitting(true);
     try {
       // Gabungkan spesifikasi terstruktur ke dalam deskripsi produk jika diisi
-      const specItems = [
-        specMaterial.trim() ? `Material: ${specMaterial.trim()}` : '',
-        specFinishing.trim() ? `Finishing/Warna: ${specFinishing.trim()}` : '',
-        specDimension.trim() ? `Dimensi: ${specDimension.trim()}` : '',
-        specGrade.trim() ? `Ketahanan: ${specGrade.trim()}` : '',
-        specThickness.trim() ? `Ketebalan: ${specThickness.trim()}` : '',
-        specCertification.trim() ? `Sertifikasi: ${specCertification.trim()}` : '',
-        specWeight.trim() ? `Berat: ${specWeight.trim()}` : '',
-        specWarranty.trim() ? `Garansi: ${specWarranty.trim()}` : '',
-        specCapacity.trim() ? `Kapasitas: ${specCapacity.trim()}` : '',
-        specOrigin.trim() ? `Negara Asal: ${specOrigin.trim()}` : '',
-        ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
-      ].filter(Boolean);
+      let specItems: string[] = [];
+      if (activeCategorySchema.length > 0) {
+        specItems = [
+          ...activeCategorySchema.map(f => {
+            const val = categoryFieldValues[f.label]?.trim();
+            if (!val) return '';
+            return f.unit ? `${f.label}: ${val} ${f.unit}` : `${f.label}: ${val}`;
+          }),
+          ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
+        ].filter(Boolean);
+      } else {
+        specItems = [
+          specMaterial.trim() ? `Material: ${specMaterial.trim()}` : '',
+          specFinishing.trim() ? `Finishing/Warna: ${specFinishing.trim()}` : '',
+          specDimension.trim() ? `Dimensi: ${specDimension.trim()}` : '',
+          specGrade.trim() ? `Ketahanan: ${specGrade.trim()}` : '',
+          specThickness.trim() ? `Ketebalan: ${specThickness.trim()}` : '',
+          specCertification.trim() ? `Sertifikasi: ${specCertification.trim()}` : '',
+          specWeight.trim() ? `Berat: ${specWeight.trim()}` : '',
+          specWarranty.trim() ? `Garansi: ${specWarranty.trim()}` : '',
+          specCapacity.trim() ? `Kapasitas: ${specCapacity.trim()}` : '',
+          specOrigin.trim() ? `Negara Asal: ${specOrigin.trim()}` : '',
+          ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
+        ].filter(Boolean);
+      }
 
       const parts: string[] = [];
       if (description.trim()) {
@@ -779,14 +818,82 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
           ref={sectionSpesifikasiRef}
           className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
         >
-          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4">
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4 flex items-center justify-between">
             <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
               <Sliders size={16} className="text-[#c28e62]" />
               <span>Spesifikasi Produk</span>
             </h2>
+            {activeCategorySchema.length > 0 && (
+              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold">
+                {activeCategorySchema.length} Parameter Khusus
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+          {activeCategorySchema.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              {activeCategorySchema.map((field) => (
+                <div key={field.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      {field.label}
+                      {field.required && <span className="text-rose-500 ml-1">*</span>}
+                    </label>
+                    {field.unit && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Satuan: {field.unit}
+                      </span>
+                    )}
+                  </div>
+
+                  {field.type === 'select' ? (
+                    <CustomSelect
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(val) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: val }))}
+                      options={(field.options || []).map(opt => ({ value: opt, label: opt }))}
+                      placeholder={`Pilih ${field.label}...`}
+                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100"
+                    />
+                  ) : field.type === 'boolean' ? (
+                    <CustomSelect
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(val) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: val }))}
+                      options={[
+                        { value: 'Ya', label: 'Ya (Aktif)' },
+                        { value: 'Tidak', label: 'Tidak (Nonaktif)' }
+                      ]}
+                      placeholder={`Pilih ${field.label}...`}
+                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100"
+                    />
+                  ) : field.type === 'number' ? (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder={`Masukkan ${field.label.toLowerCase()}...`}
+                        value={categoryFieldValues[field.label] || ''}
+                        onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                        className="w-full pl-5 pr-14 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:border-[#c28e62]"
+                      />
+                      {field.unit && (
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400">
+                          {field.unit}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder={`Masukkan ${field.label.toLowerCase()}...`}
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                      className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:border-[#c28e62]"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {/* 1. Material / Bahan */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
@@ -927,6 +1034,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               />
             </div>
           </div>
+          )}
 
           {/* Spesifikasi Kustom / Dinamis */}
           <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 space-y-3">
