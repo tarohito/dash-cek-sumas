@@ -77,7 +77,7 @@ const SelectOptionsEditor: React.FC<SelectOptionsEditorProps> = ({ options = [],
 
       {/* Chip Tag Pilihan */}
       {options.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl max-h-28 overflow-y-auto">
+        <div className="flex flex-wrap gap-1.5 px-3.5 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-full max-h-28 overflow-y-auto">
           {options.map((opt, idx) => (
             <span
               key={idx}
