@@ -351,7 +351,7 @@ const CustomSelect = ({
           />
           {/* MENU DROPDOWN PALING ATAS DENGAN SHADOW & MAX-H */}
           <div 
-            className={`fixed z-[999991] bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-80 flex flex-col  ${
+            className={`fixed z-[999991] bg-white dark:bg-zinc-800 rounded-3xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-2 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-80 flex flex-col shadow-2xl ${
               direction === 'up' ? '-translate-y-full origin-bottom' : 'origin-top'
             }`}
             style={{ 

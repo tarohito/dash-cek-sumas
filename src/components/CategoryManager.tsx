@@ -1142,6 +1142,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                           ]}
                           placeholder="Pilih tipe input..."
                           minDropdownWidth={180}
+                          searchable={false}
                           buttonClassName="w-full h-9 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs text-slate-700 dark:text-zinc-300 flex items-center justify-between cursor-pointer select-none"
                         />
                       </div>

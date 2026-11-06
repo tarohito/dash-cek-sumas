@@ -155,7 +155,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           />
           {/* MENU DROPDOWN PALING ATAS DENGAN SHADOW & MAX-H */}
           <div 
-            className={`fixed z-[999991] bg-white dark:bg-zinc-800 rounded-2xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-1.5 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-80 flex flex-col shadow-xl ${
+            className={`fixed z-[999991] bg-white dark:bg-zinc-800 rounded-3xl border border-[#cd9a6f]/30 dark:border-zinc-600 p-2 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-80 flex flex-col shadow-2xl ${
               direction === 'up' ? '-translate-y-full origin-bottom' : 'origin-top'
             }`}
             style={{ 
@@ -211,7 +211,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                     setIsOpen(false);
                     setSearchQuery('');
                   }}
-                  className={`px-3.5 py-2 text-xs sm:text-sm cursor-pointer transition-colors flex items-center justify-between gap-2.5 rounded-xl my-0.5 select-none ${value === opt.value ? 'bg-[#fcf7f3] dark:bg-zinc-700/80 text-[#c28e62] font-bold' : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62]'}`}
+                  className={`px-4 py-2 text-xs sm:text-sm cursor-pointer transition-colors flex items-center justify-between gap-2.5 rounded-full my-0.5 select-none ${value === opt.value ? 'bg-[#fcf7f3] dark:bg-zinc-700/80 text-[#c28e62] font-bold' : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62]'}`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     {opt.avatar ? (
