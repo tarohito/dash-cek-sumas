@@ -2380,10 +2380,32 @@ app.put('/api/categories/:id/specs', (req, res) => {
     const { id } = req.params;
     const { specSchema } = req.body;
     const finalSchema = typeof specSchema === 'string' ? specSchema : JSON.stringify(specSchema || []);
-    db.prepare('UPDATE categories SET specSchema = ? WHERE id = ?').run(finalSchema, id);
-    const updated = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+    
+    // 1. Cari kategori berdasarkan ID
+    let existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(id) as any;
+    
+    // 2. Jika tidak ditemukan via ID, coba cari via Nama (case-insensitive)
+    if (!existing) {
+      existing = db.prepare('SELECT * FROM categories WHERE LOWER(name) = LOWER(?)').get(id) as any;
+    }
+
+    // 3. Jika kategori belum ada di database, buat otomatis sebagai kategori baru
+    if (!existing) {
+      const newId = id.startsWith('cat-') ? id : `cat-${Date.now()}`;
+      const catCode = id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'CAT';
+      db.prepare(`
+        INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema)
+        VALUES (?, ?, NULL, 1, ?, 'Kategori produk', 'Aktif', 0, 99, ?, ?)
+      `).run(newId, id, catCode, new Date().toISOString().split('T')[0], finalSchema);
+      existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(newId);
+      return res.json(existing);
+    }
+
+    db.prepare('UPDATE categories SET specSchema = ? WHERE id = ?').run(finalSchema, existing.id);
+    const updated = db.prepare('SELECT * FROM categories WHERE id = ?').get(existing.id);
     res.json(updated);
   } catch (error) {
+    console.error('Error updating category specs:', error);
     res.status(500).json({ error: String(error) });
   }
 });

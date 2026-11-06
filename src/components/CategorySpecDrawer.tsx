@@ -24,6 +24,109 @@ export interface CategorySpecDrawerProps {
   onAlert?: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
+
+interface SelectOptionsEditorProps {
+  options?: string[];
+  onChange: (options: string[]) => void;
+}
+
+const SelectOptionsEditor: React.FC<SelectOptionsEditorProps> = ({ options = [], onChange }) => {
+  const [inputValue, setInputValue] = useState('');
+
+  const handleAdd = (textToAdd?: string) => {
+    const raw = textToAdd !== undefined ? textToAdd : inputValue;
+    if (!raw.trim()) return;
+
+    const newItems = raw
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (newItems.length === 0) return;
+
+    const existingLower = new Set(options.map(o => o.toLowerCase()));
+    const filteredToAdd = newItems.filter(item => !existingLower.has(item.toLowerCase()));
+
+    if (filteredToAdd.length > 0) {
+      onChange([...options, ...filteredToAdd]);
+    }
+    setInputValue('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAdd();
+    }
+  };
+
+  const handleRemove = (indexToRemove: number) => {
+    onChange(options.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  return (
+    <div className="pl-7 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+          Opsi Pilihan Dropdown ({options.length} Opsi)
+        </span>
+        <span className="text-[10px] text-slate-400">
+          Pisahkan dengan koma atau Enter
+        </span>
+      </div>
+
+      {/* Chip Tag Pilihan */}
+      {options.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 p-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl max-h-28 overflow-y-auto">
+          {options.map((opt, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#c28e62]/10 text-[#c28e62] border border-[#c28e62]/20"
+            >
+              <span>{opt}</span>
+              <button
+                type="button"
+                onClick={() => handleRemove(idx)}
+                className="hover:text-red-500 cursor-pointer transition-colors p-0.5 rounded-full hover:bg-[#c28e62]/20"
+                title="Hapus opsi ini"
+              >
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Input Tambah Opsi */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          placeholder="Ketik opsi pilihan (contoh: Standar, Premium, Custom)..."
+          value={inputValue}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val.includes(',')) {
+              handleAdd(val);
+            } else {
+              setInputValue(val);
+            }
+          }}
+          onKeyDown={handleKeyDown}
+          className="flex-1 h-9 px-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none transition-colors"
+        />
+        <button
+          type="button"
+          onClick={() => handleAdd()}
+          disabled={!inputValue.trim()}
+          className="h-9 px-4 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-40 text-white text-xs font-semibold transition-colors cursor-pointer shrink-0"
+        >
+          + Tambah
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
   isOpen,
   onClose,
@@ -116,11 +219,12 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
         );
         handleClose();
       } else {
-        onAlert?.('Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan spesifikasi.', 'error');
+        const errData = await res.json().catch(() => ({}));
+        onAlert?.('Gagal Menyimpan', errData.error || 'Terjadi kesalahan saat menyimpan spesifikasi ke server.', 'error');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving specs in drawer:', err);
-      onAlert?.('Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan spesifikasi.', 'error');
+      onAlert?.('Gagal Menyimpan', err.message || 'Koneksi ke server terputus. Pastikan server aktif.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -237,18 +341,10 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
 
                 {/* OPSI JIKA SELECT */}
                 {field.type === 'select' && (
-                  <div className="pl-7 space-y-1">
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">Opsi Pilihan (Pisahkan dengan koma)</span>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Opsi A, Opsi B, Opsi C"
-                      value={(field.options || []).join(', ')}
-                      onChange={(e) => handleUpdateField(field.id, {
-                        options: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                      })}
-                      className="w-full h-9 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none transition-colors"
-                    />
-                  </div>
+                  <SelectOptionsEditor
+                    options={field.options || []}
+                    onChange={(newOpts) => handleUpdateField(field.id, { options: newOpts })}
+                  />
                 )}
 
                 {/* SATUAN JIKA NUMBER */}
