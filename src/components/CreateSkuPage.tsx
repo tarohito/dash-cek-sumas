@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { CustomSelect } from './CustomSelect';
+import { CategorySpecDrawer } from './CategorySpecDrawer';
 import { CategoryPickerModal } from './CategoryPickerModal';
 import { compressAndConvertToWebP } from '../utils/imageOptimizer';
 import { 
@@ -14,7 +15,8 @@ import {
   ChevronRight,
   X,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-react';
 
 interface BrandRef {
@@ -68,6 +70,7 @@ interface CreateSkuPageProps {
     image?: string;
   }) => Promise<void>;
   onAlert: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
+  onCategoriesUpdated?: (cats: CategoryRef[]) => void;
   onDirtyChange?: (isDirty: boolean) => void;
 }
 
@@ -82,7 +85,8 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
   onBack,
   onSave,
   onAlert,
-  onDirtyChange
+  onDirtyChange,
+  onCategoriesUpdated
 }) => {
   interface CustomSpecItem {
     id: string;
@@ -193,6 +197,17 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
   const [specOrigin, setSpecOrigin] = useState<string>(parsedInitial.origin);
   const [customSpecs, setCustomSpecs] = useState<CustomSpecItem[]>(parsedInitial.customSpecs);
   const [categoryFieldValues, setCategoryFieldValues] = useState<Record<string, string>>({});
+  const [isSpecDrawerOpen, setIsSpecDrawerOpen] = useState(false);
+
+  // Target kategori aktif untuk konfigurasi form spesifikasi
+  const matchedCategory = useMemo(() => {
+    if (!category || !categories.length) return null;
+    const parts = category.split('>').map(p => p.trim());
+    const leafName = parts[parts.length - 1];
+    return categories.find(cat => cat.name.toLowerCase() === leafName?.toLowerCase())
+      || categories.find(cat => parts.some(p => p.toLowerCase() === cat.name.toLowerCase()))
+      || null;
+  }, [category, categories]);
 
   // Deteksi skema spesifikasi dinamis dari kategori terpilih
   const activeCategorySchema = useMemo<CategorySpecField[]>(() => {
@@ -461,32 +476,15 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Gabungkan spesifikasi terstruktur ke dalam deskripsi produk jika diisi
-      let specItems: string[] = [];
-      if (activeCategorySchema.length > 0) {
-        specItems = [
-          ...activeCategorySchema.map(f => {
-            const val = categoryFieldValues[f.label]?.trim();
-            if (!val) return '';
-            return f.unit ? `${f.label}: ${val} ${f.unit}` : `${f.label}: ${val}`;
-          }),
-          ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
-        ].filter(Boolean);
-      } else {
-        specItems = [
-          specMaterial.trim() ? `Material: ${specMaterial.trim()}` : '',
-          specFinishing.trim() ? `Finishing/Warna: ${specFinishing.trim()}` : '',
-          specDimension.trim() ? `Dimensi: ${specDimension.trim()}` : '',
-          specGrade.trim() ? `Ketahanan: ${specGrade.trim()}` : '',
-          specThickness.trim() ? `Ketebalan: ${specThickness.trim()}` : '',
-          specCertification.trim() ? `Sertifikasi: ${specCertification.trim()}` : '',
-          specWeight.trim() ? `Berat: ${specWeight.trim()}` : '',
-          specWarranty.trim() ? `Garansi: ${specWarranty.trim()}` : '',
-          specCapacity.trim() ? `Kapasitas: ${specCapacity.trim()}` : '',
-          specOrigin.trim() ? `Negara Asal: ${specOrigin.trim()}` : '',
-          ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
-        ].filter(Boolean);
-      }
+      // Gabungkan spesifikasi terstruktur ke dalam deskripsi produk
+      const specItems: string[] = [
+        ...activeCategorySchema.map(f => {
+          const val = categoryFieldValues[f.label]?.trim();
+          if (!val) return '';
+          return f.unit ? `${f.label}: ${val} ${f.unit}` : `${f.label}: ${val}`;
+        }),
+        ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
+      ].filter(Boolean);
 
       const parts: string[] = [];
       if (description.trim()) {
@@ -811,23 +809,35 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* SECTION 2: SPESIFIKASI TEKNIS PRODUK                                      */}
+        {/* SECTION 2: SPESIFIKASI TEKNIS PRODUK (DINAMIS DARI TEMPLATE KATEGORI)     */}
         {/* ========================================================================= */}
         <section 
           id="section-spesifikasi" 
           ref={sectionSpesifikasiRef}
           className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
         >
-          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4 flex items-center justify-between">
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4 flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
               <Sliders size={16} className="text-[#c28e62]" />
               <span>Spesifikasi Produk</span>
             </h2>
-            {activeCategorySchema.length > 0 && (
-              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold">
-                {activeCategorySchema.length} Parameter Khusus
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {activeCategorySchema.length > 0 && (
+                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold">
+                  {activeCategorySchema.length} Parameter
+                </span>
+              )}
+              {matchedCategory && (
+                <button
+                  type="button"
+                  onClick={() => setIsSpecDrawerOpen(true)}
+                  className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] bg-slate-50 dark:bg-zinc-800/80 text-xs font-semibold text-slate-700 dark:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Sliders size={12} className="text-[#c28e62]" />
+                  <span>{activeCategorySchema.length > 0 ? 'Kelola Form Kategori' : 'Atur Spesifikasi Kategori'}</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {activeCategorySchema.length > 0 ? (
@@ -852,6 +862,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
                       onChange={(val) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: val }))}
                       options={(field.options || []).map(opt => ({ value: opt, label: opt }))}
                       placeholder={`Pilih ${field.label}...`}
+                      searchable={(field.options || []).length > 5}
                       buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 flex items-center justify-between cursor-pointer select-none"
                     />
                   ) : field.type === 'boolean' ? (
@@ -911,150 +922,42 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-            {/* 1. Material / Bahan */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Bahan / Material Utama
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Solid Phenolic Resin, Nylon 66, Stainless 304"
-                value={specMaterial}
-                onChange={(e) => setSpecMaterial(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
+            <div className="py-10 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-850/40 flex flex-col items-center justify-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-[#c28e62]/10 flex items-center justify-center text-[#c28e62]">
+                <Sliders size={18} />
+              </div>
+              <div className="space-y-1 max-w-sm">
+                <h3 className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-200">
+                  Spesifikasi Produk Kosong
+                </h3>
+                <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+                  {matchedCategory 
+                    ? `Kategori "${matchedCategory.name}" belum memiliki form spesifikasi khusus.` 
+                    : 'Pilih kategori terlebih dahulu untuk mengatur spesifikasi produk.'}
+                </p>
+              </div>
+              {matchedCategory ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSpecDrawerOpen(true)}
+                  className="px-4 py-2 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Plus size={14} />
+                  <span>Atur Spesifikasi Kategori</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="px-4 py-2 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] text-slate-700 dark:text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Pilih Kategori Produk
+                </button>
+              )}
             </div>
-
-            {/* 2. Finishing & Warna */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Finishing &amp; Warna
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Matte Black, Woodgrain, Brushed Chrome"
-                value={specFinishing}
-                onChange={(e) => setSpecFinishing(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 3. Dimensi / Ukuran */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Dimensi &amp; Ukuran (PxLxT)
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: 1830 x 2440 mm, 200 x 90 x 4 cm"
-                value={specDimension}
-                onChange={(e) => setSpecDimension(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 4. Grade Mutu & Ketahanan */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Grade Mutu &amp; Ketahanan
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Water &amp; Fire Resistant, Anti-Bakteri, Grade A"
-                value={specGrade}
-                onChange={(e) => setSpecGrade(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 5. Ketebalan / Diameter */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Ketebalan / Diameter
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Tebal 12 mm, 18 mm, Ø 2.5 inch"
-                value={specThickness}
-                onChange={(e) => setSpecThickness(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 6. Standar Mutu & Sertifikasi */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Standar Mutu &amp; Sertifikasi
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: SNI, ISO 9001, Green Label Indonesia, CE"
-                value={specCertification}
-                onChange={(e) => setSpecCertification(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 7. Berat / Bobot Produk */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Berat / Bobot Produk
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: 14.5 kg / lembar, 850 gram / unit"
-                value={specWeight}
-                onChange={(e) => setSpecWeight(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 8. Masa Garansi */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Masa Garansi
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Garansi Resmi 1 Tahun, Life span 10 Tahun"
-                value={specWarranty}
-                onChange={(e) => setSpecWarranty(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 9. Kapasitas / Beban Maksimal */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Kapasitas / Beban Maksimal
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Beban statis maks 150 kg, volume 250 liter"
-                value={specCapacity}
-                onChange={(e) => setSpecCapacity(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* 10. Negara Asal / Manufaktur */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                Negara Asal / Manufaktur
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Indonesia (TKDN 45%), Jerman, Jepang"
-                value={specOrigin}
-                onChange={(e) => setSpecOrigin(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-          </div>
           )}
 
-          {/* Spesifikasi Kustom / Dinamis */}
+          {/* Spesifikasi Kustom / Tambahan */}
           <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -1149,6 +1052,22 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
         currentCategory={category}
         onSelectCategory={(chosenPath) => setCategory(chosenPath)}
       />
+
+      {/* SLIDE-OVER DRAWER SPESIFIKASI KATEGORI (IDENTIK DENGAN HALAMAN KATEGORI) */}
+      {matchedCategory && (
+        <CategorySpecDrawer
+          isOpen={isSpecDrawerOpen}
+          onClose={() => setIsSpecDrawerOpen(false)}
+          targetCategory={matchedCategory}
+          onSaved={(updated) => {
+            const nextCats = categories.map(c => 
+              c.id === updated.id ? { ...c, specSchema: updated.specSchema } : c
+            );
+            onCategoriesUpdated?.(nextCats);
+          }}
+          onAlert={onAlert}
+        />
+      )}
 
 
     </div>

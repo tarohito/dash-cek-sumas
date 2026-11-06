@@ -4884,6 +4884,7 @@ export default function App() {
           onSave={skuSubView === 'edit' ? handleUpdateSkuFromPage : handleSaveNewSkuFromPage}
           onAlert={triggerAlert}
           onDirtyChange={setIsSkuFormDirty}
+          onCategoriesUpdated={setCategories}
         />
       );
     }
