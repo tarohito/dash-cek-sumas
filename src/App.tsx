@@ -61,7 +61,9 @@ import {
   CheckCheck,
   Send,
   FileEdit,
-  AlertTriangle
+  AlertTriangle,
+  Sliders,
+  FileText
 } from 'lucide-react';
 import { ScanLocationMap } from './components/ScanLocationMap';
 import { ScanActivityChart } from './components/ScanActivityChart';
@@ -9400,7 +9402,7 @@ export default function App() {
       )}
 
       {/* ============================================================== */}
-      {/* MODAL DETAIL SKU PRODUK (RELATIONAL VIEW) */}
+      {/* MODAL DETAIL SKU PRODUK (RELATIONAL VIEW - CLEAN, SINGKAT & PADAT) */}
       {/* ============================================================== */}
       {isDetailSkuModalOpen && skuToView && createPortal(
         <div 
@@ -9412,50 +9414,105 @@ export default function App() {
           }}
           className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
-            {/* DETAIL HEADER */}
-            <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-800/80 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
-                  <Box size={22} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">
-                      {skuToView.sku}
-                    </h3>
-                    <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold">
-                      {skuToView.skuCode || `SKU-${skuToView.id.toUpperCase()}`}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-                    Master Katalog Produk &amp; Riwayat Tag Fisik
-                  </p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }} 
-                data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
-                className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 shadow-2xl animate-in zoom-in-95 duration-200">
+            {(() => {
+              const bObj = brands.find(b => b.id === skuToView.brandId || b.name.toLowerCase() === skuToView.brandName.toLowerCase());
+              const linkedBatches = getSkuBatches(skuToView.sku, skuToView.brandName);
+              const totalProducedTags = linkedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
+              const categoryParts = (skuToView.category || '').split('>').map(p => p.trim()).filter(Boolean);
 
-            {/* DETAIL CONTENT BODY */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs sm:text-sm">
-              {/* RELATIONAL GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* Brand Info Card */}
-                {(() => {
-                  const bObj = brands.find(b => b.id === skuToView.brandId || b.name.toLowerCase() === skuToView.brandName.toLowerCase());
-                  return (
-                    <div className="bg-slate-50 dark:bg-zinc-800/70 p-4 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider block mb-2">
-                        Brand Pemilik
-                      </span>
-                      <div className="flex items-center gap-3">
+              // Parser spesifikasi terstruktur & deskripsi naratif
+              const parseSkuSpecs = (rawDesc?: string) => {
+                if (!rawDesc) return { pureDesc: '', specs: [] };
+                const lines = rawDesc.split('\n\n');
+                const remainingLines: string[] = [];
+                const specs: { key: string; value: string }[] = [];
+
+                lines.forEach(line => {
+                  if (line.includes(':') && (line.includes(' | ') || line.match(/^[A-Za-z0-9\s\/\-_]+:\s*.+$/))) {
+                    const parts = line.split(' | ');
+                    let lineHasSpec = false;
+                    parts.forEach(part => {
+                      const m = part.match(/^([^:]+):\s*(.*)$/);
+                      if (m) {
+                        lineHasSpec = true;
+                        specs.push({ key: m[1].trim(), value: m[2].trim() });
+                      }
+                    });
+                    if (!lineHasSpec) remainingLines.push(line);
+                  } else {
+                    remainingLines.push(line);
+                  }
+                });
+
+                return {
+                  pureDesc: remainingLines.join('\n\n').trim(),
+                  specs
+                };
+              };
+
+              const { pureDesc, specs } = parseSkuSpecs(skuToView.description);
+
+              return (
+                <>
+                  {/* MODAL HEADER: FOTO, IDENTITAS & KATEGORI HIERARKIS */}
+                  <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-800/60 flex items-start justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      {skuToView.image ? (
+                        <img 
+                          src={skuToView.image} 
+                          alt={skuToView.sku} 
+                          className="w-12 h-12 rounded-2xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0 shadow-2xs"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold shrink-0 shadow-2xs">
+                          <Box size={22} />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base truncate">
+                            {skuToView.sku}
+                          </h3>
+                          <span className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-700/80 text-slate-700 dark:text-zinc-200 font-bold tracking-wide">
+                            {skuToView.skuCode || `SKU-${skuToView.id.toUpperCase()}`}
+                          </span>
+                        </div>
+                        {categoryParts.length > 0 ? (
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-zinc-500 mt-0.5 flex-wrap">
+                            {categoryParts.map((part, idx) => (
+                              <React.Fragment key={idx}>
+                                {idx > 0 && <span className="text-slate-300 dark:text-zinc-600">›</span>}
+                                <span className={idx === categoryParts.length - 1 ? 'font-semibold text-[#c28e62]' : ''}>
+                                  {part}
+                                </span>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                            Kategori Umum
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button"
+                      onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }} 
+                      className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer shrink-0"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* MODAL CONTENT: SCROLLABLE BODY */}
+                  <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs sm:text-sm scrollbar-thin">
+                    
+                    {/* METRIC CARDS (BRAND, PRODUKSI, STATUS) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* Brand Info */}
+                      <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60 flex items-center gap-2.5">
                         {bObj?.logo ? (
                           <img
                             src={bObj.logo}
@@ -9465,173 +9522,206 @@ export default function App() {
                               el.onerror = null;
                               el.src = getBrandInitialsLogo(skuToView.brandName);
                             }}
-                            className="w-10 h-10 rounded-xl object-contain bg-white dark:bg-zinc-800 p-1 border border-slate-200 dark:border-zinc-700 shrink-0"
+                            className="w-8 h-8 rounded-xl object-contain bg-white dark:bg-zinc-800 p-0.5 border border-slate-200 dark:border-zinc-700 shrink-0"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-xl bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold text-sm shrink-0">
+                          <div className="w-8 h-8 rounded-xl bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold text-xs shrink-0">
                             {skuToView.brandName.slice(0, 1)}
                           </div>
                         )}
                         <div className="min-w-0">
-                          <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-sm truncate">
+                          <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">
+                            Brand Pemilik
+                          </span>
+                          <span className="font-bold text-slate-800 dark:text-zinc-200 text-xs truncate block">
                             {skuToView.brandName}
-                          </h4>
-                          <p className="text-[11px] text-slate-400 dark:text-zinc-500 truncate">
-                            {bObj?.ownerName ? `PIC: ${bObj.ownerName}` : 'Brand Terverifikasi'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Production & Category Card */}
-                {(() => {
-                  const linkedBatches = getSkuBatches(skuToView.sku, skuToView.brandName);
-                  const totalProducedTags = linkedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
-                  return (
-                    <div className="bg-slate-50 dark:bg-zinc-800/70 p-4 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider block mb-2">
-                        Kategori &amp; Ringkasan Produksi
-                      </span>
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500 dark:text-zinc-400 text-xs">Kategori:</span>
-                          <span className="font-semibold text-slate-700 dark:text-zinc-200 text-xs truncate max-w-[170px]">
-                            {skuToView.category || 'Umum'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-500 dark:text-zinc-400 text-xs">Tag Fisik Tercetak:</span>
-                          <span className="font-mono font-bold text-[#c28e62] text-xs">
-                            {totalProducedTags.toLocaleString('id-ID')} Tag ({linkedBatches.length} Batch)
                           </span>
                         </div>
                       </div>
-                    </div>
-                  );
-                })()}
-              </div>
 
-              {/* Description Box */}
-              <div className="bg-white dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-200 dark:border-zinc-700/70">
-                <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider block mb-1">
-                  Deskripsi &amp; Catatan Produk
-                </span>
-                <p className="text-slate-700 dark:text-zinc-300 leading-relaxed text-xs">
-                  {skuToView.description || 'Tidak ada deskripsi tambahan untuk produk ini dalam katalog master.'}
-                </p>
-              </div>
-
-              {/* LINKED PRODUCTION BATCHES */}
-              {(() => {
-                const linkedBatches = getSkuBatches(skuToView.sku, skuToView.brandName);
-                const totalProducedTags = linkedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
-
-                return (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm">
-                          Riwayat Batch &amp; Tag Fisik Terhubung
-                        </h4>
+                      {/* Tag Fisik Tercetak */}
+                      <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">
+                          Tag Fisik Tercetak
+                        </span>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="font-mono font-bold text-slate-800 dark:text-zinc-100 text-sm">
+                            {totalProducedTags.toLocaleString('id-ID')}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            Tag ({linkedBatches.length} Batch)
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-xs font-semibold text-[#c28e62] font-mono">
-                        {linkedBatches.length} Batch • {totalProducedTags.toLocaleString('id-ID')} Tag
-                      </span>
+
+                      {/* Status SKU */}
+                      <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">
+                          Status Katalog
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-xs">
+                            Aktif &amp; Terverifikasi
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    {linkedBatches.length > 0 ? (
-                      <div className="border border-slate-200 dark:border-zinc-700/80 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-zinc-800">
-                        {linkedBatches.map(b => (
-                          <div 
-                            key={b.id}
-                            className="p-3 sm:p-3.5 bg-slate-50/50 dark:bg-zinc-800/30 flex items-center justify-between gap-3 hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition-colors"
-                          >
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-xs text-slate-800 dark:text-zinc-100 font-mono">
-                                  {b.batchId}
-                                </span>
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                                  b.status === 'Disuspend' 
-                                    ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400' 
-                                    : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
-                                }`}>
-                                  {b.status || 'Aktif'}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
-                                Rilis: {b.date} • PIN {b.pinLength} Digit • Format {b.qrType || 'dynamic'}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-3 shrink-0">
-                              <div className="text-right">
-                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200 font-mono block">
-                                  {Number(b.qty).toLocaleString('id-ID')} Tag
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsDetailSkuModalOpen(false);
-                                  setSkuToView(null);
-                                  setActiveBatch(b);
-                                  setActiveMenu('tag-qr');
-                                  openDetailModal(b);
-                                }}
-                                className="px-3 py-1.5 rounded-full bg-[#c28e62]/10 hover:bg-[#c28e62]/20 text-[#c28e62] text-xs font-semibold transition-colors cursor-pointer"
-                              >
-                                Buka Tag →
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                    {/* SPESIFIKASI TEKNIS PRODUK (PARSED STRUCTURED GRID) */}
+                    <div className="bg-white dark:bg-zinc-800/30 rounded-2xl border border-slate-200 dark:border-zinc-700/70 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider flex items-center gap-1.5">
+                          <Sliders size={12} className="text-[#c28e62]" />
+                          <span>Spesifikasi Produk</span>
+                        </span>
+                        {specs.length > 0 && (
+                          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62]">
+                            {specs.length} Parameter
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="p-6 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-slate-400 dark:text-zinc-500 text-xs">
-                        Belum ada batch produksi yang didaftarkan menggunakan SKU ini.
+
+                      {specs.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                          {specs.map((item, sIdx) => (
+                            <div 
+                              key={sIdx} 
+                              className="p-2.5 rounded-xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-700/40"
+                            >
+                              <span className="text-[10px] font-medium text-slate-400 dark:text-zinc-400 block truncate">
+                                {item.key}
+                              </span>
+                              <span className="font-semibold text-slate-800 dark:text-zinc-100 text-xs block mt-0.5 truncate" title={item.value}>
+                                {item.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 dark:text-zinc-500 italic py-1">
+                          Belum ada parameter spesifikasi khusus untuk produk ini.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* DESKRIPSI & CATATAN PRODUK */}
+                    {pureDesc && (
+                      <div className="bg-white dark:bg-zinc-800/30 rounded-2xl border border-slate-200 dark:border-zinc-700/70 p-4 space-y-1.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider flex items-center gap-1.5">
+                          <FileText size={12} className="text-[#c28e62]" />
+                          <span>Deskripsi &amp; Catatan</span>
+                        </span>
+                        <p className="text-slate-700 dark:text-zinc-300 leading-relaxed text-xs">
+                          {pureDesc}
+                        </p>
                       </div>
                     )}
-                  </div>
-                );
-              })()}
-            </div>
 
-            {/* DETAIL FOOTER */}
-            <div className="px-5 sm:px-6 py-3.5 bg-slate-50 dark:bg-zinc-850 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between flex-shrink-0">
-              <span className="text-[11px] text-slate-400 dark:text-zinc-500">
-                Terdaftar: {skuToView.createdAt ? formatDateTimeDisplay(skuToView.createdAt) : 'Katalog Master Sumas'}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const toEdit = skuToView;
-                    setIsDetailSkuModalOpen(false);
-                    setSkuToView(null);
-                    handleOpenEditSku(toEdit);
-                  }}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center justify-center"
-                >
-                  <span>Edit SKU Ini</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-slate-200/70 dark:bg-zinc-750 text-slate-700 dark:text-zinc-300 hover:bg-slate-300/70 transition-colors cursor-pointer"
-                >
-                  Tutup
-                </button>
-              </div>
-            </div>
+                    {/* RIWAYAT BATCH PRODUKSI TERHUBUNG */}
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider flex items-center gap-1.5">
+                          <Layers size={12} className="text-[#c28e62]" />
+                          <span>Riwayat Batch Produksi</span>
+                        </span>
+                        <span className="text-xs font-semibold text-[#c28e62] font-mono">
+                          {linkedBatches.length} Batch
+                        </span>
+                      </div>
+
+                      {linkedBatches.length > 0 ? (
+                        <div className="border border-slate-200 dark:border-zinc-700/80 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-zinc-800">
+                          {linkedBatches.map(b => (
+                            <div 
+                              key={b.id}
+                              className="p-3 bg-slate-50/40 dark:bg-zinc-800/30 flex items-center justify-between gap-3 hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 transition-colors"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-slate-800 dark:text-zinc-100 font-mono">
+                                    {b.batchId}
+                                  </span>
+                                  <span className={`text-[9px] px-2 py-0.2 rounded-full font-semibold ${
+                                    b.status === 'Disuspend' 
+                                      ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400' 
+                                      : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
+                                  }`}>
+                                    {b.status || 'Aktif'}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
+                                  Rilis: {b.date} • PIN {b.pinLength} Digit • Format {b.qrType || 'dynamic'}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2.5 shrink-0">
+                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200 font-mono">
+                                  {Number(b.qty).toLocaleString('id-ID')} Tag
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsDetailSkuModalOpen(false);
+                                    setSkuToView(null);
+                                    setActiveBatch(b);
+                                    setActiveMenu('tag-qr');
+                                    openDetailModal(b);
+                                  }}
+                                  className="px-3 py-1 rounded-full bg-[#c28e62]/10 hover:bg-[#c28e62]/20 text-[#c28e62] text-xs font-semibold transition-colors cursor-pointer"
+                                >
+                                  Buka Tag →
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-slate-400 dark:text-zinc-500 text-xs">
+                          Belum ada batch produksi yang didaftarkan menggunakan SKU ini.
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* MODAL FOOTER */}
+                  <div className="px-5 sm:px-6 py-3 bg-slate-50/80 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                      Terdaftar: {skuToView.createdAt ? formatDateTimeDisplay(skuToView.createdAt) : 'Katalog Master'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const toEdit = skuToView;
+                          setIsDetailSkuModalOpen(false);
+                          setSkuToView(null);
+                          handleOpenEditSku(toEdit);
+                        }}
+                        className="px-4 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <Edit3 size={13} />
+                        <span>Edit SKU</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }}
+                        className="px-4 py-2 rounded-full text-xs font-semibold border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>,
         document.body
       )}
 
-      {/* ============================================================== */}
+            {/* ============================================================== */}
       {/* MODAL KONFIRMASI HAPUS SKU */}
       {/* ============================================================== */}
       {isDeleteSkuModalOpen && skuToDelete && createPortal(
