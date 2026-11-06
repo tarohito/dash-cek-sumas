@@ -955,7 +955,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               placeholder="Tuliskan deskripsi lengkap produk, keunggulan material, petunjuk pemasangan, sertifikasi, atau catatan penting saat scan QR..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-5 py-3.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-3xl text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors leading-relaxed resize-y min-h-[110px]"
+              className="w-full px-5 py-3.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-2xl text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors leading-relaxed resize-y min-h-[110px]"
             />
           </div>
         </section>
