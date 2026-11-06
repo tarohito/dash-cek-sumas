@@ -477,14 +477,11 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
     setIsSubmitting(true);
     try {
       // Gabungkan spesifikasi terstruktur ke dalam deskripsi produk
-      const specItems: string[] = [
-        ...activeCategorySchema.map(f => {
-          const val = categoryFieldValues[f.label]?.trim();
-          if (!val) return '';
-          return f.unit ? `${f.label}: ${val} ${f.unit}` : `${f.label}: ${val}`;
-        }),
-        ...customSpecs.filter(cs => cs.key.trim() && cs.value.trim()).map(cs => `${cs.key.trim()}: ${cs.value.trim()}`)
-      ].filter(Boolean);
+      const specItems: string[] = activeCategorySchema.map(f => {
+        const val = categoryFieldValues[f.label]?.trim();
+        if (!val) return '';
+        return f.unit ? `${f.label}: ${val} ${f.unit}` : `${f.label}: ${val}`;
+      }).filter(Boolean);
 
       const parts: string[] = [];
       if (description.trim()) {
@@ -956,57 +953,6 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
             </div>
           )}
 
-          {/* Spesifikasi Kustom / Tambahan */}
-          <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 block">
-                  Spesifikasi Tambahan / Kustom
-                </span>
-                <span className="text-[11px] text-slate-400 dark:text-zinc-500">
-                  Tambahkan parameter teknis khusus produk bila diperlukan
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddCustomSpec}
-                className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] bg-white dark:bg-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer"
-              >
-                + Tambah Spesifikasi
-              </button>
-            </div>
-
-            {customSpecs.length > 0 && (
-              <div className="space-y-2.5">
-                {customSpecs.map((cs) => (
-                  <div key={cs.id} className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="text"
-                      placeholder="Nama parameter (Contoh: Voltase)"
-                      value={cs.key}
-                      onChange={(e) => handleUpdateCustomSpec(cs.id, 'key', e.target.value)}
-                      className="w-1/3 px-4 py-2 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Nilai parameter (Contoh: 220V / 50Hz)"
-                      value={cs.value}
-                      onChange={(e) => handleUpdateCustomSpec(cs.id, 'value', e.target.value)}
-                      className="flex-1 px-4 py-2 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveCustomSpec(cs.id)}
-                      className="w-8 h-8 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/60 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                      title="Hapus parameter ini"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </section>
 
         {/* ========================================================================= */}
