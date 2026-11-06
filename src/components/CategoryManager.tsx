@@ -706,10 +706,21 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             {(() => {
                               try {
                                 const s = item.specSchema ? JSON.parse(item.specSchema) : [];
-                                if (Array.isArray(s) && s.length > 0) {
+                                const directCount = Array.isArray(s) ? s.length : 0;
+                                const parent = categories.find(c => c.id === item.parentId);
+                                const parentSpecs = parent?.specSchema ? JSON.parse(parent.specSchema) : [];
+                                const inheritedCount = Array.isArray(parentSpecs) ? parentSpecs.length : 0;
+
+                                if (directCount > 0) {
                                   return (
                                     <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold shrink-0">
-                                      {s.length} Atribut
+                                      {directCount} Atribut
+                                    </span>
+                                  );
+                                } else if (inheritedCount > 0) {
+                                  return (
+                                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium shrink-0" title={"Diwarisi dari " + (parent?.name || "Kategori Induk")}>
+                                      {inheritedCount} Diwarisi
                                     </span>
                                   );
                                 }
@@ -862,10 +873,23 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             {(() => {
                               try {
                                 const s = item.specSchema ? JSON.parse(item.specSchema) : [];
-                                if (Array.isArray(s) && s.length > 0) {
+                                const directCount = Array.isArray(s) ? s.length : 0;
+                                const parent = categories.find(c => c.id === item.parentId);
+                                const grandparent = parent ? categories.find(c => c.id === parent.parentId) : null;
+                                const parentSpecs = parent?.specSchema ? JSON.parse(parent.specSchema) : [];
+                                const grandSpecs = grandparent?.specSchema ? JSON.parse(grandparent.specSchema) : [];
+                                const inheritedCount = (Array.isArray(parentSpecs) ? parentSpecs.length : 0) + (Array.isArray(grandSpecs) ? grandSpecs.length : 0);
+
+                                if (directCount > 0) {
                                   return (
                                     <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold shrink-0">
-                                      {s.length} Atribut
+                                      {directCount} Atribut
+                                    </span>
+                                  );
+                                } else if (inheritedCount > 0) {
+                                  return (
+                                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 font-medium shrink-0" title="Diwarisi dari hierarki kategori induk">
+                                      {inheritedCount} Diwarisi
                                     </span>
                                   );
                                 }

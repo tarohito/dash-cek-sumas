@@ -35,6 +35,12 @@ export interface CategorySpecField {
   required?: boolean;
 }
 
+export interface ExtendedCategorySpecField extends CategorySpecField {
+  sourceCategoryName?: string;
+  sourceCategoryLevel?: number;
+  sourceCategoryId?: string;
+}
+
 export interface CategoryRef {
   id: string;
   name: string;
@@ -94,35 +100,15 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
     value: string;
   }
 
-  // Parser spesifikasi dari deskripsi awal
+  // Parser spesifikasi dari deskripsi awal produk (relasional & format teks)
   const parseInitialDescription = (rawDesc?: string) => {
     if (!rawDesc) return {
       desc: '',
-      material: '',
-      dimension: '',
-      thickness: '',
-      weight: '',
-      capacity: '',
-      finishing: '',
-      grade: '',
-      certification: '',
-      warranty: '',
-      origin: '',
-      customSpecs: [] as CustomSpecItem[]
+      rawSpecs: {} as Record<string, string>
     };
     const lines = rawDesc.split('\n\n');
     const remainingLines: string[] = [];
-    let material = '';
-    let dimension = '';
-    let thickness = '';
-    let weight = '';
-    let capacity = '';
-    let finishing = '';
-    let grade = '';
-    let certification = '';
-    let warranty = '';
-    let origin = '';
-    const customSpecs: CustomSpecItem[] = [];
+    const rawSpecs: Record<string, string> = {};
 
     lines.forEach(line => {
       if (line.includes(':') && (line.includes(' | ') || line.match(/^[A-Za-z0-9\s\/\-_]+:\s*.+$/))) {
@@ -132,21 +118,10 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
           const m = part.match(/^([^:]+):\s*(.*)$/);
           if (m) {
             lineHasSpec = true;
-            const k = m[1].trim().toLowerCase();
-            const v = m[2].trim();
-            if (k === 'material' || k === 'bahan') material = v;
-            else if (k === 'dimensi' || k === 'ukuran') dimension = v;
-            else if (k === 'ketebalan' || k === 'tebal' || k === 'diameter') thickness = v;
-            else if (k === 'berat' || k === 'bobot') weight = v;
-            else if (k === 'kapasitas' || k === 'daya tampung') capacity = v;
-            else if (k === 'finishing/warna' || k === 'finishing' || k === 'warna') finishing = v;
-            else if (k === 'ketahanan' || k === 'grade' || k === 'mutu') grade = v;
-            else if (k === 'sertifikasi' || k === 'standar') certification = v;
-            else if (k === 'garansi/standar' || k === 'garansi') warranty = v;
-            else if (k === 'negara asal' || k === 'asal pabrik' || k === 'manufaktur') origin = v;
-            else {
-              customSpecs.push({ id: `cs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, key: m[1].trim(), value: v });
-            }
+            const originalKey = m[1].trim();
+            const val = m[2].trim();
+            rawSpecs[originalKey] = val;
+            rawSpecs[originalKey.toLowerCase()] = val;
           }
         });
         if (!lineHasSpec) remainingLines.push(line);
@@ -157,17 +132,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
     return {
       desc: remainingLines.join('\n\n').trim(),
-      material,
-      dimension,
-      thickness,
-      weight,
-      capacity,
-      finishing,
-      grade,
-      certification,
-      warranty,
-      origin,
-      customSpecs
+      rawSpecs
     };
   };
 
@@ -181,62 +146,113 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
   const [category, setCategory] = useState<string>(initialData?.category || '');
   const [productImage, setProductImage] = useState<string>(initialData?.image || '');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  // Specifications state
-  const [specMaterial, setSpecMaterial] = useState<string>(parsedInitial.material);
-  const [specDimension, setSpecDimension] = useState<string>(parsedInitial.dimension);
-  const [specThickness, setSpecThickness] = useState<string>(parsedInitial.thickness);
-  const [specWeight, setSpecWeight] = useState<string>(parsedInitial.weight);
-  const [specCapacity, setSpecCapacity] = useState<string>(parsedInitial.capacity);
-  const [specFinishing, setSpecFinishing] = useState<string>(parsedInitial.finishing);
-  const [specGrade, setSpecGrade] = useState<string>(parsedInitial.grade);
-  const [specCertification, setSpecCertification] = useState<string>(parsedInitial.certification);
-  const [specWarranty, setSpecWarranty] = useState<string>(parsedInitial.warranty);
-  const [specOrigin, setSpecOrigin] = useState<string>(parsedInitial.origin);
-  const [customSpecs, setCustomSpecs] = useState<CustomSpecItem[]>(parsedInitial.customSpecs);
-  const [categoryFieldValues, setCategoryFieldValues] = useState<Record<string, string>>({});
+  const [categoryFieldValues, setCategoryFieldValues] = useState<Record<string, string>>(parsedInitial.rawSpecs || {});
+  const [description, setDescription] = useState<string>(parsedInitial.desc || '');
   const [isSpecDrawerOpen, setIsSpecDrawerOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
+  const [selectedDrawerCatId, setSelectedDrawerCatId] = useState<string | null>(null);
 
-  // Target kategori aktif untuk konfigurasi form spesifikasi
-  const matchedCategory = useMemo(() => {
-    if (!category || !categories.length) return null;
-    const parts = category.split('>').map(p => p.trim());
-    const leafName = parts[parts.length - 1];
-    return categories.find(cat => cat.name.toLowerCase() === leafName?.toLowerCase())
-      || categories.find(cat => parts.some(p => p.toLowerCase() === cat.name.toLowerCase()))
-      || null;
-  }, [category, categories]);
-
-  // Deteksi skema spesifikasi dinamis dari kategori terpilih
-  const activeCategorySchema = useMemo<CategorySpecField[]>(() => {
+  // Resolusi hierarki kategori secara relasional dari data database SQLite (L1 -> L2 -> L3)
+  const categoryChain = useMemo<CategoryRef[]>(() => {
     if (!category || !categories.length) return [];
-    const parts = category.split('>').map(p => p.trim());
-    const leafName = parts[parts.length - 1];
-    const matched = categories.find(cat => cat.name.toLowerCase() === leafName?.toLowerCase())
-      || categories.find(cat => parts.some(p => p.toLowerCase() === cat.name.toLowerCase() && cat.specSchema));
-    if (matched?.specSchema) {
-      try {
-        const parsed = JSON.parse(matched.specSchema);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch {}
+
+    let parts: string[] = [];
+    for (const sep of ['>', '›', '→', ' / ']) {
+      if (category.includes(sep)) {
+        parts = category.split(sep).map(p => p.trim()).filter(Boolean);
+        break;
+      }
     }
-    return [];
+    if (parts.length === 0) {
+      parts = [category.trim()];
+    }
+
+    if (parts.length > 1) {
+      const l1 = categories.find(c => c.level === 1 && c.name.toLowerCase() === parts[0].toLowerCase());
+      const l2 = l1 
+        ? categories.find(c => c.level === 2 && c.parentId === l1.id && c.name.toLowerCase() === parts[1].toLowerCase())
+        : categories.find(c => c.level === 2 && c.name.toLowerCase() === parts[1].toLowerCase());
+      const l3 = (parts.length >= 3 && l2)
+        ? categories.find(c => c.level === 3 && c.parentId === l2.id && c.name.toLowerCase() === parts[2].toLowerCase())
+        : (parts.length >= 3 ? categories.find(c => c.level === 3 && c.name.toLowerCase() === parts[2].toLowerCase()) : null);
+
+      return [l1, l2, l3].filter((c): c is CategoryRef => Boolean(c));
+    }
+
+    const singleName = parts[0].toLowerCase();
+    const match = categories.find(c => c.name.toLowerCase() === singleName)
+      || categories.find(c => c.id.toLowerCase() === singleName);
+
+    if (!match) return [];
+
+    if (match.level === 3) {
+      const parent = categories.find(c => c.id === match.parentId);
+      const grandparent = parent ? categories.find(c => c.id === parent.parentId) : null;
+      return [grandparent, parent, match].filter((c): c is CategoryRef => Boolean(c));
+    }
+    if (match.level === 2) {
+      const parent = categories.find(c => c.id === match.parentId);
+      return [parent, match].filter((c): c is CategoryRef => Boolean(c));
+    }
+    return [match];
   }, [category, categories]);
 
-  const handleAddCustomSpec = () => {
-    setCustomSpecs(prev => [...prev, { id: `cs-${Date.now()}`, key: '', value: '' }]);
-  };
+  // Kategori paling spesifik (leaf) dalam hierarki
+  const leafCategory = useMemo<CategoryRef | null>(() => {
+    if (categoryChain.length === 0) return null;
+    return categoryChain[categoryChain.length - 1];
+  }, [categoryChain]);
 
-  const handleUpdateCustomSpec = (id: string, field: 'key' | 'value', val: string) => {
-    setCustomSpecs(prev => prev.map(item => item.id === id ? { ...item, [field]: val } : item));
-  };
+  // Target kategori untuk Drawer form konfigurasi spesifikasi
+  const targetCategoryForDrawer = useMemo<CategoryRef | null>(() => {
+    if (selectedDrawerCatId) {
+      const found = categories.find(c => c.id === selectedDrawerCatId);
+      if (found) return found;
+    }
+    // Jika tidak ada pilihan eksplisit, pilih kategori teratas yang memiliki schema atau leafCategory
+    const catWithSchema = [...categoryChain].reverse().find(c => {
+      try {
+        const s = c.specSchema ? JSON.parse(c.specSchema) : [];
+        return Array.isArray(s) && s.length > 0;
+      } catch {
+        return false;
+      }
+    });
+    return catWithSchema || leafCategory || null;
+  }, [selectedDrawerCatId, categories, categoryChain, leafCategory]);
 
-  const handleRemoveCustomSpec = (id: string) => {
-    setCustomSpecs(prev => prev.filter(item => item.id !== id));
-  };
+  // Skema atribut spesifikasi gabungan terwariskan dari hierarki database (L1 -> L2 -> L3)
+  const activeCategorySchema = useMemo<ExtendedCategorySpecField[]>(() => {
+    if (categoryChain.length === 0) return [];
 
-  // Description state
-  const [description, setDescription] = useState<string>(parsedInitial.desc);
+    const result: ExtendedCategorySpecField[] = [];
+    const seenLabels = new Set<string>();
+
+    for (const cat of categoryChain) {
+      if (!cat.specSchema) continue;
+      try {
+        const parsed = JSON.parse(cat.specSchema);
+        if (Array.isArray(parsed)) {
+          for (const field of parsed) {
+            const normLabel = (field.label || '').trim().toLowerCase();
+            if (normLabel && !seenLabels.has(normLabel)) {
+              seenLabels.add(normLabel);
+              result.push({
+                ...field,
+                sourceCategoryName: cat.name,
+                sourceCategoryLevel: cat.level,
+                sourceCategoryId: cat.id
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing specSchema for category', cat.id, err);
+      }
+    }
+
+    return result;
+  }, [categoryChain]);
 
   // Sinkronkan state saat initialData berubah
   useEffect(() => {
@@ -249,6 +265,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       setCategory(initialData.category || bObj?.category || '');
       setProductImage(initialData.image || '');
       setDescription(parsedInitial.desc || '');
+      setCategoryFieldValues(parsedInitial.rawSpecs || {});
     } else if (mode === 'create') {
       setBrandId('');
       setBrandName('');
@@ -257,10 +274,10 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       setCategory('');
       setProductImage('');
       setDescription('');
+      setCategoryFieldValues({});
     }
-  }, [initialData, mode, brands, parsedInitial.desc]);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
-  
+  }, [initialData, mode, brands, parsedInitial.desc, parsedInitial.rawSpecs]);
+
   // Active anchor tab state
   const [activeSection, setActiveSection] = useState<SectionKey>('informasi');
 
@@ -287,7 +304,6 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
   // Helper untuk membuat kode SKU dengan format standar industri terbaik: [BRAND]-[KATEGORI]-[NOMOR URUT]
   const createBestPracticeSkuCode = (targetBrand: string, targetCategory: string, targetName: string) => {
-    // 1. Ekstrak kode Brand (3 karakter akronim/huruf konsonan)
     const cleanBrand = (targetBrand || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     let brandPrefix = 'SKU';
     const brandWords = (targetBrand || '').trim().split(/\s+/).filter(Boolean);
@@ -299,7 +315,6 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       brandPrefix = cleanBrand.padEnd(3, 'X');
     }
 
-    // 2. Ekstrak kode Kategori / Karakteristik Produk (3 karakter akronim)
     let catPrefix = 'PRD';
     const sourceText = targetCategory || targetName || '';
     if (sourceText) {
@@ -315,93 +330,71 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       }
     }
 
-    const basePrefix = `${brandPrefix}-${catPrefix}`;
+    const sameBrandCount = existingProducts.filter(p => (p as any).brandId === brandId || p.brandName === brandName).length;
+    const nextSeq = String(sameBrandCount + 1).padStart(3, '0');
 
-    // 3. Sequential Counter dengan jaminan 100% bebas duplikasi
-    const existingCodes = new Set(
-      existingProducts.map(p => (p.skuCode || p.sku || '').trim().toUpperCase())
-    );
-
-    let counter = 1;
-    while (true) {
-      const formattedNum = String(counter).padStart(3, '0');
-      const candidate = `${basePrefix}-${formattedNum}`;
-      if (!existingCodes.has(candidate)) {
-        return candidate;
-      }
-      counter++;
-    }
+    return `${brandPrefix}-${catPrefix}-${nextSeq}`;
   };
 
-  // Generate Otomatis Kode SKU Menggunakan Metode Terbaik
   const handleGenerateSkuCode = () => {
     const generated = createBestPracticeSkuCode(brandName, category, skuName);
     setSkuCode(generated);
   };
 
-  // Scroll to targeted section smoothly
-  const scrollToSection = (section: SectionKey) => {
-    setActiveSection(section);
-    let targetEl: HTMLDivElement | null = null;
-    if (section === 'informasi') targetEl = sectionInformasiRef.current;
-    if (section === 'spesifikasi') targetEl = sectionSpesifikasiRef.current;
-    if (section === 'deskripsi') targetEl = sectionDeskripsiRef.current;
-
-    if (targetEl) {
-      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  // Track scroll position to update active anchor menu
-  const handleScroll = () => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const infoPos = sectionInformasiRef.current?.getBoundingClientRect();
-    const specPos = sectionSpesifikasiRef.current?.getBoundingClientRect();
-    const descPos = sectionDeskripsiRef.current?.getBoundingClientRect();
-
-    const triggerPoint = 200;
-
-    if (descPos && descPos.top <= triggerPoint) {
-      setActiveSection('deskripsi');
-    } else if (specPos && specPos.top <= triggerPoint) {
-      setActiveSection('spesifikasi');
-    } else if (infoPos && infoPos.top <= triggerPoint) {
-      setActiveSection('informasi');
-    }
-  };
-
-  // Handle local image upload dengan auto compress dan konversi ke WebP
+  // Handler Upload Foto Produk
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      onAlert('Format Tidak Didukung', 'Harap unggah berkas gambar (JPG, PNG, WEBP, SVG).', 'warning');
+      onAlert('Format Tidak Didukung', 'Silakan pilih file gambar (JPG, PNG, WebP).', 'warning');
       return;
     }
 
     try {
-      const optimizedWebP = await compressAndConvertToWebP(file, {
-        maxWidth: 1200,
-        maxHeight: 1200,
-        quality: 0.85
-      });
-      setProductImage(optimizedWebP);
-    } catch (err) {
-      console.error('Gagal optimasi gambar:', err);
+      const optimizedBase64 = await compressAndConvertToWebP(file, { maxWidth: 800, maxHeight: 800, quality: 0.82 });
+      setProductImage(optimizedBase64);
+      onAlert('Foto Dipilih', 'Foto produk berhasil dimuat & dioptimalkan.', 'success');
+    } catch {
       const reader = new FileReader();
       reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setProductImage(reader.result);
-        }
+        setProductImage(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Handle Submit
+  // Navigasi scroll ke anchor section tertentu
+  const scrollToSection = (section: SectionKey) => {
+    setActiveSection(section);
+    let targetRef: React.RefObject<HTMLDivElement | null> | null = null;
+    if (section === 'informasi') targetRef = sectionInformasiRef;
+    if (section === 'spesifikasi') targetRef = sectionSpesifikasiRef;
+    if (section === 'deskripsi') targetRef = sectionDeskripsiRef;
+
+    if (targetRef?.current) {
+      targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Deteksi scroll untuk memperbarui active section tab
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const scrollPos = scrollContainerRef.current.scrollTop + 140;
+
+    const infoTop = sectionInformasiRef.current?.offsetTop || 0;
+    const specTop = sectionSpesifikasiRef.current?.offsetTop || 0;
+    const descTop = sectionDeskripsiRef.current?.offsetTop || 0;
+
+    if (descTop && scrollPos >= descTop) {
+      setActiveSection('deskripsi');
+    } else if (specTop && scrollPos >= specTop) {
+      setActiveSection('spesifikasi');
+    } else {
+      setActiveSection('informasi');
+    }
+  };
+
   // Deteksi perubahan data formulir (di mode edit: apakah ada perubahan dibanding initialData)
   const isFormDirty = mode === 'edit' && initialData ? Boolean(
     skuName.trim() !== (initialData.sku || '').trim() ||
@@ -409,34 +402,14 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
     category.trim() !== (initialData.category || '').trim() ||
     brandId !== initialData.brandId ||
     productImage !== (initialData.image || '') ||
-    specMaterial.trim() !== parsedInitial.material.trim() ||
-    specDimension.trim() !== parsedInitial.dimension.trim() ||
-    specThickness.trim() !== parsedInitial.thickness.trim() ||
-    specWeight.trim() !== parsedInitial.weight.trim() ||
-    specCapacity.trim() !== parsedInitial.capacity.trim() ||
-    specFinishing.trim() !== parsedInitial.finishing.trim() ||
-    specGrade.trim() !== parsedInitial.grade.trim() ||
-    specCertification.trim() !== parsedInitial.certification.trim() ||
-    specWarranty.trim() !== parsedInitial.warranty.trim() ||
-    specOrigin.trim() !== parsedInitial.origin.trim() ||
-    customSpecs.length !== parsedInitial.customSpecs.length ||
-    description.trim() !== parsedInitial.desc.trim()
+    description.trim() !== (parsedInitial.desc || '').trim() ||
+    Object.keys(categoryFieldValues).some(k => (categoryFieldValues[k] || '').trim() !== (parsedInitial.rawSpecs[k] || '').trim())
   ) : Boolean(
     skuName.trim() ||
     skuCode.trim() ||
     productImage ||
-    specMaterial.trim() ||
-    specDimension.trim() ||
-    specThickness.trim() ||
-    specWeight.trim() ||
-    specCapacity.trim() ||
-    specFinishing.trim() ||
-    specGrade.trim() ||
-    specCertification.trim() ||
-    specWarranty.trim() ||
-    specOrigin.trim() ||
-    customSpecs.length > 0 ||
-    description.trim()
+    description.trim() ||
+    Object.keys(categoryFieldValues).some(k => (categoryFieldValues[k] || '').trim())
   );
 
   // Sinkronkan status dirty form ke induk komponen
@@ -461,7 +434,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isFormDirty]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+    const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!brandId || !brandName.trim()) {
       onAlert('Brand Wajib Dipilih', 'Silakan pilih Brand / Merk pemilik SKU terlebih dahulu.', 'warning');
@@ -814,44 +787,74 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
           ref={sectionSpesifikasiRef}
           className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
         >
-          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4 flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
-              <Sliders size={16} className="text-[#c28e62]" />
-              <span>Spesifikasi Produk</span>
-            </h2>
-            {activeCategorySchema.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold">
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
+                <Sliders size={16} className="text-[#c28e62]" />
+                <span>Spesifikasi Produk</span>
+              </h2>
+              {categoryChain.length > 0 && (
+                <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
+                  Atribut otomatis sinkron &amp; terwariskan dari hierarki database kategori.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeCategorySchema.length > 0 && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold">
                   {activeCategorySchema.length} Parameter
                 </span>
-                {matchedCategory && (
+              )}
+              {categoryChain.map(cat => {
+                let count = 0;
+                try {
+                  const s = cat.specSchema ? JSON.parse(cat.specSchema) : [];
+                  count = Array.isArray(s) ? s.length : 0;
+                } catch {}
+                return (
                   <button
+                    key={cat.id}
                     type="button"
-                    onClick={() => setIsSpecDrawerOpen(true)}
+                    onClick={() => {
+                      setSelectedDrawerCatId(cat.id);
+                      setIsSpecDrawerOpen(true);
+                    }}
                     className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] bg-slate-50 dark:bg-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title={`Atur template spesifikasi ${cat.name} (Level ${cat.level})`}
                   >
                     <Sliders size={12} className="text-[#c28e62]" />
-                    <span>Ubah Form Kategori</span>
+                    <span>{cat.name} ({count} Atribut)</span>
                   </button>
-                )}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
 
           {activeCategorySchema.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
               {activeCategorySchema.map((field) => (
                 <div key={field.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 truncate">
                       {field.label}
                       {field.required && <span className="text-rose-500 ml-1">*</span>}
                     </label>
-                    {field.unit && (
-                      <span className="text-[10px] font-mono text-slate-400">
-                        Satuan: {field.unit}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {field.sourceCategoryName && (
+                        <span 
+                          className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400"
+                          title={`Atribut terwariskan dari Level ${field.sourceCategoryLevel}: ${field.sourceCategoryName}`}
+                        >
+                          {field.sourceCategoryName}
+                        </span>
+                      )}
+                      {field.unit && (
+                        <span className="text-[10px] font-mono text-slate-400">
+                          Satuan: {field.unit}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {field.type === 'select' ? (
@@ -929,19 +932,28 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
                   Spesifikasi Produk Kosong
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                  {matchedCategory 
-                    ? `Kategori "${matchedCategory.name}" belum memiliki form spesifikasi khusus. Atur template kategori untuk menambahkan parameter seperti bahan, dimensi, garansi, dll.` 
+                  {categoryChain.length > 0 
+                    ? `Kategori "${leafCategory?.name || category}" dan hierarki induknya belum memiliki atribut spesifikasi di database. Atur form kategori untuk menambahkan parameter seperti bahan, dimensi, garansi, dll.` 
                     : 'Pilih kategori terlebih dahulu untuk mengatur spesifikasi produk.'}
                 </p>
               </div>
-              {matchedCategory ? (
-                <button
-                  type="button"
-                  onClick={() => setIsSpecDrawerOpen(true)}
-                  className="mt-1 px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-                >
-                  Atur Spesifikasi Kategori
-                </button>
+              {categoryChain.length > 0 ? (
+                <div className="flex items-center gap-2 flex-wrap justify-center mt-1">
+                  {categoryChain.map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDrawerCatId(cat.id);
+                        setIsSpecDrawerOpen(true);
+                      }}
+                      className="px-4 py-2 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                    >
+                      <Plus size={13} />
+                      <span>Atur Spesifikasi {cat.name} (L{cat.level})</span>
+                    </button>
+                  ))}
+                </div>
               ) : (
                 <button
                   type="button"
@@ -1000,11 +1012,14 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       />
 
       {/* SLIDE-OVER DRAWER SPESIFIKASI KATEGORI (IDENTIK DENGAN HALAMAN KATEGORI) */}
-      {matchedCategory && (
+      {targetCategoryForDrawer && (
         <CategorySpecDrawer
           isOpen={isSpecDrawerOpen}
-          onClose={() => setIsSpecDrawerOpen(false)}
-          targetCategory={matchedCategory}
+          onClose={() => {
+            setIsSpecDrawerOpen(false);
+            setSelectedDrawerCatId(null);
+          }}
+          targetCategory={targetCategoryForDrawer}
           onSaved={(updated) => {
             const nextCats = categories.map(c => 
               c.id === updated.id ? { ...c, specSchema: updated.specSchema } : c
@@ -1014,7 +1029,6 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
           onAlert={onAlert}
         />
       )}
-
 
     </div>
   );

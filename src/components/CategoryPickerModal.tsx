@@ -14,6 +14,7 @@ export interface CategoryRef {
   level: number;
   parentId?: string | null;
   code?: string | null;
+  specSchema?: string | null;
 }
 
 interface CategoryPickerModalProps {
@@ -111,6 +112,17 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
         !searchQuery.trim() || c.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
       ))
     : [];
+
+  
+  const getSpecsCount = (specSchema?: string | null) => {
+    if (!specSchema) return 0;
+    try {
+      const s = JSON.parse(specSchema);
+      return Array.isArray(s) ? s.length : 0;
+    } catch {
+      return 0;
+    }
+  };
 
   const getSubCount = (parentId: string, targetLevel: number) => {
     return categories.filter(c => c.level === targetLevel && c.parentId === parentId).length;
@@ -233,8 +245,16 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                           : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span className="truncate">{item.name}</span>
+                        {(() => {
+                          const cnt = getSpecsCount(item.specSchema);
+                          return cnt > 0 ? (
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold shrink-0">
+                              {cnt} Atribut
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
@@ -282,8 +302,16 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                           : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span className="truncate">{item.name}</span>
+                        {(() => {
+                          const cnt = getSpecsCount(item.specSchema);
+                          return cnt > 0 ? (
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold shrink-0">
+                              {cnt} Atribut
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400">
@@ -331,8 +359,16 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
                           : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <span className="truncate">{item.name}</span>
+                        {(() => {
+                          const cnt = getSpecsCount(item.specSchema);
+                          return cnt > 0 ? (
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold shrink-0">
+                              {cnt} Atribut
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                       <div className="shrink-0">
                         {isSelected ? (
