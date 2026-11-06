@@ -792,6 +792,16 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               <Sliders size={16} className="text-[#c28e62]" />
               <span>Spesifikasi Produk</span>
             </h2>
+            {category && targetCategoryForDrawer && (
+              <button
+                type="button"
+                onClick={() => setIsSpecDrawerOpen(true)}
+                className="px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] bg-slate-50 dark:bg-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:text-[#c28e62] flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <Sliders size={12} className="text-[#c28e62]" />
+                <span>Atur Atribut Kategori</span>
+              </button>
+            )}
           </div>
 
           {activeCategorySchema.length > 0 ? (
@@ -968,6 +978,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
             setSelectedDrawerCatId(null);
           }}
           targetCategory={targetCategoryForDrawer}
+          availableCategories={categoryChain.length > 0 ? categoryChain : undefined}
           onSaved={(updated) => {
             const nextCats = categories.map(c => 
               c.id === updated.id ? { ...c, specSchema: updated.specSchema } : c

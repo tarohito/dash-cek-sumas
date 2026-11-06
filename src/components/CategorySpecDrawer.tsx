@@ -18,8 +18,15 @@ export interface CategorySpecDrawerProps {
   targetCategory: {
     id: string;
     name: string;
+    level?: number;
     specSchema?: string | null;
   } | null;
+  availableCategories?: Array<{
+    id: string;
+    name: string;
+    level?: number;
+    specSchema?: string | null;
+  }>;
   onSaved: (updated: { id: string; specSchema: string }) => void;
   onAlert?: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 }
@@ -132,9 +139,17 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
   isOpen,
   onClose,
   targetCategory,
+  availableCategories,
   onSaved,
   onAlert
 }) => {
+  const [activeCategory, setActiveCategory] = useState(targetCategory);
+
+  useEffect(() => {
+    setActiveCategory(targetCategory);
+  }, [targetCategory]);
+
+  const currentTargetCategory = activeCategory || targetCategory;
   const [fields, setFields] = useState<CategorySpecField[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -147,13 +162,13 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isOpen && targetCategory) {
+    if (isOpen && currentTargetCategory) {
       if (closeTimerRef.current) {
         clearTimeout(closeTimerRef.current);
         closeTimerRef.current = null;
       }
       try {
-        const parsed = targetCategory.specSchema ? JSON.parse(targetCategory.specSchema) : [];
+        const parsed = currentTargetCategory.specSchema ? JSON.parse(currentTargetCategory.specSchema) : [];
         setFields(Array.isArray(parsed) ? parsed : []);
       } catch {
         setFields([]);
@@ -166,7 +181,7 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
     } else {
       setIsVisible(false);
     }
-  }, [isOpen, targetCategory]);
+  }, [isOpen, currentTargetCategory]);
 
   const handleClose = () => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -200,11 +215,11 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
   };
 
   const handleSave = async () => {
-    if (!targetCategory) return;
+    if (!currentTargetCategory) return;
     const validFields = fields.filter(f => f.label.trim());
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/categories/${targetCategory.id}/specs`, {
+      const res = await fetch(`/api/categories/${currentTargetCategory.id}/specs`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ specSchema: JSON.stringify(validFields) })
@@ -213,9 +228,12 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
       if (res.ok) {
         const updated = await res.json();
         onSaved({ id: updated.id, specSchema: updated.specSchema });
+        if (activeCategory && activeCategory.id === updated.id) {
+          setActiveCategory({ ...activeCategory, specSchema: updated.specSchema });
+        }
         onAlert?.(
           'Spesifikasi Disimpan',
-          `Template spesifikasi untuk "${targetCategory.name}" berhasil diperbarui.`,
+          `Template spesifikasi untuk "${currentTargetCategory.name}" berhasil diperbarui.`,
           'success'
         );
         handleClose();
@@ -232,7 +250,7 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
   };
 
   if (!isOpen && !isVisible) return null;
-  if (!targetCategory) return null;
+  if (!currentTargetCategory) return null;
 
   return createPortal(
     <div
@@ -254,7 +272,7 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
               Form Spesifikasi
             </h2>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] font-semibold truncate max-w-[200px]">
-              {targetCategory.name}
+              {currentTargetCategory.name}
             </span>
           </div>
           <button
@@ -265,6 +283,32 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
             <X size={15} />
           </button>
         </div>
+
+        {/* SELECTOR TINGKAT KATEGORI (JIKA MULTI-LEVEL) */}
+        {availableCategories && availableCategories.length > 1 && (
+          <div className="px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/50 border-b border-slate-100 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <span className="text-[11px] font-medium text-slate-400 shrink-0">
+              Target Kategori:
+            </span>
+            {availableCategories.map((c) => {
+              const isSelected = c.id === currentTargetCategory.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setActiveCategory(c)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    isSelected
+                      ? 'bg-[#c28e62] text-white shadow-2xs'
+                      : 'bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:border-[#c28e62]'
+                  }`}
+                >
+                  {c.name} {c.level ? `(Level ${c.level})` : ''}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 scrollbar-thin">
