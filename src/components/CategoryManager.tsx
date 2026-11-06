@@ -394,7 +394,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
       <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
         
         {/* TOP STATUS BAR KATEGORI: SECTION STRUKTUR HIRARKI + FITUR PENCARIAN 1 INPUTAN DI ATAS KANAN */}
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
               <Layers size={16} />
@@ -404,21 +404,21 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
             </span>
           </div>
 
-          {/* SINGLE UNIFIED SEARCH INPUT DI ATAS KANAN (UKURAN DISAMAKAN DENGAN BUTTON TAMBAH SKU) */}
+          {/* SINGLE UNIFIED SEARCH INPUT DI ATAS KANAN (UKURAN & TINGGI IDENTIK DENGAN TOMBOL SKU / BRAND) */}
           <div className="relative w-full sm:w-80">
-            <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 pointer-events-none" />
             <input
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               placeholder="Cari kategori, sub kategori, varian..."
-              className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-9 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+              className="w-full h-10 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-9 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
             />
             {globalSearch && (
               <button
                 type="button"
                 onClick={() => setGlobalSearch('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer p-0.5"
               >
                 <X size={15} />
               </button>
@@ -473,7 +473,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                     <div
                       key={item.id}
                       onClick={() => !editingId && handleSelectLevel1(item.id)}
-                      className={`group p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                      className={`group px-3.5 py-2.5 rounded-full border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         isSelected 
                           ? 'bg-slate-50 dark:bg-zinc-800 border-[#c28e62] text-slate-900 dark:text-zinc-100 font-semibold' 
                           : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800/80 hover:bg-slate-50/60 dark:hover:bg-zinc-800/50 text-slate-700 dark:text-zinc-300'
@@ -503,7 +503,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             type="submit"
                             disabled={isSubmitting || !editingName.trim()}
                             title="Simpan"
-                            className="p-1.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                            className="p-1.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full transition-colors cursor-pointer shrink-0 disabled:opacity-50"
                           >
                             <Check size={13} />
                           </button>
@@ -511,7 +511,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             type="button"
                             onClick={handleCancelInlineEdit}
                             title="Batal"
-                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg transition-colors cursor-pointer shrink-0"
+                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full transition-colors cursor-pointer shrink-0"
                           >
                             <X size={13} />
                           </button>
@@ -541,7 +541,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                               type="button"
                               onClick={(e) => handleStartInlineEdit(item, e)}
                               title="Edit Kategori"
-                              className="p-1.5 text-slate-400 hover:text-[#c28e62] dark:hover:text-[#c28e62] hover:bg-slate-100 dark:hover:bg-zinc-700/60 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-[#c28e62] dark:hover:text-[#c28e62] hover:bg-slate-100 dark:hover:bg-zinc-700/60 rounded-full transition-colors cursor-pointer"
                             >
                               <Edit3 size={13} />
                             </button>
@@ -549,7 +549,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                               type="button"
                               onClick={(e) => handleOpenDelete(item, e)}
                               title="Hapus Kategori"
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition-colors cursor-pointer"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -610,7 +610,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                     <div
                       key={item.id}
                       onClick={() => !editingId && handleSelectLevel2(item.id)}
-                      className={`group p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                      className={`group px-3.5 py-2.5 rounded-full border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         isSelected 
                           ? 'bg-slate-50 dark:bg-zinc-800 border-[#c28e62] text-slate-900 dark:text-zinc-100 font-semibold' 
                           : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800/80 hover:bg-slate-50/60 dark:hover:bg-zinc-800/50 text-slate-700 dark:text-zinc-300'
@@ -640,7 +640,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             type="submit"
                             disabled={isSubmitting || !editingName.trim()}
                             title="Simpan"
-                            className="p-1.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                            className="p-1.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full transition-colors cursor-pointer shrink-0 disabled:opacity-50"
                           >
                             <Check size={13} />
                           </button>
@@ -648,7 +648,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             type="button"
                             onClick={handleCancelInlineEdit}
                             title="Batal"
-                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg transition-colors cursor-pointer shrink-0"
+                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full transition-colors cursor-pointer shrink-0"
                           >
                             <X size={13} />
                           </button>
@@ -678,7 +678,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                               type="button"
                               onClick={(e) => handleStartInlineEdit(item, e)}
                               title="Edit Sub Kategori"
-                              className="p-1.5 text-slate-400 hover:text-[#c28e62] dark:hover:text-[#c28e62] hover:bg-slate-100 dark:hover:bg-zinc-700/60 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-[#c28e62] dark:hover:text-[#c28e62] hover:bg-slate-100 dark:hover:bg-zinc-700/60 rounded-full transition-colors cursor-pointer"
                             >
                               <Edit3 size={13} />
                             </button>
@@ -686,7 +686,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                               type="button"
                               onClick={(e) => handleOpenDelete(item, e)}
                               title="Hapus Sub Kategori"
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition-colors cursor-pointer"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -745,7 +745,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                     <div
                       key={item.id}
                       onClick={() => !editingId && setSelectedLevel3Id(prev => prev === item.id ? null : item.id)}
-                      className={`group p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                      className={`group px-3.5 py-2.5 rounded-full border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         isSelected 
                           ? 'bg-slate-50 dark:bg-zinc-800 border-[#c28e62] text-slate-900 dark:text-zinc-100 font-semibold' 
                           : 'bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800/80 hover:bg-slate-50/60 dark:hover:bg-zinc-800/50 text-slate-700 dark:text-zinc-300'
@@ -775,7 +775,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             type="submit"
                             disabled={isSubmitting || !editingName.trim()}
                             title="Simpan"
-                            className="p-1.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                            className="p-1.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full transition-colors cursor-pointer shrink-0 disabled:opacity-50"
                           >
                             <Check size={13} />
                           </button>
@@ -783,7 +783,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                             type="button"
                             onClick={handleCancelInlineEdit}
                             title="Batal"
-                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-lg transition-colors cursor-pointer shrink-0"
+                            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full transition-colors cursor-pointer shrink-0"
                           >
                             <X size={13} />
                           </button>
@@ -813,7 +813,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                               type="button"
                               onClick={(e) => handleStartInlineEdit(item, e)}
                               title="Edit Varian"
-                              className="p-1.5 text-slate-400 hover:text-[#c28e62] dark:hover:text-[#c28e62] hover:bg-slate-100 dark:hover:bg-zinc-700/60 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-[#c28e62] dark:hover:text-[#c28e62] hover:bg-slate-100 dark:hover:bg-zinc-700/60 rounded-full transition-colors cursor-pointer"
                             >
                               <Edit3 size={13} />
                             </button>
@@ -821,7 +821,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                               type="button"
                               onClick={(e) => handleOpenDelete(item, e)}
                               title="Hapus Varian"
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition-colors cursor-pointer"
                             >
                               <Trash2 size={13} />
                             </button>

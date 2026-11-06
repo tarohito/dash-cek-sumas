@@ -252,6 +252,12 @@ try {
 try {
   db.prepare('ALTER TABLE products ADD COLUMN skuCode TEXT').run();
 } catch (_) {}
+try {
+  db.prepare('ALTER TABLE products ADD COLUMN createdAt TEXT').run();
+} catch (_) {}
+try {
+  db.prepare('ALTER TABLE products ADD COLUMN image TEXT').run();
+} catch (_) {}
 
 // Update existing users with full data matching Tambah Pengguna form
 try {
@@ -336,7 +342,7 @@ if (brandCountRow && brandCountRow.count === 0) {
     'kalinggajeandy3@gmail.com',
     'Administrator',
     'Material partisi cubicle toilet, phenolic board tahan air & benturan untuk proyek rumah sakit, bandara, mall, dan fasilitas komersial.',
-    'B2B Material & Konstruksi',
+    'Material & Konstruksi',
     'Aktif',
     '28 Okt 2026, 09:00'
   );
@@ -349,7 +355,7 @@ if (brandCountRow && brandCountRow.count === 0) {
     'siti.r@mki.co.id',
     'Operator',
     'Lini streetwear retail eksklusif dengan sistem verifikasi QR code hologram anti-counterfeit dan PIN verifikasi publik.',
-    'Retail Fashion & Streetwear',
+    'Fashion & Streetwear',
     'Aktif',
     '23 Mei 2025, 10:00'
   );
@@ -362,7 +368,7 @@ if (brandCountRow && brandCountRow.count === 0) {
     'budi.s@mki.co.id',
     'Operator',
     'Koleksi fashion premium & casual lifestyle dengan tag serial unik untuk garansi keaslian pakaian.',
-    'Retail Apparel & Lifestyle',
+    'Apparel & Lifestyle',
     'Aktif',
     '15 Jun 2025, 14:20'
   );
@@ -404,14 +410,14 @@ if (productCountRow && productCountRow.count === 0) {
     INSERT INTO products (id, brandId, brandName, sku, category, isB2B)
     VALUES (?, ?, ?, ?, ?, ?)
   `);
-  insertProduct.run('p1', 'br-sumas', 'Sumas', 'Pintu Cubicle Toilet', 'B2B Material & Konstruksi', 1);
-  insertProduct.run('p2', 'br-sumas', 'Sumas', 'Phenolic Board 12mm Standard', 'B2B Material & Konstruksi', 1);
-  insertProduct.run('p3', 'br-sumas', 'Sumas', 'Cubicle Hardware Set', 'B2B Material & Konstruksi', 1);
-  insertProduct.run('p4', 'br-assc', 'ASSC', 'Dew Drops', 'Retail Fashion & Streetwear', 0);
-  insertProduct.run('p5', 'br-assc', 'ASSC', 'ASSC Classic Hoodie', 'Retail Fashion & Streetwear', 0);
-  insertProduct.run('p6', 'br-assc', 'ASSC', 'Overthinking Cap', 'Retail Fashion & Streetwear', 0);
-  insertProduct.run('p7', 'br-blimey', 'BLIMEY!', 'A LITTLE CLOSER (BLIMEY!)', 'Retail Apparel & Lifestyle', 0);
-  insertProduct.run('p8', 'br-blimey', 'BLIMEY!', 'Oversized Street Jacket', 'Retail Apparel & Lifestyle', 0);
+  insertProduct.run('p1', 'br-sumas', 'Sumas', 'Pintu Cubicle Toilet', 'Material & Konstruksi', 1);
+  insertProduct.run('p2', 'br-sumas', 'Sumas', 'Phenolic Board 12mm Standard', 'Material & Konstruksi', 1);
+  insertProduct.run('p3', 'br-sumas', 'Sumas', 'Cubicle Hardware Set', 'Material & Konstruksi', 1);
+  insertProduct.run('p4', 'br-assc', 'ASSC', 'Dew Drops', 'Fashion & Streetwear', 0);
+  insertProduct.run('p5', 'br-assc', 'ASSC', 'ASSC Classic Hoodie', 'Fashion & Streetwear', 0);
+  insertProduct.run('p6', 'br-assc', 'ASSC', 'Overthinking Cap', 'Fashion & Streetwear', 0);
+  insertProduct.run('p7', 'br-blimey', 'BLIMEY!', 'A LITTLE CLOSER (BLIMEY!)', 'Apparel & Lifestyle', 0);
+  insertProduct.run('p8', 'br-blimey', 'BLIMEY!', 'Oversized Street Jacket', 'Apparel & Lifestyle', 0);
 }
 
 // Seed initial 3-level categories if empty

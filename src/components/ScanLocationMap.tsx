@@ -24,7 +24,6 @@ export interface ScanPoint {
   batchId: string;
   latestTagId: string;
   latestTime: string;
-  isB2B: boolean;
   status: ScanSecurityStatus;
   anomalyReason?: string;
   deviceInfo: string;

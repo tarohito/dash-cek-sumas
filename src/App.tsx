@@ -69,6 +69,7 @@ import { CustomTooltipProvider } from './components/CustomTooltip';
 import { CategoryManager } from './components/CategoryManager';
 import { CreateSkuPage } from './components/CreateSkuPage';
 import { generateA3PlusStickersPdf, generateTagsCsv, saveFileWithNativePicker } from './utils/pdfGenerator';
+import { compressAndConvertToWebP } from './utils/imageOptimizer';
 
 // ==========================================
 // RESILIENT OFFLINE FALLBACK AVATARS & LOGOS
@@ -791,7 +792,6 @@ export default function App() {
     sku: string;
     skuCode?: string;
     category: string;
-    isB2B: boolean;
     description?: string;
     image?: string;
     createdAt?: string;
@@ -1122,12 +1122,8 @@ export default function App() {
   // Metrik Live yang diagregasikan langsung dari database & state batches & brands
   const liveStats = React.useMemo(() => {
     let totalTags = 0;
-    let b2bTotalTags = 0;
-    let b2bAllocatedTags = 0;
-    let b2bAvailableTags = 0;
-    let retailTotalTags = 0;
-    const projectMap: { [key: string]: { name: string; count: number; batchId: string; batchObj: any; specs: string } } = {};
-    const brandMap: { [key: string]: { brand: string; batchCount: number; totalQty: number; isB2B: boolean; logo?: string | null } } = {};
+                    const projectMap: { [key: string]: { name: string; count: number; batchId: string; batchObj: any; specs: string } } = {};
+    const brandMap: { [key: string]: { brand: string; batchCount: number; totalQty: number; logo?: string | null } } = {};
 
     // Inisialisasi peta brand dari master brands
     brands.forEach(br => {
@@ -1135,7 +1131,6 @@ export default function App() {
         brand: br.name,
         batchCount: 0,
         totalQty: 0,
-        isB2B: br.category.toLowerCase().includes('b2b') || br.name.toLowerCase() === 'sumas',
         logo: br.logo
       };
     });
@@ -1144,27 +1139,19 @@ export default function App() {
       const qty = Number(b.qty) || 0;
       totalTags += qty;
       if (!brandMap[b.brand]) {
-        brandMap[b.brand] = { brand: b.brand, batchCount: 0, totalQty: 0, isB2B: Boolean(b.isB2B) };
+        brandMap[b.brand] = { brand: b.brand, batchCount: 0, totalQty: 0 };
       }
       brandMap[b.brand].batchCount += 1;
       brandMap[b.brand].totalQty += qty;
 
-      if (b.isB2B) {
-        b2bTotalTags += qty;
-        const used = typeof b.usedCount === 'number' ? b.usedCount : (b.project ? qty : 0);
-        const avail = typeof b.availableCount === 'number' ? b.availableCount : Math.max(0, qty - used);
-        b2bAllocatedTags += used;
-        b2bAvailableTags += avail;
-        if (b.project) {
-          const parts = String(b.project).split(',').map((p: string) => p.trim()).filter(Boolean);
-          parts.forEach((proj: string) => {
-            if (!projectMap[proj]) {
-              projectMap[proj] = { name: proj, count: used || qty, batchId: b.batchId, batchObj: b, specs: b.specs || '-' };
-            }
-          });
-        }
-      } else {
-        retailTotalTags += qty;
+      const used = typeof b.usedCount === 'number' ? b.usedCount : (b.project ? qty : 0);
+      if (b.project) {
+        const parts = String(b.project).split(',').map((p: string) => p.trim()).filter(Boolean);
+        parts.forEach((proj: string) => {
+          if (!projectMap[proj]) {
+            projectMap[proj] = { name: proj, count: used || qty, batchId: b.batchId, batchObj: b, specs: b.specs || '-' };
+          }
+        });
       }
     });
 
@@ -1175,10 +1162,6 @@ export default function App() {
       totalBatches: batches.length,
       activeBatches: batches.filter(b => b.status !== 'Disuspend').length,
       suspendedBatches: batches.filter(b => b.status === 'Disuspend').length,
-      b2bTotalTags,
-      b2bAllocatedTags,
-      b2bAvailableTags,
-      retailTotalTags,
       projectsList,
       brandList: Object.values(brandMap),
       totalLogs: auditLogs.length,
@@ -1339,7 +1322,7 @@ export default function App() {
     logo: '',
     ownerId: '',
     description: '',
-    category: 'B2B Material & Konstruksi',
+    category: 'Material & Konstruksi',
     status: 'Aktif' as 'Aktif' | 'Nonaktif'
   });
 
@@ -1351,7 +1334,57 @@ export default function App() {
   const [skuSortBy, setSkuSortBy] = useState('newest');
   const [skuPage, setSkuPage] = useState(1);
   const [skuPerPage, setSkuPerPage] = useState(10);
-  const [skuSubView, setSkuSubView] = useState<'list' | 'create'>('list');
+  const [skuSubView, setSkuSubView] = useState<'list' | 'create' | 'edit'>('list');
+  const [isSkuFormDirty, setIsSkuFormDirty] = useState<boolean>(false);
+  const [showSkuLeaveModal, setShowSkuLeaveModal] = useState<boolean>(false);
+  const [pendingSkuLeaveNav, setPendingSkuLeaveNav] = useState<(() => void) | null>(null);
+
+  // Helper pelindung navigasi saat form SKU sedang diedit / belum disimpan
+  const requestLeaveSkuPage = (onProceed: () => void) => {
+    if (activeMenu === 'sku' && (skuSubView === 'create' || skuSubView === 'edit') && isSkuFormDirty) {
+      setPendingSkuLeaveNav(() => onProceed);
+      setShowSkuLeaveModal(true);
+    } else {
+      onProceed();
+    }
+  };
+
+  // Tangani navigasi mundur browser (popstate) saat di halaman tambah SKU
+  useEffect(() => {
+    if (activeMenu === 'sku' && (skuSubView === 'create' || skuSubView === 'edit')) {
+      window.history.pushState({ skuView: 'create' }, '');
+
+      const handlePopState = () => {
+        if (isSkuFormDirty) {
+          window.history.pushState({ skuView: 'create' }, '');
+          setPendingSkuLeaveNav(() => () => {
+            setIsSkuFormDirty(false);
+            setSkuSubView('list');
+          });
+          setShowSkuLeaveModal(true);
+        } else {
+          setSkuSubView('list');
+        }
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, [activeMenu, skuSubView, isSkuFormDirty]);
+
+  // Tangani refresh atau tutup tab browser saat form SKU belum tersimpan
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (activeMenu === 'sku' && (skuSubView === 'create' || skuSubView === 'edit') && isSkuFormDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [activeMenu, skuSubView, isSkuFormDirty]);
 
   const [isCreateSkuModalOpen, setIsCreateSkuModalOpen] = useState(false);
   const [isEditSkuModalOpen, setIsEditSkuModalOpen] = useState(false);
@@ -1373,7 +1406,6 @@ export default function App() {
     sku: '',
     skuCode: '',
     category: '',
-    isB2B: true,
     description: ''
   };
   const [skuForm, setSkuForm] = useState(defaultSkuForm);
@@ -1461,9 +1493,9 @@ export default function App() {
   ];
 
   const brandCategoriesList = [
-    'B2B Material & Konstruksi',
-    'Retail Fashion & Streetwear',
-    'Retail Apparel & Lifestyle',
+    'Material & Konstruksi',
+    'Fashion & Streetwear',
+    'Apparel & Lifestyle',
     'Elektronik & Hardware',
     'FMCG & Konsumsi',
     'Umum'
@@ -1478,7 +1510,7 @@ export default function App() {
 
   const [logoInputTab, setLogoInputTab] = useState<'upload' | 'url' | 'preset'>('upload');
 
-  // Preset foto/logo brand arsitektural dan retail siap pakai (100% lokal SVG)
+  // Preset foto/logo brand arsitektural siap pakai (100% lokal SVG)
   const presetBrandLogos = [
     { label: 'Sumas / Architectural & Material', url: '/assets/brand/logo_horizontal.svg' },
     { label: 'ASSC / Streetwear & Fashion', url: '/assets/brand/assc_logo.svg' },
@@ -1905,7 +1937,7 @@ export default function App() {
       logo: '',
       ownerId: defaultOwnerId,
       description: '',
-      category: 'B2B Material & Konstruksi',
+      category: 'Material & Konstruksi',
       status: 'Aktif'
     });
     setLogoInputTab('upload');
@@ -1934,7 +1966,7 @@ export default function App() {
       logo: brand.logo || '',
       ownerId: targetOwnerId,
       description: brand.description || '',
-      category: brand.category || 'B2B Material & Konstruksi',
+      category: brand.category || 'Material & Konstruksi',
       status: brand.status
     });
     setLogoInputTab(brand.logo ? (brand.logo.startsWith('data:') ? 'upload' : 'url') : 'upload');
@@ -2485,36 +2517,49 @@ export default function App() {
 
   const activeDropdownUser = users.find(u => u.id === openUserDropdownId);
 
-  const handleUserAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUserAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      triggerAlert('Ukuran File Terlalu Besar', 'Maksimal ukuran file foto adalah 5MB.', 'warning');
-      return;
+    try {
+      const optimizedWebP = await compressAndConvertToWebP(file, {
+        maxWidth: 600,
+        maxHeight: 600,
+        quality: 0.82
+      });
+      setUserForm(prev => ({ ...prev, avatar: optimizedWebP }));
+    } catch (err) {
+      console.error('Gagal optimasi avatar:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setUserForm(prev => ({ ...prev, avatar: reader.result as string }));
+        }
+      };
+      reader.readAsDataURL(file);
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setUserForm(prev => ({ ...prev, avatar: reader.result as string }));
-      }
-    };
-    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
-  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      triggerAlert('Ukuran File Terlalu Besar', 'Maksimal ukuran file foto adalah 5MB.', 'warning');
-      return;
+    try {
+      const optimizedWebP = await compressAndConvertToWebP(file, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.85
+      });
+      setBrandForm(prev => ({ ...prev, logo: optimizedWebP }));
+    } catch (err) {
+      console.error('Gagal optimasi logo:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setBrandForm(prev => ({ ...prev, logo: reader.result as string }));
+        }
+      };
+      reader.readAsDataURL(file);
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setBrandForm(prev => ({ ...prev, logo: reader.result as string }));
-      }
-    };
-    reader.readAsDataURL(file);
     e.target.value = '';
   };
 
@@ -2556,6 +2601,7 @@ export default function App() {
   };
 
   const handleOpenCreateSku = () => {
+    setIsSkuFormDirty(false);
     setSkuSubView('create');
   };
 
@@ -2565,7 +2611,6 @@ export default function App() {
     sku: string;
     skuCode: string;
     category: string;
-    isB2B: boolean;
     description?: string;
     image?: string;
   }) => {
@@ -2577,13 +2622,13 @@ export default function App() {
       sku: productData.sku.trim(),
       skuCode: productData.skuCode.trim() || `SKU-${Date.now().toString().slice(-4)}`,
       category: productData.category.trim() || 'Umum',
-      isB2B: Boolean(productData.isB2B),
       description: productData.description?.trim() || undefined,
       image: productData.image,
       createdAt: new Date().toISOString()
     };
 
     setProducts(prev => [newSkuItem, ...prev]);
+    setIsSkuFormDirty(false);
     setSkuSubView('list');
 
     try {
@@ -2597,6 +2642,7 @@ export default function App() {
       );
     } catch (err) {
       console.error('Gagal membuat SKU di SQLite:', err);
+      setProducts(prev => prev.filter(p => p.id !== newSkuItem.id));
       triggerAlert(
         'Gagal Menyimpan SKU',
         'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
@@ -2619,7 +2665,6 @@ export default function App() {
       sku: skuForm.sku.trim(),
       skuCode: skuForm.skuCode.trim() || `SKU-${Date.now().toString().slice(-4)}`,
       category: skuForm.category.trim() || 'Umum',
-      isB2B: Boolean(skuForm.isB2B),
       description: skuForm.description.trim() || undefined,
       createdAt: new Date().toISOString()
     };
@@ -2638,6 +2683,7 @@ export default function App() {
       );
     } catch (err) {
       console.error('Gagal membuat SKU di SQLite:', err);
+      setProducts(prev => prev.filter(p => p.id !== newSkuItem.id));
       triggerAlert(
         'Gagal Menyimpan SKU',
         'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
@@ -2648,18 +2694,56 @@ export default function App() {
 
   const handleOpenEditSku = (prod: ProductItem) => {
     setSkuToEdit(prod);
-    setSkuForm({
-      id: prod.id,
-      brandId: prod.brandId,
-      brandName: prod.brandName,
-      sku: prod.sku,
-      skuCode: prod.skuCode || `SKU-${prod.id.toUpperCase()}`,
-      category: prod.category || '',
-      isB2B: Boolean(prod.isB2B),
-      description: prod.description || ''
-    });
+    setIsSkuFormDirty(false);
+    setSkuSubView('edit');
     setOpenSkuDropdownId(null);
-    setIsEditSkuModalOpen(true);
+    setIsDetailSkuModalOpen(false);
+  };
+
+  const handleUpdateSkuFromPage = async (productData: {
+    brandId: string;
+    brandName: string;
+    sku: string;
+    skuCode: string;
+    category: string;
+    description?: string;
+    image?: string;
+  }) => {
+    if (!skuToEdit) return;
+
+    const editingId = skuToEdit.id;
+    const updatedData: Partial<ProductItem> = {
+      brandId: productData.brandId,
+      brandName: productData.brandName,
+      sku: productData.sku.trim(),
+      skuCode: productData.skuCode.trim(),
+      category: productData.category.trim() || 'Umum',
+      description: productData.description?.trim(),
+      image: productData.image
+    };
+
+    setProducts(prev => prev.map(p => p.id === editingId ? { ...p, ...updatedData } : p));
+    setIsSkuFormDirty(false);
+    setSkuSubView('list');
+    setSkuToEdit(null);
+
+    try {
+      await api.updateProduct(editingId, updatedData);
+      const freshProducts = await api.getProducts();
+      if (Array.isArray(freshProducts)) setProducts(freshProducts);
+      triggerAlert(
+        'SKU Berhasil Diperbarui',
+        `Data produk "${productData.sku.trim()}" telah diperbarui di katalog master.`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Gagal memperbarui SKU di SQLite:', err);
+      triggerAlert(
+        'Gagal Memperbarui SKU',
+        'Terjadi kesalahan saat menyimpan perubahan ke database.',
+        'error'
+      );
+    }
   };
 
   const handleUpdateSku = async () => {
@@ -2675,7 +2759,6 @@ export default function App() {
       sku: skuForm.sku.trim(),
       skuCode: skuForm.skuCode.trim() || (skuToEdit?.skuCode || `SKU-${skuForm.id.toUpperCase()}`),
       category: skuForm.category.trim() || 'Umum',
-      isB2B: Boolean(skuForm.isB2B),
       description: skuForm.description.trim()
     };
 
@@ -2922,13 +3005,12 @@ export default function App() {
     if (!selectedSku || !formQty) return; 
 
     const matchedProduct = products.find(p => p.id === selectedSku || p.sku === selectedSku);
-    const isB2B = matchedProduct ? Boolean(matchedProduct.isB2B) : false;
-    const brandName = matchedProduct ? matchedProduct.brandName : 'UMUM';
+        const brandName = matchedProduct ? matchedProduct.brandName : 'UMUM';
     const skuName = matchedProduct ? matchedProduct.sku : selectedSku;
     const newId = `b${Date.now()}`;
     const randCode = Math.floor(1000 + Math.random() * 9000); 
     
-    // Batch murni untuk stok, data B2B di-set null/kosong.
+    // Batch murni untuk stok, data proyek di-set null/kosong.
     const newBatch = {
       id: newId,
       batchId: `${brandName}-BATCH-${randCode}-${formQty}`,
@@ -2941,7 +3023,6 @@ export default function App() {
       specs: '-', 
       pinLength: Number(selectedPinLength),
       status: 'Aktif', // Status batch aktif normal
-      isB2B: isB2B,
       redirectUrl: (formRedirectUrl && formRedirectUrl.trim()) || 'https://cek.sumas.id/',
       qrType: formQrType || 'dynamic',
       requirePin: Boolean(formRequirePin),
@@ -3831,9 +3912,11 @@ export default function App() {
           href="#" 
           onClick={(e) => { 
             e.preventDefault(); 
-            setActiveMenu(id); 
-            if (id === 'sku') setSkuSubView('list');
-            if (isMobile) setIsMobileMenuOpen(false); 
+            requestLeaveSkuPage(() => {
+              setActiveMenu(id); 
+              if (id === 'sku') setSkuSubView('list');
+              if (isMobile) setIsMobileMenuOpen(false); 
+            });
           }} 
           className={`group flex items-center transition-all ${
             isMin 
@@ -3865,14 +3948,14 @@ export default function App() {
             <div className={`flex items-center gap-2 overflow-hidden w-full ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : ''}`}>
               {isSidebarMinimized && !isMobile ? (
                 <div 
-                  onClick={() => setActiveMenu('dashboard')}
+                  onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
                   className="cursor-pointer flex items-center justify-center hover:opacity-80 transition-opacity py-1 select-none"
                 >
                   <SumasEmblem className="h-7 w-auto object-contain" />
                 </div>
               ) : (
                 <div 
-                  onClick={() => setActiveMenu('dashboard')}
+                  onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
                   className="cursor-pointer py-1 flex items-center"
                 >
                   <SumasLogo className="h-7 w-auto object-contain" />
@@ -4044,15 +4127,6 @@ export default function App() {
         onScroll={() => { if(openDropdownId) setOpenDropdownId(null); }}
       >
         <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
-          {/* TOP STATUS BAR DI BAWAH HEADER */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
-              <LayoutDashboard size={16} />
-            </div>
-            <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-              Monitoring Geolokasi & Scan
-            </span>
-          </div>
 
           {/* 1. BAGIAN 1: 4 KOLOM CARD (KPI STATS) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -4790,14 +4864,24 @@ export default function App() {
   // RENDER HALAMAN SKU PRODUK (KATALOG MASTER)
   // ==========================================
   const renderSkuContent = () => {
-    if (skuSubView === 'create') {
+    if (skuSubView === 'create' || skuSubView === 'edit') {
       return (
         <CreateSkuPage
+          mode={skuSubView}
+          initialData={skuSubView === 'edit' ? skuToEdit : null}
           brands={brands}
           categories={categories}
-          onBack={() => setSkuSubView('list')}
-          onSave={handleSaveNewSkuFromPage}
+          existingProducts={products}
+          onBack={() => {
+            requestLeaveSkuPage(() => {
+              setIsSkuFormDirty(false);
+              setSkuSubView('list');
+              setSkuToEdit(null);
+            });
+          }}
+          onSave={skuSubView === 'edit' ? handleUpdateSkuFromPage : handleSaveNewSkuFromPage}
           onAlert={triggerAlert}
+          onDirtyChange={setIsSkuFormDirty}
         />
       );
     }
@@ -5449,8 +5533,7 @@ export default function App() {
                                   <span className="px-2 py-0.5 rounded-full bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 text-[10px] font-medium">
                                     PIN: {batch.pinLength} Digit
                                   </span>
-                                  {batch.isB2B && (
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
                                       used === 0 
                                         ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50'
                                         : remaining > 0
@@ -5459,7 +5542,6 @@ export default function App() {
                                     }`}>
                                       {used === 0 ? `${qtyNum} Siap Pakai` : `${used} Terpakai • ${remaining} Sisa`}
                                     </span>
-                                  )}
                                 </div>
                               </div>
                             );
@@ -6292,7 +6374,7 @@ export default function App() {
                     value={editProjectForm.note} 
                     onChange={(e) => setEditProjectForm({ ...editProjectForm, note: e.target.value })}
                     placeholder="Contoh: Gedung Rawat Inap Baru Lt 4, PIC Pak Rahmat..."
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all resize-none" 
+                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-2xl px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-medium transition-all resize-none" 
                   />
                 </div>
 
@@ -6306,7 +6388,7 @@ export default function App() {
                     placeholder="Jelaskan alasan perubahan untuk audit log..."
                     value={editProjectForm.reason}
                     onChange={(e) => setEditProjectForm({ ...editProjectForm, reason: e.target.value })}
-                    className="w-full bg-amber-50/20 dark:bg-amber-950/20 border border-amber-300/80 dark:border-amber-900/50 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none resize-none font-medium placeholder:font-normal transition-all"
+                    className="w-full bg-amber-50/20 dark:bg-amber-950/20 border border-amber-300/80 dark:border-amber-900/50 rounded-2xl px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none resize-none font-medium placeholder:font-normal transition-all"
                   />
                 </div>
               </div>
@@ -6599,15 +6681,13 @@ export default function App() {
                   <QrCode size={15} />
                   <span>Daftar Tag ({(tagsTotalCount || activeBatch?.actualTagCount || activeBatch?.qty || currentTags.length).toLocaleString('id-ID')})</span>
                 </button>
-                {activeBatch?.isB2B && (
-                  <button 
+                <button 
                     onClick={() => { setActiveTab('projects'); setHoveredTagInfo(null); }}
                     className={`pb-3 px-1 border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${activeTab === 'projects' ? 'border-[#c28e62] text-[#c28e62] font-bold' : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200'}`}
                   >
                     <Building2 size={15} />
                     <span>Alokasi Proyek ({activeBatchProjects.length})</span>
                   </button>
-                )}
                 <button 
                   onClick={() => { setActiveTab('history'); setHoveredTagInfo(null); }}
                   className={`pb-3 px-1 border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${activeTab === 'history' ? 'border-[#c28e62] text-[#c28e62] font-bold' : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200'}`}
@@ -6621,7 +6701,7 @@ export default function App() {
             <div className="p-4 sm:p-5 pb-6 sm:pb-8 flex-1 flex flex-col min-h-0 bg-white dark:bg-zinc-900 overflow-y-auto">
               {/* STATS BREADCRUMB / SUMMARY */}
               {(() => {
-                if (activeBatch?.isB2B) {
+                if (true) {
                   return (
                     <div className="bg-slate-50 dark:bg-zinc-800 p-3 sm:p-3.5 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0 text-xs sm:text-sm">
                       <div>
@@ -6698,7 +6778,7 @@ export default function App() {
                       <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                       <input 
                         type="text" 
-                        placeholder={activeBatch?.isB2B ? "Cari Digit PIN, No. Tag, atau Nama Proyek..." : "Cari Nomor Tag atau Digit PIN..."} 
+                        placeholder="Cari Digit PIN, No. Tag, atau Nama Proyek..." 
                         value={tagSearch}
                         onChange={(e) => handleTagSearchChange(e.target.value)}
                         className="w-full pl-10 pr-9 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-600 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#cd9a6f]/20 focus:border-[#cd9a6f] dark:focus:border-[#cd9a6f] transition-all"
@@ -6728,8 +6808,7 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* FILTER PILLS KHUSUS BRAND SUMAS (B2B) */}
-                  {activeBatch?.isB2B && (
+                  {/* FILTER PILLS STATUS TAG */}
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 mb-2 flex-shrink-0">
                       <span className="text-xs text-slate-400 font-medium whitespace-nowrap mr-1">Filter:</span>
                       <button
@@ -6776,11 +6855,10 @@ export default function App() {
                         </button>
                       ))}
                     </div>
-                  )}
 
 
                   {/* ACTIVE PROJECT FILTER INFO BANNER */}
-                  {activeBatch?.isB2B && tagProjectFilter !== 'all' && tagProjectFilter !== 'available' && (
+                  {tagProjectFilter !== 'all' && tagProjectFilter !== 'available' && (
                     <div className="bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 mb-3 text-xs flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Building2 size={15} className="text-[#c28e62]" />
@@ -6824,7 +6902,7 @@ export default function App() {
                   )}
 
                   {/* QUICK SELECTION BAR / ALLOCATED STATUS */}
-                  {activeBatch?.isB2B && activeBatch?.status !== 'Disuspend' && (
+                  {activeBatch?.status !== 'Disuspend' && (
                     availableCount > 0 ? (
                       <div className="bg-[#fcf7f3] dark:bg-zinc-800/60 border border-[#cd9a6f]/30 rounded-xl px-3 py-2 mb-3 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 text-xs">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -6871,9 +6949,8 @@ export default function App() {
                     )
                   )}
                   
-                  {/* LEGENDA STATUS KHUSUS BRAND SUMAS (B2B) ATAU INFO KATALOG BRAND LAIN */}
-                  {activeBatch?.isB2B ? (
-                    <div className="flex items-center gap-4 text-xs font-semibold mb-2.5 px-1 flex-wrap">
+                  {/* LEGENDA STATUS TAG */}
+                  <div className="flex items-center gap-4 text-xs font-semibold mb-2.5 px-1 flex-wrap">
                       <div className="flex items-center gap-1.5">
                         <div className="w-3.5 h-3.5 rounded border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 dark:border-emerald-400"></div>
                         <span className="text-emerald-700 dark:text-emerald-300 font-bold">Tersedia (Siap Alokasi)</span>
@@ -6887,12 +6964,6 @@ export default function App() {
                         <span className="text-slate-400 dark:text-zinc-500 font-medium">Terpakai (Teralokasi)</span>
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 mb-2 px-1">
-                      <span>Katalog Tag Resmi ({tagsTotalCount} Tag Terdaftar)</span>
-                      <span className="text-[11px] text-slate-400 hidden sm:inline">Arahkan kursor ke PIN untuk melihat detail</span>
-                    </div>
-                  )}
 
                   {/* GRID PIN TAG PAS 8 KOLOM (SIMETRIS & IMBANG KIRI-KANAN) */}
                   <div 
@@ -6914,7 +6985,7 @@ export default function App() {
                         {filteredTags.map((tag) => {
                           const isAvailable = tag.status === 'Tersedia';
                           const isSelected = selectedTagsToAllocate.includes(tag.id);
-                          const isInteractive = activeBatch?.isB2B && activeBatch?.status !== 'Disuspend' && isAvailable;
+                          const isInteractive = activeBatch?.status !== 'Disuspend' && isAvailable;
 
                           return (
                             <div 
@@ -6932,7 +7003,7 @@ export default function App() {
                                 relative flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center font-mono select-none transition-all w-full
                                 ${isInteractive ? 'cursor-pointer hover:-translate-y-0.5' : 'cursor-default'}
                                 ${
-                                  activeBatch?.isB2B && !isAvailable 
+                                  !isAvailable 
                                     ? 'bg-slate-200/90 dark:bg-zinc-950/90 border-slate-300/80 dark:border-zinc-800 text-slate-400 dark:text-zinc-600 opacity-70 cursor-not-allowed' 
                                     : isSelected
                                       ? 'bg-[#c28e62] dark:bg-[#c28e62] border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10 ' 
@@ -7148,7 +7219,7 @@ export default function App() {
             
             <div className="px-4 sm:px-6 py-3 bg-slate-50/90 dark:bg-zinc-800/90 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
               <div className="text-xs sm:text-sm font-medium text-slate-500 dark:text-zinc-400 self-start sm:self-center">
-                {activeBatch?.isB2B && activeTab === 'tags' && selectedTagsToAllocate.length > 0 ? (
+                {activeTab === 'tags' && selectedTagsToAllocate.length > 0 ? (
                   <span><span className="font-bold text-[#c28e62]">{selectedTagsToAllocate.length}</span> Tag Terpilih</span>
                 ) : null}
               </div>
@@ -7173,7 +7244,7 @@ export default function App() {
                   <Download size={15} />
                   <span>Unduh</span>
                 </button>
-                {activeBatch?.isB2B && activeTab === 'tags' && selectedTagsToAllocate.length > 0 && (
+                {activeTab === 'tags' && selectedTagsToAllocate.length > 0 && (
                   <button 
                     onClick={() => setIsAllocateModalOpen(true)}
                     className="bg-slate-800 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-slate-900 dark:hover:bg-white px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-colors flex items-center cursor-pointer"
@@ -7450,7 +7521,7 @@ export default function App() {
                   placeholder="Contoh: Penangguhan batch karena tidak lolos Quality Control (QC), cacat produksi masal, atau investigasi material..."
                   value={suspendForm.reason}
                   onChange={(e) => setSuspendForm({ reason: e.target.value })}
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none resize-none font-medium transition-all"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-2xl px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none resize-none font-medium transition-all"
                 ></textarea>
               </div>
             </div>
@@ -7514,7 +7585,7 @@ export default function App() {
                   placeholder="Contoh: Kesalahan klik saat melakukan suspend, atau batch telah diverifikasi ulang lolos kendali mutu dan aman digunakan..."
                   value={unsuspendForm.reason}
                   onChange={(e) => setUnsuspendForm({ reason: e.target.value })}
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none font-medium transition-all"
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-2xl px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none font-medium transition-all"
                 ></textarea>
               </div>
             </div>
@@ -7902,7 +7973,7 @@ export default function App() {
                   placeholder="Tuliskan catatan profil merk, katalog produk, atau keterangan..." 
                   value={brandForm.description}
                   onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
-                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none resize-none transition-all font-medium placeholder:font-normal" 
+                  className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-2xl px-4 py-3 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none resize-none transition-all font-medium placeholder:font-normal" 
                 ></textarea>
               </div>
             </div>
@@ -8625,7 +8696,7 @@ export default function App() {
                     label: r,
                     sublabel: r === 'Administrator' 
                       ? 'Akses penuh sistem, kelola user & reset password, master brand' 
-                      : 'Penerbitan batch, download cetak QR, alokasi proyek B2B & pantau scan',
+                      : 'Penerbitan batch, download cetak QR, alokasi proyek & pantau scan',
                     badge: r === 'Administrator' ? 'Akses Penuh' : 'Operasional'
                   }))}
                 />
@@ -8700,11 +8771,7 @@ export default function App() {
                       {brandToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
                       <span>{brandToView.status}</span>
                     </span>
-                    {brandToView.category && (
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700">
-                        {brandToView.category}
-                      </span>
-                    )}
+
                   </div>
                   <p className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
                     ID Brand: {brandToView.id}
@@ -8772,17 +8839,13 @@ export default function App() {
                 const ownerDisplayName = linkedUser ? linkedUser.name : brandToView.ownerName;
                 const ownerDisplayRole = linkedUser ? linkedUser.role : (brandToView.ownerRole || 'PIC Brand');
                 const ownerDisplayEmail = linkedUser ? linkedUser.email : (brandToView.ownerEmail || '-');
-                const ownerDisplayPhone = linkedUser?.phone || '-';
                 const ownerDisplayStatus = linkedUser?.status || 'Aktif';
                 const ownerAvatar = linkedUser?.avatar;
 
                 return (
                   <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
                     <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <User size={13} className="text-[#c28e62]" />
-                        <span>Pemilik Akun / PIC Otorisasi (Tabel Users)</span>
-                      </span>
+                      <span>Pemilik Akun / PIC Otorisasi (Tabel Users)</span>
                       <span className="font-mono text-[10px] text-slate-400">ID: {brandToView.ownerId}</span>
                     </div>
 
@@ -8821,12 +8884,7 @@ export default function App() {
                               <Mail size={12} className="text-slate-400" />
                               <span>{ownerDisplayEmail}</span>
                             </span>
-                            {ownerDisplayPhone !== '-' && (
-                              <span className="flex items-center gap-1.5">
-                                <Phone size={12} className="text-slate-400" />
-                                <span>{ownerDisplayPhone}</span>
-                              </span>
-                            )}
+
                           </div>
                         </div>
                       </div>
@@ -8854,11 +8912,9 @@ export default function App() {
                 return (
                   <div>
                     <div className="flex items-center justify-between mb-2.5">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Box size={13} className="text-[#c28e62]" />
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                         <span>Katalog Produk Terdaftar ({brandProducts.length})</span>
                       </div>
-                      <span className="text-[11px] text-slate-400">Relasi: Tabel Products</span>
                     </div>
 
                     {brandProducts.length > 0 ? (
@@ -8881,13 +8937,6 @@ export default function App() {
                                 </div>
                               </div>
                             </div>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
-                              p.isB2B 
-                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60' 
-                                : 'bg-slate-200 text-slate-700 dark:bg-zinc-700 dark:text-zinc-300'
-                            }`}>
-                              {p.isB2B ? 'B2B' : 'Retail'}
-                            </span>
                           </div>
                         ))}
                       </div>
@@ -8907,8 +8956,7 @@ export default function App() {
                 return (
                   <div>
                     <div className="flex items-center justify-between mb-2.5">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Layers size={13} className="text-indigo-500" />
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                         <span>Riwayat Batch Produksi ({brandBatches.length})</span>
                       </div>
                       {brandBatches.length > 0 && (
@@ -9076,7 +9124,7 @@ export default function App() {
                   <span className="text-slate-400 text-[11px]">Digit PIN:</span>
                   <span className="font-kode-mono font-bold text-white tracking-widest">{hoveredTagInfo.tag.pin}</span>
                 </div>
-                {activeBatch?.isB2B && hoveredTagInfo.tag.project ? (
+                {hoveredTagInfo.tag.project ? (
                   <>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 text-[11px]">Proyek:</span>
@@ -9093,19 +9141,15 @@ export default function App() {
                       Sudah dialokasikan (Terkunci)
                     </div>
                   </>
-                ) : activeBatch?.isB2B && activeBatch?.status === 'Disuspend' ? (
+                ) : activeBatch?.status === 'Disuspend' ? (
                   <div className="text-[10px] text-amber-300 font-medium pt-0.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     Batch disuspend (Terkunci)
                   </div>
-                ) : activeBatch?.isB2B ? (
+                ) : (
                   <div className="text-[10px] text-emerald-400 font-medium pt-0.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                     Siap dialokasikan ke proyek
-                  </div>
-                ) : (
-                  <div className="text-[10px] text-slate-300 italic pt-0.5 leading-tight">
-                    Katalog Brand {activeBatch?.brand} (Tidak ada alokasi proyek B2B)
                   </div>
                 )}
               </div>
@@ -9226,10 +9270,9 @@ export default function App() {
                       brandId: bId,
                       brandName: b ? b.name : prev.brandName,
                       category: b?.category || prev.category,
-                      isB2B: b ? b.name.toLowerCase() === 'sumas' : prev.isB2B
                     }));
                   }}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] cursor-pointer"
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full text-slate-700 dark:text-zinc-200 focus:outline-none focus:border-[#c28e62] cursor-pointer"
                 >
                   {brands.map(b => (
                     <option key={b.id} value={b.id}>
@@ -9252,7 +9295,7 @@ export default function App() {
                   placeholder="Contoh: Pintu Cubicle Toilet, Dew Drops, dll."
                   value={skuForm.sku}
                   onChange={(e) => setSkuForm(prev => ({ ...prev, sku: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
                 />
               </div>
 
@@ -9266,7 +9309,7 @@ export default function App() {
                   placeholder="Kode identifikasi barang unik (otomatis jika kosong)"
                   value={skuForm.skuCode}
                   onChange={(e) => setSkuForm(prev => ({ ...prev, skuCode: e.target.value.toUpperCase() }))}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] font-mono uppercase"
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] font-mono uppercase"
                 />
               </div>
 
@@ -9282,7 +9325,7 @@ export default function App() {
                   placeholder="Contoh: Material &amp; Konstruksi &gt; Partisi Cubicle Toilet &gt; Phenolic Board 12mm Standard"
                   value={skuForm.category}
                   onChange={(e) => setSkuForm(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
                 />
                 <datalist id="category-suggestions">
                   {categories.length > 0 ? (
@@ -9326,7 +9369,7 @@ export default function App() {
                   placeholder="Tuliskan spesifikasi produk, dimensi, ketahanan, atau catatan registrasi..."
                   value={skuForm.description}
                   onChange={(e) => setSkuForm(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] resize-none"
+                  className="w-full px-5 py-3 bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-2xl text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] resize-none"
                 />
               </div>
             </div>
@@ -9343,9 +9386,8 @@ export default function App() {
               <button
                 type="button"
                 onClick={isEditSkuModalOpen ? handleUpdateSku : handleCreateSku}
-                className="px-5 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-5 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center justify-center"
               >
-                <Check size={14} />
                 <span>{isEditSkuModalOpen ? 'Perbarui SKU' : 'Simpan SKU'}</span>
               </button>
             </div>
@@ -9487,7 +9529,6 @@ export default function App() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <FolderKanban size={15} className="text-[#c28e62]" />
                         <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm">
                           Riwayat Batch &amp; Tag Fisik Terhubung
                         </h4>
@@ -9569,9 +9610,8 @@ export default function App() {
                     setSkuToView(null);
                     handleOpenEditSku(toEdit);
                   }}
-                  className="px-4 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center justify-center"
                 >
-                  <Edit3 size={13} />
                   <span>Edit SKU Ini</span>
                 </button>
                 <button
@@ -9643,6 +9683,66 @@ export default function App() {
                 className="px-5 py-2.5 rounded-full text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors cursor-pointer"
               >
                 Ya, Hapus SKU
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL KONFIRMASI TINGGALKAN HALAMAN SKU (MODERN, CLEAN, SINGKAT & PADAT) */}
+      {showSkuLeaveModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[10006] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            setShowSkuLeaveModal(false);
+            setPendingSkuLeaveNav(null);
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
+              <AlertTriangle size={24} />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-slate-800 dark:text-zinc-100">
+                Tinggalkan Halaman?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Perubahan yang belum disimpan akan hilang.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSkuLeaveModal(false);
+                  setPendingSkuLeaveNav(null);
+                }}
+                className="flex-1 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                Lanjut Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSkuLeaveModal(false);
+                  setIsSkuFormDirty(false);
+                  if (pendingSkuLeaveNav) {
+                    const nav = pendingSkuLeaveNav;
+                    setPendingSkuLeaveNav(null);
+                    nav();
+                  } else {
+                    setSkuSubView('list');
+                  }
+                }}
+                className="flex-1 py-2.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+              >
+                Tinggalkan
               </button>
             </div>
           </div>
