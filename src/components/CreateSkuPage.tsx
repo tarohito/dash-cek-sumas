@@ -11,10 +11,6 @@ import {
   Sliders, 
   Sparkles,
   Camera,
-  Layers,
-  Ruler,
-  ShieldCheck,
-  Palette,
   ChevronRight,
   X,
   AlertTriangle,
@@ -78,30 +74,68 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
   onAlert,
   onDirtyChange
 }) => {
+  interface CustomSpecItem {
+    id: string;
+    key: string;
+    value: string;
+  }
+
   // Parser spesifikasi dari deskripsi awal
   const parseInitialDescription = (rawDesc?: string) => {
-    if (!rawDesc) return { desc: '', material: '', dimension: '', finishing: '', warranty: '' };
+    if (!rawDesc) return {
+      desc: '',
+      material: '',
+      dimension: '',
+      thickness: '',
+      weight: '',
+      capacity: '',
+      finishing: '',
+      grade: '',
+      certification: '',
+      warranty: '',
+      origin: '',
+      customSpecs: [] as CustomSpecItem[]
+    };
     const lines = rawDesc.split('\n\n');
     const remainingLines: string[] = [];
     let material = '';
     let dimension = '';
+    let thickness = '';
+    let weight = '';
+    let capacity = '';
     let finishing = '';
+    let grade = '';
+    let certification = '';
     let warranty = '';
+    let origin = '';
+    const customSpecs: CustomSpecItem[] = [];
 
     lines.forEach(line => {
-      if (line.includes('Material:') || line.includes('Dimensi:') || line.includes('Finishing/Warna:') || line.includes('Garansi/Standar:')) {
+      if (line.includes(':') && (line.includes(' | ') || line.match(/^[A-Za-z0-9\s\/\-_]+:\s*.+$/))) {
         const parts = line.split(' | ');
+        let lineHasSpec = false;
         parts.forEach(part => {
-          const m = part.match(/^(Material|Dimensi|Finishing\/Warna|Garansi\/Standar):\s*(.*)$/);
+          const m = part.match(/^([^:]+):\s*(.*)$/);
           if (m) {
-            if (m[1] === 'Material') material = m[2];
-            else if (m[1] === 'Dimensi') dimension = m[2];
-            else if (m[1] === 'Finishing/Warna') finishing = m[2];
-            else if (m[1] === 'Garansi/Standar') warranty = m[2];
-          } else {
-            remainingLines.push(part);
+            lineHasSpec = true;
+            const k = m[1].trim().toLowerCase();
+            const v = m[2].trim();
+            if (k === 'material' || k === 'bahan') material = v;
+            else if (k === 'dimensi' || k === 'ukuran') dimension = v;
+            else if (k === 'ketebalan' || k === 'tebal' || k === 'diameter') thickness = v;
+            else if (k === 'berat' || k === 'bobot') weight = v;
+            else if (k === 'kapasitas' || k === 'daya tampung') capacity = v;
+            else if (k === 'finishing/warna' || k === 'finishing' || k === 'warna') finishing = v;
+            else if (k === 'ketahanan' || k === 'grade' || k === 'mutu') grade = v;
+            else if (k === 'sertifikasi' || k === 'standar') certification = v;
+            else if (k === 'garansi/standar' || k === 'garansi') warranty = v;
+            else if (k === 'negara asal' || k === 'asal pabrik' || k === 'manufaktur') origin = v;
+            else {
+              customSpecs.push({ id: `cs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, key: m[1].trim(), value: v });
+            }
           }
         });
+        if (!lineHasSpec) remainingLines.push(line);
       } else {
         remainingLines.push(line);
       }
@@ -111,8 +145,15 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
       desc: remainingLines.join('\n\n').trim(),
       material,
       dimension,
+      thickness,
+      weight,
+      capacity,
       finishing,
-      warranty
+      grade,
+      certification,
+      warranty,
+      origin,
+      customSpecs
     };
   };
 
@@ -481,6 +522,12 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
           ref={sectionInformasiRef}
           className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
         >
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4">
+            <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
+              <Tag size={16} className="text-[#c28e62]" />
+              <span>Informasi Produk</span>
+            </h2>
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
             
@@ -685,13 +732,18 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
           ref={sectionSpesifikasiRef}
           className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
         >
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4">
+            <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
+              <Sliders size={16} className="text-[#c28e62]" />
+              <span>Spesifikasi Produk</span>
+            </h2>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {/* 1. Material / Bahan */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                <Layers size={13} className="text-[#c28e62]" />
-                <span>Bahan / Material Utama</span>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Bahan / Material Utama
               </label>
               <input
                 type="text"
@@ -704,9 +756,8 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
             {/* 2. Dimensi / Ukuran */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                <Ruler size={13} className="text-[#c28e62]" />
-                <span>Dimensi &amp; Ketebalan</span>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Dimensi &amp; Ketebalan
               </label>
               <input
                 type="text"
@@ -719,9 +770,8 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
             {/* 3. Finishing / Warna */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                <Palette size={13} className="text-[#c28e62]" />
-                <span>Finishing &amp; Warna</span>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Finishing &amp; Warna
               </label>
               <input
                 type="text"
@@ -734,9 +784,8 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
             {/* 4. Garansi / Standar */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                <ShieldCheck size={13} className="text-[#c28e62]" />
-                <span>Standar Mutu / Garansi</span>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Standar Mutu / Garansi
               </label>
               <input
                 type="text"
@@ -757,15 +806,11 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
           ref={sectionDeskripsiRef}
           className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
         >
-          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
-                <span>Deskripsi Lengkap &amp; Catatan Produk</span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                Deskripsi naratif mengenai kegunaan produk, keunggulan fitur, dan petunjuk operasional.
-              </p>
-            </div>
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4">
+            <h2 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
+              <FileText size={16} className="text-[#c28e62]" />
+              <span>Deskripsi Produk</span>
+            </h2>
           </div>
 
           <div className="space-y-2">
