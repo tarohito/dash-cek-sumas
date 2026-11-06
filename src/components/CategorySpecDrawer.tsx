@@ -182,15 +182,15 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
                     placeholder="Nama atribut (misal: Bahan, Ketebalan, Garansi)"
                     value={field.label}
                     onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
-                    className="flex-1 px-3.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:border-[#c28e62]"
+                    className="flex-1 h-9 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => handleRemoveField(field.id)}
                     title="Hapus atribut"
-                    className="w-7 h-7 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 text-slate-400 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    className="w-9 h-9 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 text-slate-400 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
 
@@ -238,7 +238,7 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
                 {/* OPSI JIKA SELECT */}
                 {field.type === 'select' && (
                   <div className="pl-7 space-y-1">
-                    <span className="text-[11px] text-slate-400">Opsi Pilihan (Pisahkan dengan koma)</span>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">Opsi Pilihan (Pisahkan dengan koma)</span>
                     <input
                       type="text"
                       placeholder="Contoh: Opsi A, Opsi B, Opsi C"
@@ -246,7 +246,7 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
                       onChange={(e) => handleUpdateField(field.id, {
                         options: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                       })}
-                      className="w-full px-3.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:border-[#c28e62]"
+                      className="w-full h-9 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none transition-colors"
                     />
                   </div>
                 )}
@@ -254,13 +254,13 @@ export const CategorySpecDrawer: React.FC<CategorySpecDrawerProps> = ({
                 {/* SATUAN JIKA NUMBER */}
                 {field.type === 'number' && (
                   <div className="pl-7 space-y-1">
-                    <span className="text-[11px] text-slate-400">Satuan Unit (Opsional)</span>
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">Satuan Unit (Opsional)</span>
                     <input
                       type="text"
                       placeholder="Contoh: mm, cm, kg, Watt, Volt"
                       value={field.unit || ''}
                       onChange={(e) => handleUpdateField(field.id, { unit: e.target.value })}
-                      className="w-full px-3.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none focus:border-[#c28e62]"
+                      className="w-full h-9 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-full text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 focus:outline-none transition-colors"
                     />
                   </div>
                 )}
