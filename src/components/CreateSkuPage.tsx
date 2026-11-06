@@ -173,14 +173,12 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
   const parsedInitial = useMemo(() => parseInitialDescription(initialData?.description), [initialData?.description]);
 
-  // Form state
-  const defaultBrand = brands.find(b => b.id === initialData?.brandId || b.name === initialData?.brandName) || brands[0] || { id: 'br-sumas', name: 'Sumas', category: 'Partisi Cubicle Toilet' };
-  
-  const [brandId, setBrandId] = useState<string>(initialData?.brandId || defaultBrand.id);
-  const [brandName, setBrandName] = useState<string>(initialData?.brandName || defaultBrand.name);
+  // Form state (Default kosong tanpa pilihan otomatis)
+  const [brandId, setBrandId] = useState<string>(initialData?.brandId || '');
+  const [brandName, setBrandName] = useState<string>(initialData?.brandName || '');
   const [skuName, setSkuName] = useState<string>(initialData?.sku || '');
   const [skuCode, setSkuCode] = useState<string>(initialData?.skuCode || '');
-  const [category, setCategory] = useState<string>(initialData?.category || defaultBrand.category || 'Partisi Cubicle Toilet');
+  const [category, setCategory] = useState<string>(initialData?.category || '');
   const [productImage, setProductImage] = useState<string>(initialData?.image || '');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -243,27 +241,24 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
   // Sinkronkan state saat initialData berubah
   useEffect(() => {
     if (initialData && mode === 'edit') {
-      const bObj = brands.find(b => b.id === initialData.brandId || b.name === initialData.brandName) || defaultBrand;
-      setBrandId(initialData.brandId || bObj.id);
-      setBrandName(initialData.brandName || bObj.name);
+      const bObj = brands.find(b => b.id === initialData.brandId || b.name === initialData.brandName);
+      setBrandId(initialData.brandId || bObj?.id || '');
+      setBrandName(initialData.brandName || bObj?.name || '');
       setSkuName(initialData.sku || '');
       setSkuCode(initialData.skuCode || '');
-      setCategory(initialData.category || bObj.category || '');
+      setCategory(initialData.category || bObj?.category || '');
       setProductImage(initialData.image || '');
-      setSpecMaterial(parsedInitial.material);
-      setSpecDimension(parsedInitial.dimension);
-      setSpecThickness(parsedInitial.thickness);
-      setSpecWeight(parsedInitial.weight);
-      setSpecCapacity(parsedInitial.capacity);
-      setSpecFinishing(parsedInitial.finishing);
-      setSpecGrade(parsedInitial.grade);
-      setSpecCertification(parsedInitial.certification);
-      setSpecWarranty(parsedInitial.warranty);
-      setSpecOrigin(parsedInitial.origin);
-      setCustomSpecs(parsedInitial.customSpecs);
-      setDescription(parsedInitial.desc);
+      setDescription(parsedInitial.desc || '');
+    } else if (mode === 'create') {
+      setBrandId('');
+      setBrandName('');
+      setSkuName('');
+      setSkuCode('');
+      setCategory('');
+      setProductImage('');
+      setDescription('');
     }
-  }, [initialData, mode]);
+  }, [initialData, mode, brands, parsedInitial.desc]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
   
   // Active anchor tab state
@@ -468,6 +463,11 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!brandId || !brandName.trim()) {
+      onAlert('Brand Wajib Dipilih', 'Silakan pilih Brand / Merk pemilik SKU terlebih dahulu.', 'warning');
+      scrollToSection('informasi');
+      return;
+    }
     if (!skuName.trim()) {
       onAlert('Nama Produk Wajib Diisi', 'Silakan masukkan nama produk SKU pada formulir informasi produk.', 'warning');
       scrollToSection('informasi');
@@ -683,7 +683,8 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
                     setBrandId(bId);
                     if (b) {
                       setBrandName(b.name);
-                      setCategory(b.category || category);
+                    } else {
+                      setBrandName('');
                     }
                   }}
                   options={brands.map(b => ({
