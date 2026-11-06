@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { CustomSelect } from './CustomSelect';
 import { createPortal } from 'react-dom';
 import { 
@@ -75,8 +75,22 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
   const [currentSpecFields, setCurrentSpecFields] = useState<CategorySpecField[]>([]);
   const [isSavingSpecs, setIsSavingSpecs] = useState<boolean>(false);
 
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleOpenSpecDrawer = (cat: CategoryItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
     setSpecTargetCategory(cat);
     try {
       const parsed = cat.specSchema ? JSON.parse(cat.specSchema) : [];
@@ -85,14 +99,22 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
       setCurrentSpecFields([]);
     }
     setSpecDrawerOpen(true);
-    setTimeout(() => setSpecDrawerVisible(true), 20);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setSpecDrawerVisible(true);
+      });
+    });
   };
 
   const handleCloseSpecDrawer = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
     setSpecDrawerVisible(false);
-    setTimeout(() => {
-      handleCloseSpecDrawer();
+    closeTimerRef.current = setTimeout(() => {
+      setSpecDrawerOpen(false);
       setSpecTargetCategory(null);
+      closeTimerRef.current = null;
     }, 300);
   };
 
@@ -136,7 +158,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
           return next;
         });
         showAlert('Spesifikasi Disimpan', `Template form untuk "${specTargetCategory.name}" berhasil diperbarui.`, 'success');
-        setSpecDrawerOpen(false);
+        handleCloseSpecDrawer();
       } else {
         showAlert('Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan spesifikasi.', 'error');
       }
