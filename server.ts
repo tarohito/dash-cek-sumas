@@ -267,9 +267,9 @@ try {
 try {
   const updateUserStmt = db.prepare('UPDATE users SET name = ?, username = ?, email = ?, phone = ?, role = ?, avatar = ?, status = ?, createdAt = ? WHERE id = ?');
   updateUserStmt.run('Kalingga Jeandy', 'kalingga.jeandy', 'kalinggajeandy3@gmail.com', '+62 812-8899-1020', 'Administrator', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 08:30', 'u1');
-  updateUserStmt.run('Budi Santoso', 'budi.santoso', 'budi.s@mki.co.id', '+62 813-7722-3344', 'Operator', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 09:15', 'u2');
-  updateUserStmt.run('Rina Wijaya', 'rina.wijaya', 'rina.w@mki.co.id', '+62 821-4455-6677', 'Operator', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 10:00', 'u3');
-  updateUserStmt.run('Siti Rahma', 'siti.rahma', 'siti.r@mki.co.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30', 'u4');
+  updateUserStmt.run('Budi Santoso', 'budi.santoso', 'budi.s@sumas.id', '+62 813-7722-3344', 'Operator', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 09:15', 'u2');
+  updateUserStmt.run('Rina Wijaya', 'rina.wijaya', 'rina.w@sumas.id', '+62 821-4455-6677', 'Operator', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 10:00', 'u3');
+  updateUserStmt.run('Siti Rahma', 'siti.rahma', 'siti.r@sumas.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30', 'u4');
 } catch (_) {}
 
 // Seed password_reset_requests if empty
@@ -283,7 +283,7 @@ if (resetRequestsCountRow && resetRequestsCountRow.count === 0) {
     'pr-1',
     'u3',
     'Budi Santoso',
-    'budi.s@mki.co.id',
+    'budi.s@sumas.id',
     'Operator',
     'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80',
     '15 menit yang lalu',
@@ -295,7 +295,7 @@ if (resetRequestsCountRow && resetRequestsCountRow.count === 0) {
     'pr-2',
     'u4',
     'Siti Rahma',
-    'siti.r@mki.co.id',
+    'siti.r@sumas.id',
     'Operator',
     'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
     '1 jam yang lalu',
@@ -307,7 +307,7 @@ if (resetRequestsCountRow && resetRequestsCountRow.count === 0) {
     'pr-3',
     'u2',
     'admin',
-    'admin@mki.co.id',
+    'admin@sumas.id',
     'Administrator',
     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
     'Kemarin, 16:40',
@@ -325,9 +325,9 @@ if (userCountRow && userCountRow.count === 0) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   insertUser.run('u1', 'Kalingga Jeandy', 'kalingga.jeandy', 'kalinggajeandy3@gmail.com', '+62 812-8899-1020', 'Administrator', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 08:30');
-  insertUser.run('u2', 'Budi Santoso', 'budi.santoso', 'budi.s@mki.co.id', '+62 813-7722-3344', 'Operator', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 09:15');
-  insertUser.run('u3', 'Rina Wijaya', 'rina.wijaya', 'rina.w@mki.co.id', '+62 821-4455-6677', 'Operator', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 10:00');
-  insertUser.run('u4', 'Siti Rahma', 'siti.rahma', 'siti.r@mki.co.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30');
+  insertUser.run('u2', 'Budi Santoso', 'budi.santoso', 'budi.s@sumas.id', '+62 813-7722-3344', 'Operator', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 09:15');
+  insertUser.run('u3', 'Rina Wijaya', 'rina.wijaya', 'rina.w@sumas.id', '+62 821-4455-6677', 'Operator', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 10:00');
+  insertUser.run('u4', 'Siti Rahma', 'siti.rahma', 'siti.r@sumas.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30');
 }
 
 // Seed initial brands if empty
@@ -356,7 +356,7 @@ if (brandCountRow && brandCountRow.count === 0) {
     '/assets/brand/assc_logo.svg',
     'u4',
     'Siti Rahma',
-    'siti.r@mki.co.id',
+    'siti.r@sumas.id',
     'Operator',
     'Lini streetwear retail eksklusif dengan sistem verifikasi QR code hologram anti-counterfeit dan PIN verifikasi publik.',
     'Fashion & Streetwear',
@@ -369,7 +369,7 @@ if (brandCountRow && brandCountRow.count === 0) {
     '/assets/brand/blimey_logo.svg',
     'u3',
     'Budi Santoso',
-    'budi.s@mki.co.id',
+    'budi.s@sumas.id',
     'Operator',
     'Koleksi fashion premium & casual lifestyle dengan tag serial unik untuk garansi keaslian pakaian.',
     'Apparel & Lifestyle',
@@ -1429,7 +1429,7 @@ app.get('/q/:tagNumber', (req, res) => {
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Tag Tidak Ditemukan - Sistem Verifikasi MKI</title>
+            <title>Tag Tidak Ditemukan - Sistem Verifikasi Sumas</title>
             <style>
               body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
               .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 32px 24px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
@@ -1441,7 +1441,7 @@ app.get('/q/:tagNumber', (req, res) => {
           <body>
             <div class="card">
               <h2>Tag Tidak Terdaftar</h2>
-              <p>Nomor tag fisik berikut tidak terdata pada sistem keamanan MKI:</p>
+              <p>Nomor tag fisik berikut tidak terdata pada sistem keamanan Sumas:</p>
               <div class="badge">${tagNumber}</div>
             </div>
           </body>
@@ -1467,8 +1467,8 @@ app.get('/q/:tagNumber', (req, res) => {
         'Mobile Consumer QR Scan',
         -6.2088,
         106.8456,
-        batch?.brand || 'MKI',
-        batch?.sku || 'Material MKI',
+        batch?.brand || 'Sumas',
+        batch?.sku || 'Material Sumas',
         batch?.batchId || tag.batchId,
         tag.tagNumber,
         nowStr,

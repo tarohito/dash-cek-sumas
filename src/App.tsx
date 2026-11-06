@@ -656,7 +656,7 @@ export default function App() {
   // TEMA & ANIMASI
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
-      const saved = localStorage.getItem('mki_theme');
+      const saved = localStorage.getItem('sumas_theme');
       if (saved) return saved === 'dark';
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     } catch (e) {
@@ -674,7 +674,7 @@ export default function App() {
       root.style.colorScheme = 'light';
     }
     try {
-      localStorage.setItem('mki_theme', isDarkMode ? 'dark' : 'light');
+      localStorage.setItem('sumas_theme', isDarkMode ? 'dark' : 'light');
     } catch (_) {}
   }, [isDarkMode]);
 
@@ -1024,7 +1024,7 @@ export default function App() {
 
   const [batches, setBatches] = useState<any[]>(() => {
     try {
-      const savedBatches = localStorage.getItem('mki_batches');
+      const savedBatches = localStorage.getItem('sumas_batches') || localStorage.getItem('mki_batches');
       return savedBatches ? JSON.parse(savedBatches) : [];
     } catch (e) {
       return [];
@@ -1033,7 +1033,7 @@ export default function App() {
 
   const [auditLogs, setAuditLogs] = useState<any[]>(() => {
     try {
-      const savedLogs = localStorage.getItem('mki_auditLogs');
+      const savedLogs = localStorage.getItem('sumas_auditLogs') || localStorage.getItem('mki_auditLogs');
       return savedLogs ? JSON.parse(savedLogs) : [];
     } catch (e) {
       return [];
@@ -1042,7 +1042,7 @@ export default function App() {
 
   const [brands, setBrands] = useState<BrandItem[]>(() => {
     try {
-      const savedBrands = localStorage.getItem('mki_brands');
+      const savedBrands = localStorage.getItem('sumas_brands') || localStorage.getItem('mki_brands');
       if (savedBrands) {
         const parsed = JSON.parse(savedBrands);
         return parsed.map((b: BrandItem) => {
@@ -1060,7 +1060,7 @@ export default function App() {
 
   const [users, setUsers] = useState<UserItem[]>(() => {
     try {
-      const savedUsers = localStorage.getItem('mki_users');
+      const savedUsers = localStorage.getItem('sumas_users') || localStorage.getItem('mki_users');
       return savedUsers ? JSON.parse(savedUsers) : [];
     } catch (e) {
       return [];
@@ -1069,7 +1069,7 @@ export default function App() {
 
   const [products, setProducts] = useState<ProductItem[]>(() => {
     try {
-      const savedProducts = localStorage.getItem('mki_products');
+      const savedProducts = localStorage.getItem('sumas_products') || localStorage.getItem('mki_products');
       return savedProducts ? JSON.parse(savedProducts) : [];
     } catch (e) {
       return [];
@@ -1249,7 +1249,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('mki_batches', JSON.stringify(batches));
+      localStorage.setItem('sumas_batches', JSON.stringify(batches));
     } catch (e) {
       console.error("Gagal menyimpan data ke localStorage", e);
     }
@@ -1257,7 +1257,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('mki_auditLogs', JSON.stringify(auditLogs));
+      localStorage.setItem('sumas_auditLogs', JSON.stringify(auditLogs));
     } catch (e) {
       console.error("Gagal menyimpan log ke localStorage", e);
     }
@@ -1265,7 +1265,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('mki_brands', JSON.stringify(brands));
+      localStorage.setItem('sumas_brands', JSON.stringify(brands));
     } catch (e) {
       console.error("Gagal menyimpan brands ke localStorage", e);
     }
@@ -1273,7 +1273,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('mki_users', JSON.stringify(users));
+      localStorage.setItem('sumas_users', JSON.stringify(users));
     } catch (e) {
       console.error("Gagal menyimpan users ke localStorage", e);
     }
@@ -1281,7 +1281,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('mki_products', JSON.stringify(products));
+      localStorage.setItem('sumas_products', JSON.stringify(products));
     } catch (e) {
       console.error("Gagal menyimpan products ke localStorage", e);
     }
@@ -5685,7 +5685,7 @@ export default function App() {
                   {activeDetails.pageTitle}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md">
-                  {activeDetails.subtitle}. Modul ini terhubung secara terpusat dengan sistem manajemen tag fisik & otentikasi MKI.
+                  {activeDetails.subtitle}. Modul ini terhubung secara terpusat dengan sistem manajemen tag fisik & otentikasi Sumas.
                 </p>
               </div>
             </div>
@@ -8664,7 +8664,7 @@ export default function App() {
                     <Mail size={15} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${userForm.email.trim().length > 0 && !isValidEmail(userForm.email) ? 'text-rose-500' : 'text-slate-400'}`} />
                     <input 
                       type="email" 
-                      placeholder="Cth: kalingga@mki.co.id" 
+                      placeholder="Cth: kalingga@sumas.id" 
                       value={userForm.email}
                       onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                       className={`w-full bg-white dark:bg-zinc-800 border rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 outline-none font-medium transition-all ${
@@ -9599,7 +9599,7 @@ export default function App() {
             {/* DETAIL FOOTER */}
             <div className="px-5 sm:px-6 py-3.5 bg-slate-50 dark:bg-zinc-850 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between flex-shrink-0">
               <span className="text-[11px] text-slate-400 dark:text-zinc-500">
-                Terdaftar: {skuToView.createdAt ? formatDateTimeDisplay(skuToView.createdAt) : 'Katalog Master MKI'}
+                Terdaftar: {skuToView.createdAt ? formatDateTimeDisplay(skuToView.createdAt) : 'Katalog Master Sumas'}
               </span>
               <div className="flex items-center gap-2">
                 <button

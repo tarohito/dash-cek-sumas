@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { CustomSelect } from './CustomSelect';
 import { createPortal } from 'react-dom';
 import { 
   Search, 
@@ -69,6 +70,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
 
   // Slide-over Drawer State untuk Konfigurasi Spesifikasi Kategori
   const [specDrawerOpen, setSpecDrawerOpen] = useState<boolean>(false);
+  const [specDrawerVisible, setSpecDrawerVisible] = useState<boolean>(false);
   const [specTargetCategory, setSpecTargetCategory] = useState<CategoryItem | null>(null);
   const [currentSpecFields, setCurrentSpecFields] = useState<CategorySpecField[]>([]);
   const [isSavingSpecs, setIsSavingSpecs] = useState<boolean>(false);
@@ -83,6 +85,15 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
       setCurrentSpecFields([]);
     }
     setSpecDrawerOpen(true);
+    setTimeout(() => setSpecDrawerVisible(true), 20);
+  };
+
+  const handleCloseSpecDrawer = () => {
+    setSpecDrawerVisible(false);
+    setTimeout(() => {
+      handleCloseSpecDrawer();
+      setSpecTargetCategory(null);
+    }, 300);
   };
 
   const handleAddField = () => {
@@ -1026,14 +1037,18 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
       )}
 
 
-      {/* SLIDE-OVER DRAWER KONFIGURASI FORM SPESIFIKASI */}
+      {/* SLIDE-OVER DRAWER KONFIGURASI FORM SPESIFIKASI (SMOOTH TRANSITION) */}
       {specDrawerOpen && specTargetCategory && createPortal(
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
-          onClick={() => !isSavingSpecs && setSpecDrawerOpen(false)}
+          className={`fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex justify-end transition-opacity duration-300 ease-out ${
+            specDrawerVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={() => !isSavingSpecs && handleCloseSpecDrawer()}
         >
           <div 
-            className="bg-white dark:bg-zinc-900 w-full max-w-lg h-full border-l border-slate-200 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
+            className={`bg-white dark:bg-zinc-900 w-full max-w-lg h-full border-l border-slate-200 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              specDrawerVisible ? 'translate-x-0' : 'translate-x-full'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* HEADER */}
@@ -1048,7 +1063,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
               </div>
               <button
                 type="button"
-                onClick={() => setSpecDrawerOpen(false)}
+                onClick={handleCloseSpecDrawer}
                 className="w-8 h-8 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 flex items-center justify-center transition-colors cursor-pointer shrink-0"
               >
                 <X size={15} />
@@ -1092,16 +1107,18 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                     <div className="pl-7 grid grid-cols-2 gap-2 items-center">
                       <div className="space-y-1">
                         <span className="text-[11px] text-slate-400">Tipe Input</span>
-                        <select
+                        <CustomSelect
                           value={field.type}
-                          onChange={(e) => handleUpdateField(field.id, { type: e.target.value as any })}
-                          className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-[#c28e62]"
-                        >
-                          <option value="text">Teks Singkat</option>
-                          <option value="number">Angka</option>
-                          <option value="select">Pilihan Dropdown</option>
-                          <option value="boolean">Ya / Tidak</option>
-                        </select>
+                          onChange={(val) => handleUpdateField(field.id, { type: val as any })}
+                          options={[
+                            { value: 'text', label: 'Teks Singkat' },
+                            { value: 'number', label: 'Angka' },
+                            { value: 'select', label: 'Pilihan Dropdown' },
+                            { value: 'boolean', label: 'Ya / Tidak' }
+                          ]}
+                          placeholder="Pilih tipe input..."
+                          buttonClassName="w-full h-8 px-3.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-full text-xs text-slate-700 dark:text-zinc-300"
+                        />
                       </div>
 
                       <div className="space-y-1">
@@ -1169,7 +1186,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
             <div className="p-4 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2.5 bg-slate-50/50 dark:bg-zinc-800/30 shrink-0">
               <button
                 type="button"
-                onClick={() => setSpecDrawerOpen(false)}
+                onClick={handleCloseSpecDrawer}
                 className="px-4 py-2 rounded-full border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 Batal
