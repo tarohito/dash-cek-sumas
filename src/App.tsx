@@ -1178,13 +1178,14 @@ export default function App() {
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      const [dbBatches, dbLogs, dbBrands, dbUsers, dbProducts, dbCategories] = await Promise.all([
+      const [dbBatches, dbLogs, dbBrands, dbUsers, dbProducts, dbCategories, dbStats] = await Promise.all([
         api.getBatches(), 
         api.getAuditLogs(),
         api.getBrands(),
         api.getUsers(),
         api.getProducts(),
-        api.getCategories()
+        api.getCategories(),
+        api.getDashboardStats()
       ]);
       if (Array.isArray(dbBatches)) setBatches(dbBatches);
       if (Array.isArray(dbLogs)) setAuditLogs(dbLogs);
@@ -1192,6 +1193,7 @@ export default function App() {
       if (Array.isArray(dbUsers)) setUsers(dbUsers);
       if (Array.isArray(dbProducts)) setProducts(dbProducts);
       if (Array.isArray(dbCategories)) setCategories(dbCategories);
+      if (dbStats) setDashboardStats(dbStats);
       setLastSyncTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       setDbStatus('connected');
     } catch (err) {
@@ -1208,30 +1210,20 @@ export default function App() {
       api.getBatches(), 
       api.getAuditLogs(), 
       api.getBrands(), 
-      api.getUsers(),
-      api.getProducts(),
-      api.getCategories()
+      api.getUsers(), 
+      api.getProducts(), 
+      api.getCategories(),
+      api.getDashboardStats()
     ])
-      .then(([dbBatches, dbLogs, dbBrands, dbUsers, dbProducts, dbCategories]) => {
+      .then(([dbBatches, dbLogs, dbBrands, dbUsers, dbProducts, dbCategories, dbStats]) => {
         if (!isMounted) return;
-        if (Array.isArray(dbBatches)) {
-          setBatches(dbBatches);
-        }
-        if (Array.isArray(dbLogs)) {
-          setAuditLogs(dbLogs);
-        }
-        if (Array.isArray(dbBrands)) {
-          setBrands(dbBrands);
-        }
-        if (Array.isArray(dbUsers)) {
-          setUsers(dbUsers);
-        }
-        if (Array.isArray(dbProducts)) {
-          setProducts(dbProducts);
-        }
-        if (Array.isArray(dbCategories)) {
-          setCategories(dbCategories);
-        }
+        if (Array.isArray(dbBatches)) setBatches(dbBatches);
+        if (Array.isArray(dbLogs)) setAuditLogs(dbLogs);
+        if (Array.isArray(dbBrands)) setBrands(dbBrands);
+        if (Array.isArray(dbUsers)) setUsers(dbUsers);
+        if (Array.isArray(dbProducts)) setProducts(dbProducts);
+        if (Array.isArray(dbCategories)) setCategories(dbCategories);
+        if (dbStats) setDashboardStats(dbStats);
         setDbStatus('connected');
         setLastSyncTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       })
@@ -1242,8 +1234,11 @@ export default function App() {
 
     loadNotifications();
     const notifInterval = setInterval(() => {
-      if (isMounted) loadNotifications();
-    }, 25000);
+      if (isMounted) {
+        loadNotifications();
+        api.getDashboardStats().then(s => { if (isMounted && s) setDashboardStats(s); }).catch(() => {});
+      }
+    }, 15000);
 
     return () => {
       isMounted = false;
@@ -1330,6 +1325,22 @@ export default function App() {
     status: 'Aktif' as 'Aktif' | 'Nonaktif'
   });
 
+  // State sinkronisasi metrik dasbor real-time
+  const [dashboardStats, setDashboardStats] = useState<{
+    totalBatches: number;
+    activeBatches: number;
+    suspendedBatches: number;
+    totalTags: number;
+    totalProducts: number;
+    totalBrands: number;
+    activeBrands: number;
+    totalScans: number;
+    todayScans: number;
+    distinctCities: number;
+    totalScanPoints: number;
+    validScans: number;
+  } | null>(null);
+
   // ==========================================
   // STATE KHUSUS SKU / PRODUK MANAGEMENT (CRUD)
   // ==========================================
@@ -1398,6 +1409,9 @@ export default function App() {
   const [skuToEdit, setSkuToEdit] = useState<ProductItem | null>(null);
   const [skuToDelete, setSkuToDelete] = useState<ProductItem | null>(null);
   const [skuToView, setSkuToView] = useState<ProductItem | null>(null);
+  const [skuRelationalData, setSkuRelationalData] = useState<any | null>(null);
+  const [isSkuRelationalLoading, setIsSkuRelationalLoading] = useState(false);
+  const [showAllSkuProdCodes, setShowAllSkuProdCodes] = useState(false);
 
   const [openSkuDropdownId, setOpenSkuDropdownId] = useState<string | null>(null);
   const [skuDropdownPos, setSkuDropdownPos] = useState({ top: 0, left: 0 });
@@ -2823,10 +2837,25 @@ export default function App() {
     }
   };
 
-  const handleOpenDetailSku = (prod: ProductItem) => {
+  const handleOpenDetailSku = async (prod: ProductItem) => {
     setSkuToView(prod);
+    setSkuRelationalData(null);
+    setShowAllSkuProdCodes(false);
     setOpenSkuDropdownId(null);
     setIsDetailSkuModalOpen(true);
+    setIsSkuRelationalLoading(true);
+
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(prod.id)}/relational`);
+      if (res.ok) {
+        const data = await res.json();
+        setSkuRelationalData(data);
+      }
+    } catch (err) {
+      console.error('Error fetching SKU relational data:', err);
+    } finally {
+      setIsSkuRelationalLoading(false);
+    }
   };
 
   const toggleTagSelection = (tagId: string) => {
@@ -4136,7 +4165,8 @@ export default function App() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {/* CARD 1: TOTAL TAG TERBIT */}
             <div 
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-slate-300 dark:hover:border-zinc-600 transition-colors duration-150 min-w-0 cursor-default select-none outline-none"
+              onClick={() => setActiveMenu('tag-qr')}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-[#c28e62]/60 dark:hover:border-[#c28e62]/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Total Tag Terbit</span>
@@ -4146,14 +4176,20 @@ export default function App() {
               </div>
               <div>
                 <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
-                  {liveStats.totalTags.toLocaleString('id-ID')}
+                  {(dashboardStats?.totalTags ?? liveStats.totalTags).toLocaleString('id-ID')}
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                  <span className="font-semibold text-[#c28e62]">{batches.length} Batch</span>
+                  <span>•</span>
+                  <span>{liveStats.activeBatches} Batch Aktif</span>
                 </div>
               </div>
             </div>
 
-            {/* CARD 2: TOTAL SCAN BERHASIL */}
+            {/* CARD 2: TOTAL SCAN AKTIVITAS */}
             <div 
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-slate-300 dark:hover:border-zinc-600 transition-colors duration-150 min-w-0 cursor-default select-none outline-none"
+              onClick={() => setActiveMenu('scans')}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/60 dark:hover:border-emerald-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Total Aktivitas Scan</span>
@@ -4163,14 +4199,22 @@ export default function App() {
               </div>
               <div>
                 <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
-                  18,492
+                  {(dashboardStats?.totalScans ?? 27840).toLocaleString('id-ID')}
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    +{(dashboardStats?.todayScans ?? 625).toLocaleString('id-ID')} Hari ini
+                  </span>
+                  <span>•</span>
+                  <span>{dashboardStats?.validScans ?? 15} Titik Valid</span>
                 </div>
               </div>
             </div>
 
             {/* CARD 3: BRAND & PORTOFOLIO */}
             <div 
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-slate-300 dark:hover:border-zinc-600 transition-colors duration-150 min-w-0 cursor-default select-none outline-none"
+              onClick={() => setActiveMenu('brands')}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/60 dark:hover:border-indigo-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Brand Terdaftar</span>
@@ -4182,12 +4226,18 @@ export default function App() {
                 <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
                   {brands.length} <span className="text-base font-normal text-slate-500 dark:text-zinc-400">Merk</span>
                 </div>
+                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">{products.length} SKU Katalog</span>
+                  <span>•</span>
+                  <span>{liveStats.activeBrands} Aktif</span>
+                </div>
               </div>
             </div>
 
-            {/* CARD 4: SEBARAN TITIK SCAN (LEAFLET + OSM) */}
+            {/* CARD 4: SEBARAN WILAYAH SCAN (LEAFLET + OSM) */}
             <div 
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-slate-300 dark:hover:border-zinc-600 transition-colors duration-150 min-w-0 cursor-default select-none outline-none"
+              onClick={() => setActiveMenu('scans')}
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-amber-500/60 dark:hover:border-amber-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Sebaran Wilayah Scan</span>
@@ -4197,7 +4247,12 @@ export default function App() {
               </div>
               <div>
                 <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
-                  34 <span className="text-base font-normal text-slate-500 dark:text-zinc-400">Kota</span>
+                  {dashboardStats?.distinctCities ?? 15} <span className="text-base font-normal text-slate-500 dark:text-zinc-400">Kota</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">{dashboardStats?.totalScanPoints ?? 15} Titik Pantau</span>
+                  <span>•</span>
+                  <span>GPS Real-Time</span>
                 </div>
               </div>
             </div>
@@ -4378,7 +4433,16 @@ export default function App() {
                             </div>
                           )}
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-800 dark:text-zinc-100 text-sm group-hover:text-[#c28e62] transition-colors">{brand.name}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDetailBrand(brand);
+                              }}
+                              className="font-bold text-slate-800 dark:text-zinc-100 text-sm hover:text-[#c28e62] hover:underline transition-colors text-left cursor-pointer"
+                            >
+                              {brand.name}
+                            </button>
                             <NewBadge date={brand.createdAt} id={brand.id} />
                           </div>
                         </div>
@@ -4411,9 +4475,22 @@ export default function App() {
                                 </div>
                               )}
                               <div>
-                                <div className="font-semibold text-slate-800 dark:text-zinc-200 text-xs">
-                                  {ownerDisplayName}
-                                </div>
+                                {linkedUser ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenDetailUser(linkedUser);
+                                    }}
+                                    className="font-semibold text-slate-800 dark:text-zinc-200 text-xs hover:text-[#c28e62] hover:underline cursor-pointer text-left block"
+                                  >
+                                    {ownerDisplayName}
+                                  </button>
+                                ) : (
+                                  <div className="font-semibold text-slate-800 dark:text-zinc-200 text-xs">
+                                    {ownerDisplayName}
+                                  </div>
+                                )}
                                 <div className="text-[11px] text-slate-400 dark:text-zinc-500">
                                   {ownerDisplayRole}
                                 </div>
@@ -4707,7 +4784,13 @@ export default function App() {
                             )}
                             <div className="min-w-0">
                               <div className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm flex items-center gap-2 flex-wrap">
-                                <span className="truncate">{user.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenDetailUser(user)}
+                                  className="font-bold text-slate-800 dark:text-zinc-100 hover:text-[#c28e62] hover:underline cursor-pointer text-left truncate"
+                                >
+                                  {user.name}
+                                </button>
                                 {currentUser && user.id === currentUser.id ? (
                                   <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#c28e62]/15 text-[#c28e62] border border-[#c28e62]/30 flex-shrink-0">
                                     Anda
@@ -4750,12 +4833,14 @@ export default function App() {
                             return (
                               <div className="flex flex-wrap items-center gap-1.5 max-w-[320px]">
                                 {userBrands.map((b) => (
-                                  <span 
+                                  <button 
                                     key={b.id}
-                                    className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700"
+                                    type="button"
+                                    onClick={() => handleOpenDetailBrand(b)}
+                                    className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] hover:text-[#c28e62] cursor-pointer transition-colors"
                                   >
                                     <span>{b.name}</span>
-                                  </span>
+                                  </button>
                                 ))}
                               </div>
                             );
@@ -5471,7 +5556,13 @@ export default function App() {
                       >
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-800 dark:text-zinc-100">{batch.batchId}</span>
+                            <button
+                              type="button"
+                              onClick={() => openDetailModal(batch)}
+                              className="font-bold text-slate-800 dark:text-zinc-100 hover:text-[#c28e62] hover:underline cursor-pointer text-left transition-colors"
+                            >
+                              {batch.batchId}
+                            </button>
                             <NewBadge date={batch.createdAt || batch.date} id={batch.id} />
                           </div>
                           <div className="text-[11px] sm:text-xs text-slate-400 dark:text-zinc-500 mt-0.5">{batch.date}</div>
@@ -5490,8 +5581,28 @@ export default function App() {
                           </div>
                         </td>
                         <td className="px-5 py-3.5">
-                          <div className="font-semibold">{batch.sku}</div>
-                          <div className="text-xs text-[#c28e62] font-medium mt-0.5">{batch.brand}</div>
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const foundSku = products.find(p => p.sku === batch.sku || (p.brandName?.toLowerCase() === (batch.brand || '').toLowerCase() && p.sku === batch.sku));
+                                if (foundSku) handleOpenDetailSku(foundSku);
+                              }}
+                              className="font-semibold text-slate-800 dark:text-zinc-200 hover:text-[#c28e62] hover:underline cursor-pointer text-left block"
+                            >
+                              {batch.sku}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const foundBrand = brands.find(b => b.name.toLowerCase() === (batch.brand || '').toLowerCase());
+                                if (foundBrand) handleOpenDetailBrand(foundBrand);
+                              }}
+                              className="text-xs text-[#c28e62] hover:underline font-medium mt-0.5 cursor-pointer text-left inline-block"
+                            >
+                              {batch.brand}
+                            </button>
+                          </div>
                           {(() => {
                             const distinctProjects = batch.tags 
                               ? Array.from(new Set(batch.tags.filter((t: any) => t.project).map((t: any) => t.project)))
@@ -6706,43 +6817,55 @@ export default function App() {
             <div className="p-4 sm:p-5 pb-6 sm:pb-8 flex-1 flex flex-col min-h-0 bg-white dark:bg-zinc-900 overflow-y-auto">
               {/* STATS BREADCRUMB / SUMMARY */}
               {(() => {
-                if (true) {
-                  return (
-                    <div className="bg-slate-50 dark:bg-zinc-800 p-3 sm:p-3.5 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0 text-xs sm:text-sm">
-                      <div>
-                        <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Batch ID</span>
-                        <span className="font-bold text-slate-800 dark:text-zinc-100 truncate block">{activeBatch?.batchId}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Total Tag</span>
-                        <span className="font-bold text-slate-800 dark:text-zinc-100">{activeBatch?.qty} Tag</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Tersedia (Sisa)</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{availableCount} Tag</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Telah Teralokasi</span>
-                        <span className="font-bold text-[#c28e62]">{usedCount} Tag ({activeBatchProjects.length} Proyek)</span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // NON-SUMAS (ASSC / BLIMEY!)
                 return (
-                  <div className="bg-slate-50 dark:bg-zinc-800 p-3 sm:p-3.5 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 grid grid-cols-2 sm:grid-cols-3 gap-3 flex-shrink-0 text-xs sm:text-sm">
+                  <div className="bg-slate-50 dark:bg-zinc-800 p-3 sm:p-3.5 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 grid grid-cols-2 sm:grid-cols-5 gap-3 flex-shrink-0 text-xs sm:text-sm">
                     <div>
                       <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Batch ID</span>
-                      <span className="font-bold text-slate-800 dark:text-zinc-100 truncate block">{activeBatch?.batchId}</span>
+                      <span className="font-bold text-slate-800 dark:text-zinc-100 truncate block font-mono">{activeBatch?.batchId}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Brand / SKU</span>
-                      <span className="font-bold text-slate-800 dark:text-zinc-100 truncate block">{activeBatch?.brand} - {activeBatch?.sku}</span>
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Brand &amp; SKU</span>
+                      <div className="truncate flex items-center gap-1 mt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const foundBrand = brands.find(b => b.name.toLowerCase() === (activeBatch?.brand || '').toLowerCase());
+                            if (foundBrand) {
+                              closeDetailModal();
+                              handleOpenDetailBrand(foundBrand);
+                            }
+                          }}
+                          className="font-bold text-[#c28e62] hover:underline cursor-pointer truncate text-left"
+                        >
+                          {activeBatch?.brand}
+                        </button>
+                        <span className="text-slate-400 text-xs">•</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const foundSku = products.find(p => p.sku === activeBatch?.sku || (p.brandName?.toLowerCase() === (activeBatch?.brand || '').toLowerCase() && p.sku === activeBatch?.sku));
+                            if (foundSku) {
+                              closeDetailModal();
+                              handleOpenDetailSku(foundSku);
+                            }
+                          }}
+                          className="font-medium text-slate-700 dark:text-zinc-300 hover:text-[#c28e62] hover:underline cursor-pointer truncate text-left"
+                        >
+                          {activeBatch?.sku}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Total Tag</span>
                       <span className="font-bold text-slate-800 dark:text-zinc-100">{activeBatch?.qty} Tag</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Tersedia (Sisa)</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">{availableCount} Tag</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Telah Teralokasi</span>
+                      <span className="font-bold text-[#c28e62]">{usedCount} Tag ({activeBatchProjects.length} Proyek)</span>
                     </div>
                   </div>
                 );
@@ -8546,6 +8669,203 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL DETAIL AKUN PENGGUNA */}
+      {isDetailUserModalOpen && userToView && (
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) { setIsDetailUserModalOpen(false); setUserToView(null); } }}
+          className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 w-full max-w-xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* USER HEADER */}
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-zinc-800 flex items-start justify-between gap-4 bg-white dark:bg-zinc-900 flex-shrink-0">
+              <div className="flex items-center gap-4">
+                {/* AVATAR */}
+                <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-0.5 flex items-center justify-center shrink-0 overflow-hidden">
+                  {userToView.avatar ? (
+                    <img 
+                      src={userToView.avatar} 
+                      alt={userToView.name} 
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        el.onerror = null;
+                        el.src = getInitialsAvatar(userToView.name);
+                      }}
+                      className="w-full h-full object-cover rounded-xl" 
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-xl bg-[#c28e62] text-white flex items-center justify-center font-bold text-lg">
+                      {userToView.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+
+                {/* IDENTIFIERS */}
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-zinc-100">
+                      {userToView.name}
+                    </h3>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                      userToView.status === 'Aktif'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                        : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                    }`}>
+                      {userToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
+                      <span>{userToView.status || 'Aktif'}</span>
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                      userToView.role === 'Administrator'
+                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
+                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700'
+                    }`}>
+                      <UserCheck size={11} />
+                      <span>{userToView.role}</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
+                    ID Pengguna: {userToView.id} {userToView.username ? `• @${userToView.username}` : ''}
+                  </p>
+                </div>
+              </div>
+
+              {/* CLOSE BUTTON */}
+              <button 
+                onClick={() => { setIsDetailUserModalOpen(false); setUserToView(null); }} 
+                data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
+                className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* DETAIL MODAL BODY */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* KONTAK & AKUN */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                  <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                    <Mail size={13} className="text-[#c28e62]" />
+                    <span>Email Akun</span>
+                  </div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 truncate font-mono">
+                    {userToView.email}
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                  <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                    <Phone size={13} className="text-emerald-500" />
+                    <span>Nomor Telepon</span>
+                  </div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 font-mono">
+                    {userToView.phone || '-'}
+                  </div>
+                </div>
+              </div>
+
+              {/* BRAND YANG DIKELOLA */}
+              {(() => {
+                const userBrands = brands.filter(b => b.ownerId === userToView.id);
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <span>Brand yang Dikelola ({userBrands.length})</span>
+                      </div>
+                    </div>
+
+                    {userBrands.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {userBrands.map(b => (
+                          <div
+                            key={b.id}
+                            onClick={() => {
+                              setIsDetailUserModalOpen(false);
+                              setUserToView(null);
+                              handleOpenDetailBrand(b);
+                            }}
+                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-1 flex items-center justify-center shrink-0">
+                                {b.logo ? (
+                                  <img 
+                                    src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
+                                    alt={b.name} 
+                                    onError={(e) => {
+                                      const el = e.currentTarget;
+                                      el.onerror = null;
+                                      el.src = getBrandInitialsLogo(b.name);
+                                    }}
+                                    className="w-full h-full object-contain" 
+                                  />
+                                ) : (
+                                  <span className="font-bold text-[10px] text-[#c28e62]">
+                                    {b.name.slice(0, 2).toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
+                                  {b.name}
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate">
+                                  {b.category}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-[#c28e62] opacity-0 group-hover:opacity-100 transition-opacity font-semibold shrink-0 ml-1">
+                              Detail →
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
+                        Pengguna ini belum ditugaskan sebagai PIC dari brand manapun.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* MODAL FOOTER */}
+            <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
+                Registrasi: {userToView.createdAt ? formatDateTimeDisplay(userToView.createdAt) : '-'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDetailUserModalOpen(false);
+                    setUserToView(null);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/60 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const u = userToView;
+                    setIsDetailUserModalOpen(false);
+                    setUserToView(null);
+                    handleOpenEditUser(u);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Edit3 size={13} />
+                  <span>Edit Pengguna</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* MODAL 2: DAFTARKAN AKUN USER BARU (QUICK ADD FROM BRAND MODAL) */}
       {isAddUserModalOpen && (
         <div 
@@ -8878,9 +9198,23 @@ export default function App() {
                         )}
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-800 dark:text-zinc-100 text-sm">
-                              {ownerDisplayName}
-                            </span>
+                            {linkedUser ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsDetailBrandModalOpen(false);
+                                  handleOpenDetailUser(linkedUser);
+                                }}
+                                className="font-bold text-slate-800 dark:text-zinc-100 text-sm hover:text-[#c28e62] hover:underline cursor-pointer text-left inline-flex items-center gap-1"
+                              >
+                                <span>{ownerDisplayName}</span>
+                                <ArrowUpRight size={13} className="text-[#c28e62]" />
+                              </button>
+                            ) : (
+                              <span className="font-bold text-slate-800 dark:text-zinc-100 text-sm">
+                                {ownerDisplayName}
+                              </span>
+                            )}
                             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300">
                               {ownerDisplayRole}
                             </span>
@@ -8931,21 +9265,33 @@ export default function App() {
                         {brandProducts.map((p) => (
                           <div 
                             key={p.id}
-                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] transition-colors"
+                            onClick={() => handleOpenDetailSku(p)}
+                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
-                                <Box size={14} />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate">
-                                  {p.sku}
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              {p.image ? (
+                                <img
+                                  src={p.image}
+                                  alt={p.sku}
+                                  className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
+                                  <Box size={16} />
                                 </div>
-                                <div className="text-[11px] text-slate-400 truncate">
-                                  {p.category || brandToView.category || 'Umum'}
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div 
+                                  className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
+                                  title={p.sku}
+                                >
+                                  {p.sku}
                                 </div>
                               </div>
                             </div>
+                            <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                              Lihat →
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -8991,7 +9337,16 @@ export default function App() {
                           >
                             <div>
                               <div className="font-mono font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
-                                <span>{b.batchId}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsDetailBrandModalOpen(false);
+                                    openDetailModal(b);
+                                  }}
+                                  className="hover:text-[#c28e62] hover:underline cursor-pointer text-left"
+                                >
+                                  {b.batchId}
+                                </button>
                                 {b.project && (
                                   <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                                     {b.project}
@@ -9416,16 +9771,32 @@ export default function App() {
               setSkuToView(null); 
             } 
           }}
-          className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/50 z-[10005] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xs animate-in fade-in duration-150"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-zinc-800 shadow-2xl">
             {(() => {
-              const bObj = brands.find(b => b.id === skuToView.brandId || b.name.toLowerCase() === skuToView.brandName.toLowerCase());
-              const linkedBatches = getSkuBatches(skuToView.sku, skuToView.brandName);
-              const totalProducedTags = linkedBatches.reduce((acc, b) => acc + (Number(b.qty) || 0), 0);
-              const categoryParts = (skuToView.category || '').split('>').map(p => p.trim()).filter(Boolean);
+              // Real relational data from database tables or fallback
+              const prod = skuRelationalData?.product || skuToView;
+              const brand = skuRelationalData?.brand || brands.find(b => b.id === prod.brandId || b.name.toLowerCase() === prod.brandName.toLowerCase());
+              const targetUser = skuRelationalData?.user || users.find(u => u.id === brand?.ownerId || u.name.toLowerCase() === (brand?.ownerName || '').toLowerCase());
+              const batchesList = skuRelationalData?.batches || getSkuBatches(prod.sku, prod.brandName);
+              const activeBatchesCount = skuRelationalData?.activeBatchesCount ?? batchesList.filter((b: any) => b.status !== 'Disuspend').length;
+              const suspendedBatchesCount = skuRelationalData?.suspendedBatchesCount ?? batchesList.filter((b: any) => b.status === 'Disuspend').length;
+              const tagStats = skuRelationalData?.tagStats || {
+                totalTags: batchesList.reduce((acc: number, b: any) => acc + (Number(b.qty) || 0), 0),
+                usedTags: 0,
+                availableTags: batchesList.reduce((acc: number, b: any) => acc + (Number(b.qty) || 0), 0)
+              };
+              const projects = skuRelationalData?.projects || (batchesList.map((b: any) => b.project).filter(Boolean));
+              const warranties = skuRelationalData?.warranties || [];
+              const prodCodes = skuRelationalData?.prodCodes || [];
 
-              // Parser spesifikasi terstruktur & deskripsi naratif
+              const hierarchy = resolveCategoryHierarchy(prod.category, categories);
+              const categoryParts = hierarchy && hierarchy.length > 0 
+                ? hierarchy 
+                : (prod.category || '').split('>').map((p: string) => p.trim()).filter(Boolean);
+
+              // Parser spesifikasi terstruktur & deskripsi naratif dari description
               const parseSkuSpecs = (rawDesc?: string) => {
                 if (!rawDesc) return { pureDesc: '', specs: [] };
                 const lines = rawDesc.split('\n\n');
@@ -9455,267 +9826,319 @@ export default function App() {
                 };
               };
 
-              const { pureDesc, specs } = parseSkuSpecs(skuToView.description);
+              const { pureDesc, specs } = parseSkuSpecs(prod.description);
 
               return (
                 <>
-                  {/* MODAL HEADER: FOTO, IDENTITAS & KATEGORI HIERARKIS */}
-                  <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-800/60 flex items-start justify-between gap-3 shrink-0">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      {skuToView.image ? (
-                        <img 
-                          src={skuToView.image} 
-                          alt={skuToView.sku} 
-                          className="w-12 h-12 rounded-2xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0 shadow-2xs"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold shrink-0 shadow-2xs">
-                          <Box size={22} />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base truncate">
-                            {skuToView.sku}
-                          </h3>
-                          <span className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-700/80 text-slate-700 dark:text-zinc-200 font-bold tracking-wide">
-                            {skuToView.skuCode || `SKU-${skuToView.id.toUpperCase()}`}
-                          </span>
-                        </div>
-                        {categoryParts.length > 0 ? (
-                          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-zinc-500 mt-0.5 flex-wrap">
-                            {categoryParts.map((part, idx) => (
-                              <React.Fragment key={idx}>
-                                {idx > 0 && <span className="text-slate-300 dark:text-zinc-600">›</span>}
-                                <span className={idx === categoryParts.length - 1 ? 'font-semibold text-[#c28e62]' : ''}>
-                                  {part}
-                                </span>
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
-                            Kategori Umum
-                          </p>
-                        )}
+                  {/* MODAL HEADER DENGAN ICON DAN JUDUL UTAMA */}
+                  <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-zinc-800/30">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-[#c28e62]/10 dark:bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold border border-[#c28e62]/20 shadow-xs">
+                        <Box size={20} />
                       </div>
+                      <h3 className="font-bold text-slate-900 dark:text-zinc-50 text-base sm:text-lg leading-tight">
+                        Detail SKU Produk
+                      </h3>
                     </div>
-
                     <button 
                       type="button"
-                      onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }} 
-                      className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer shrink-0"
+                      onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); setSkuRelationalData(null); }} 
+                      data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom"
+                      className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-2 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
                     >
                       <X size={18} />
                     </button>
                   </div>
 
-                  {/* MODAL CONTENT: SCROLLABLE BODY */}
-                  <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1 text-xs sm:text-sm scrollbar-thin">
+                  {/* MODAL CONTENT: SCROLLABLE */}
+                  <div className="overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-zinc-800/80 text-sm">
                     
-                    {/* METRIC CARDS (BRAND, PRODUKSI, STATUS) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {/* Brand Info */}
-                      <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60 flex items-center gap-2.5">
-                        {bObj?.logo ? (
-                          <img
-                            src={bObj.logo}
-                            alt={skuToView.brandName}
-                            onError={(e) => {
-                              const el = e.currentTarget;
-                              el.onerror = null;
-                              el.src = getBrandInitialsLogo(skuToView.brandName);
-                            }}
-                            className="w-8 h-8 rounded-xl object-contain bg-white dark:bg-zinc-800 p-0.5 border border-slate-200 dark:border-zinc-700 shrink-0"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-xl bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold text-xs shrink-0">
-                            {skuToView.brandName.slice(0, 1)}
+                    {/* BAGIAN ATAS: 2 KOLOM (KIRI GAMBAR 1:1, KANAN INFORMASI UTAMA & 3 KARTU RINGKASAN) */}
+                    <div className="p-6">
+                      <div className="flex flex-col sm:flex-row gap-6 items-start">
+                        
+                        {/* KOLOM KIRI: GAMBAR 1:1 DENGAN SKU CODE */}
+                        <div className="w-full sm:w-56 shrink-0 flex flex-col items-center sm:items-start gap-2.5">
+                          <div className="w-full max-w-[220px] sm:max-w-none aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 flex items-center justify-center shadow-xs">
+                            {prod.image ? (
+                              <img 
+                                src={prod.image} 
+                                alt={prod.sku} 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 gap-1.5 p-4 text-center">
+                                <Box size={32} strokeWidth={1.5} />
+                                <span className="text-xs font-medium">Tidak ada foto</span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        <div className="min-w-0">
-                          <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">
-                            Brand Pemilik
-                          </span>
-                          <span className="font-bold text-slate-800 dark:text-zinc-200 text-xs truncate block">
-                            {skuToView.brandName}
-                          </span>
+                          
+                          {/* SKU CODE (CLEAN, TANPA BADGE B2B) */}
+                          <div className="w-full max-w-[220px] sm:max-w-none text-center px-3 py-1.5 bg-slate-50 dark:bg-zinc-800/70 rounded-xl border border-slate-200/80 dark:border-zinc-700/70 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
+                            {prod.skuCode || `SKU-${prod.id.toUpperCase()}`}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Tag Fisik Tercetak */}
-                      <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">
-                          Tag Fisik Tercetak
-                        </span>
-                        <div className="flex items-baseline gap-1 mt-0.5">
-                          <span className="font-mono font-bold text-slate-800 dark:text-zinc-100 text-sm">
-                            {totalProducedTags.toLocaleString('id-ID')}
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            Tag ({linkedBatches.length} Batch)
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Status SKU */}
-                      <div className="bg-slate-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-slate-200/70 dark:border-zinc-700/60">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">
-                          Status Katalog
-                        </span>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 text-xs">
-                            Aktif &amp; Terverifikasi
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SPESIFIKASI TEKNIS PRODUK (PARSED STRUCTURED GRID) */}
-                    <div className="bg-white dark:bg-zinc-800/30 rounded-2xl border border-slate-200 dark:border-zinc-700/70 p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider flex items-center gap-1.5">
-                          <Sliders size={12} className="text-[#c28e62]" />
-                          <span>Spesifikasi Produk</span>
-                        </span>
-                        {specs.length > 0 && (
-                          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62]">
-                            {specs.length} Parameter
-                          </span>
-                        )}
-                      </div>
-
-                      {specs.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                          {specs.map((item, sIdx) => (
-                            <div 
-                              key={sIdx} 
-                              className="p-2.5 rounded-xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-700/40"
-                            >
-                              <span className="text-[10px] font-medium text-slate-400 dark:text-zinc-400 block truncate">
-                                {item.key}
-                              </span>
-                              <span className="font-semibold text-slate-800 dark:text-zinc-100 text-xs block mt-0.5 truncate" title={item.value}>
-                                {item.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-400 dark:text-zinc-500 italic py-1">
-                          Belum ada parameter spesifikasi khusus untuk produk ini.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* DESKRIPSI & CATATAN PRODUK */}
-                    {pureDesc && (
-                      <div className="bg-white dark:bg-zinc-800/30 rounded-2xl border border-slate-200 dark:border-zinc-700/70 p-4 space-y-1.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider flex items-center gap-1.5">
-                          <FileText size={12} className="text-[#c28e62]" />
-                          <span>Deskripsi &amp; Catatan</span>
-                        </span>
-                        <p className="text-slate-700 dark:text-zinc-300 leading-relaxed text-xs">
-                          {pureDesc}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* RIWAYAT BATCH PRODUKSI TERHUBUNG */}
-                    <div className="space-y-2.5 pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider flex items-center gap-1.5">
-                          <Layers size={12} className="text-[#c28e62]" />
-                          <span>Riwayat Batch Produksi</span>
-                        </span>
-                        <span className="text-xs font-semibold text-[#c28e62] font-mono">
-                          {linkedBatches.length} Batch
-                        </span>
-                      </div>
-
-                      {linkedBatches.length > 0 ? (
-                        <div className="border border-slate-200 dark:border-zinc-700/80 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-zinc-800">
-                          {linkedBatches.map(b => (
-                            <div 
-                              key={b.id}
-                              className="p-3 bg-slate-50/40 dark:bg-zinc-800/30 flex items-center justify-between gap-3 hover:bg-slate-100/50 dark:hover:bg-zinc-800/50 transition-colors"
-                            >
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-xs text-slate-800 dark:text-zinc-100 font-mono">
-                                    {b.batchId}
-                                  </span>
-                                  <span className={`text-[9px] px-2 py-0.2 rounded-full font-semibold ${
-                                    b.status === 'Disuspend' 
-                                      ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400' 
-                                      : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
-                                  }`}>
-                                    {b.status || 'Aktif'}
-                                  </span>
-                                </div>
-                                <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5">
-                                  Rilis: {b.date} • PIN {b.pinLength} Digit • Format {b.qrType || 'dynamic'}
-                                </p>
+                        {/* KOLOM KANAN: KATEGORI, NAMA PRODUK, DAN 3 KARTU RINGKAS CEPAT */}
+                        <div className="flex-1 min-w-0 w-full space-y-4">
+                          <div>
+                            {/* TEKS KATEGORI PRODUK SAJA TANPA ICON & TANPA BADGE */}
+                            {categoryParts.length > 0 && (
+                              <div className="text-xs text-slate-400 dark:text-zinc-500 font-medium mb-1 truncate">
+                                {categoryParts.join(' › ')}
                               </div>
+                            )}
+                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight leading-snug">
+                              {prod.sku}
+                            </h2>
+                          </div>
 
-                              <div className="flex items-center gap-2.5 shrink-0">
-                                <span className="text-xs font-bold text-slate-700 dark:text-zinc-200 font-mono">
-                                  {Number(b.qty).toLocaleString('id-ID')} Tag
+                          {/* 3 KARTU RINGKASAN DATA RELASIONAL (BRAND, PENGGUNA, BATCH) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            {/* KARTU 1: BRAND */}
+                            <div 
+                              onClick={() => {
+                                if (brand) {
+                                  setIsDetailSkuModalOpen(false);
+                                  setSkuToView(null);
+                                  setSkuRelationalData(null);
+                                  handleOpenDetailBrand(brand);
+                                }
+                              }}
+                              className={`p-3 rounded-2xl border transition-all ${brand ? 'bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200/80 dark:border-zinc-700/80 hover:border-[#c28e62]/50 hover:bg-[#c28e62]/5 cursor-pointer group' : 'bg-slate-50 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700/80'}`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Brand</span>
+                                <Building2 size={14} className="text-slate-400 group-hover:text-[#c28e62] transition-colors" />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-900 dark:text-zinc-100 group-hover:text-[#c28e62] transition-colors truncate">
+                                  {prod.brandName}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsDetailSkuModalOpen(false);
-                                    setSkuToView(null);
-                                    setActiveBatch(b);
-                                    setActiveMenu('tag-qr');
-                                    openDetailModal(b);
-                                  }}
-                                  className="px-3 py-1 rounded-full bg-[#c28e62]/10 hover:bg-[#c28e62]/20 text-[#c28e62] text-xs font-semibold transition-colors cursor-pointer"
-                                >
-                                  Buka Tag →
-                                </button>
+                                {brand && (
+                                  <span className="text-[11px] font-semibold text-[#c28e62] shrink-0 ml-1">
+                                    Detail →
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                                Status: <span className="text-emerald-600 dark:text-emerald-400 font-medium">{brand?.status || 'Aktif'}</span>
                               </div>
                             </div>
-                          ))}
+
+                            {/* KARTU 2: AKUN PIC PENGGUNA */}
+                            <div 
+                              onClick={() => {
+                                if (targetUser) {
+                                  setIsDetailSkuModalOpen(false);
+                                  setSkuToView(null);
+                                  setSkuRelationalData(null);
+                                  handleOpenDetailUser(targetUser);
+                                }
+                              }}
+                              className={`p-3 rounded-2xl border transition-all ${targetUser ? 'bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200/80 dark:border-zinc-700/80 hover:border-[#c28e62]/50 hover:bg-[#c28e62]/5 cursor-pointer group' : 'bg-slate-50 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700/80'}`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">PIC Pengguna</span>
+                                <UserCheck size={14} className="text-slate-400 group-hover:text-[#c28e62] transition-colors" />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-900 dark:text-zinc-100 group-hover:text-[#c28e62] transition-colors truncate">
+                                  {targetUser?.name || brand?.ownerName || '-'}
+                                </span>
+                                {targetUser && (
+                                  <span className="text-[11px] font-semibold text-[#c28e62] shrink-0 ml-1">
+                                    Detail →
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">
+                                {targetUser?.role || 'Admin'} • <span className="text-emerald-600 dark:text-emerald-400 font-medium">{targetUser?.status || 'Aktif'}</span>
+                              </div>
+                            </div>
+
+                            {/* KARTU 3: BATCH PRODUKSI */}
+                            <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-700/80">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Batch Produksi</span>
+                                <Layers size={14} className="text-slate-400" />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-900 dark:text-zinc-100">
+                                  {batchesList.length} Batch
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${activeBatchesCount > 0 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40' : 'bg-slate-100 text-slate-500'}`}>
+                                  {activeBatchesCount} Aktif
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                                {suspendedBatchesCount > 0 ? `${suspendedBatchesCount} Disuspend` : 'Semua Beroperasi Normal'}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="p-4 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-slate-400 dark:text-zinc-500 text-xs">
-                          Belum ada batch produksi yang didaftarkan menggunakan SKU ini.
+
+                      </div>
+                    </div>
+
+                    {/* BAGIAN BAWAH: 2 KOLOM RAPIH & EFISIEN (SPESIFIKASI & DESKRIPSI DI KIRI, RIWAYAT BATCH DI KANAN) */}
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                        
+                        {/* KOLOM KIRI: SPESIFIKASI PRODUK & DESKRIPSI LENGKAP */}
+                        <div className="space-y-4">
+                          
+                          {/* SPESIFIKASI TEKNIS PRODUK */}
+                          <div className="bg-slate-50/70 dark:bg-zinc-800/40 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80">
+                            <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200/60 dark:border-zinc-700/60">
+                              <div className="flex items-center gap-2">
+                                <Sliders size={16} className="text-[#c28e62]" />
+                                <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider">
+                                  Spesifikasi Teknis
+                                </h4>
+                              </div>
+                              <span className="text-[11px] font-medium text-slate-400 dark:text-zinc-500">
+                                {specs.length} Parameter
+                              </span>
+                            </div>
+
+                            <div className="divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
+                              {specs.map((item, idx) => (
+                                <div key={idx} className="flex justify-between py-1.5 first:pt-0">
+                                  <span className="text-slate-500 dark:text-zinc-400">{item.key}</span>
+                                  <span className="font-semibold text-slate-800 dark:text-zinc-200 text-right">{item.value}</span>
+                                </div>
+                              ))}
+                              <div className="flex justify-between py-1.5 last:pb-0">
+                                <span className="text-slate-500 dark:text-zinc-400">Tanggal Registrasi</span>
+                                <span className="font-medium text-slate-600 dark:text-zinc-300">
+                                  {prod.createdAt ? formatDateTimeDisplay(prod.createdAt) : 'Katalog Master'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* DESKRIPSI & CATATAN */}
+                          <div className="bg-slate-50/70 dark:bg-zinc-800/40 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80">
+                            <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-slate-200/60 dark:border-zinc-700/60">
+                              <FileText size={16} className="text-[#c28e62]" />
+                              <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider">
+                                Deskripsi &amp; Catatan
+                              </h4>
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
+                              {pureDesc || 'Produk panel akustik premium terdaftar resmi pada katalog perlindungan Sumas.'}
+                            </p>
+                          </div>
                         </div>
-                      )}
+
+                        {/* KOLOM KANAN: RIWAYAT BATCH TERHUBUNG */}
+                        <div className="space-y-4">
+                          <div className="bg-slate-50/70 dark:bg-zinc-800/40 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80">
+                            <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200/60 dark:border-zinc-700/60">
+                              <div className="flex items-center gap-2">
+                                <Layers size={16} className="text-[#c28e62]" />
+                                <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider">
+                                  Riwayat Batch Terhubung
+                                </h4>
+                              </div>
+                              <span className="text-xs font-mono text-slate-400 dark:text-zinc-500 font-semibold">
+                                {batchesList.length} Batch
+                              </span>
+                            </div>
+
+                            {batchesList.length > 0 ? (
+                              <div className="space-y-2 max-h-[360px] overflow-y-auto scrollbar-thin">
+                                {batchesList.map((b: any) => {
+                                  const isBatchActive = b.status !== 'Disuspend';
+                                  return (
+                                    <div 
+                                      key={b.id}
+                                      className="p-3 bg-white dark:bg-zinc-900/90 rounded-xl border border-slate-200/70 dark:border-zinc-700/70 flex items-center justify-between text-xs hover:border-[#c28e62]/40 transition-colors"
+                                    >
+                                      <div className="min-w-0 pr-2">
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setIsDetailSkuModalOpen(false);
+                                              setSkuToView(null);
+                                              setSkuRelationalData(null);
+                                              setActiveBatch(b);
+                                              setActiveMenu('tag-qr');
+                                              openDetailModal(b);
+                                            }}
+                                            className="font-mono font-bold text-slate-900 dark:text-zinc-100 hover:text-[#c28e62] hover:underline text-left cursor-pointer truncate"
+                                          >
+                                            {b.batchId}
+                                          </button>
+                                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${isBatchActive ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'}`}>
+                                            {isBatchActive ? 'Aktif' : 'Disuspend'}
+                                          </span>
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 truncate">
+                                          {b.date} • PIN {b.pinLength} Digit {b.project ? `• ${b.project}` : ''}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <span className="font-mono font-semibold text-slate-800 dark:text-zinc-200">
+                                          {Number(b.qty).toLocaleString('id-ID')} Tag
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setIsDetailSkuModalOpen(false);
+                                            setSkuToView(null);
+                                            setSkuRelationalData(null);
+                                            setActiveBatch(b);
+                                            setActiveMenu('tag-qr');
+                                            openDetailModal(b);
+                                          }}
+                                          className="text-[#c28e62] hover:underline font-semibold cursor-pointer text-xs"
+                                        >
+                                          Lihat →
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400 dark:text-zinc-500 italic p-3 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200/70 dark:border-zinc-800">
+                                Belum ada batch produksi terhubung ke SKU ini.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
                     </div>
 
                   </div>
 
                   {/* MODAL FOOTER */}
-                  <div className="px-5 sm:px-6 py-3 bg-slate-50/80 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
-                    <span className="text-[11px] text-slate-400 dark:text-zinc-500">
-                      Terdaftar: {skuToView.createdAt ? formatDateTimeDisplay(skuToView.createdAt) : 'Katalog Master'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const toEdit = skuToView;
-                          setIsDetailSkuModalOpen(false);
-                          setSkuToView(null);
-                          handleOpenEditSku(toEdit);
-                        }}
-                        className="px-4 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                      >
-                        <Edit3 size={13} />
-                        <span>Edit SKU</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); }}
-                        className="px-4 py-2 rounded-full text-xs font-semibold border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
-                      >
-                        Tutup
-                      </button>
-                    </div>
+                  <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); setSkuRelationalData(null); }}
+                      className="px-4 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                    >
+                      Tutup
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const toEdit = prod;
+                        setIsDetailSkuModalOpen(false);
+                        setSkuToView(null);
+                        setSkuRelationalData(null);
+                        handleOpenEditSku(toEdit);
+                      }}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer"
+                    >
+                      Edit SKU
+                    </button>
                   </div>
                 </>
               );

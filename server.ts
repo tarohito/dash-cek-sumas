@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import crypto from 'crypto';
+import { seedComprehensiveData } from './src/seedData.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -262,166 +263,20 @@ try {
 try {
   db.prepare('ALTER TABLE categories ADD COLUMN specSchema TEXT').run();
 } catch (_) {}
-
-// Update existing users with full data matching Tambah Pengguna form
 try {
-  const updateUserStmt = db.prepare('UPDATE users SET name = ?, username = ?, email = ?, phone = ?, role = ?, avatar = ?, status = ?, createdAt = ? WHERE id = ?');
-  updateUserStmt.run('Kalingga Jeandy', 'kalingga.jeandy', 'kalinggajeandy3@gmail.com', '+62 812-8899-1020', 'Administrator', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 08:30', 'u1');
-  updateUserStmt.run('Budi Santoso', 'budi.santoso', 'budi.s@sumas.id', '+62 813-7722-3344', 'Operator', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 09:15', 'u2');
-  updateUserStmt.run('Rina Wijaya', 'rina.wijaya', 'rina.w@sumas.id', '+62 821-4455-6677', 'Operator', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 10:00', 'u3');
-  updateUserStmt.run('Siti Rahma', 'siti.rahma', 'siti.r@sumas.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30', 'u4');
+  db.prepare("UPDATE products SET skuCode = 'SKU-' || UPPER(id) WHERE skuCode IS NULL OR skuCode = ''").run();
 } catch (_) {}
 
-// Seed password_reset_requests if empty
-const resetRequestsCountRow = db.prepare('SELECT COUNT(*) as count FROM password_reset_requests').get() as { count: number };
-if (resetRequestsCountRow && resetRequestsCountRow.count === 0) {
-  const insertResetReq = db.prepare(`
-    INSERT INTO password_reset_requests (id, userId, userName, userEmail, userRole, avatar, requestedAt, status, actionNote, isRead)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insertResetReq.run(
-    'pr-1',
-    'u3',
-    'Budi Santoso',
-    'budi.s@sumas.id',
-    'Operator',
-    'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80',
-    '15 menit yang lalu',
-    'Menunggu',
-    'Lupa kata sandi saat mencoba akses dari tablet lapangan proyek RSUD Kediri',
-    0
-  );
-  insertResetReq.run(
-    'pr-2',
-    'u4',
-    'Siti Rahma',
-    'siti.r@sumas.id',
-    'Operator',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-    '1 jam yang lalu',
-    'Menunggu',
-    'Permintaan reset PIN dan kata sandi berkala perangkat brand operasional',
-    0
-  );
-  insertResetReq.run(
-    'pr-3',
-    'u2',
-    'admin',
-    'admin@sumas.id',
-    'Administrator',
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
-    'Kemarin, 16:40',
-    'Disetujui',
-    'Tautan reset sandi 1-kali pakai telah dikirim otomatis ke email terdaftar',
-    1
-  );
-}
-
-// Seed initial users if empty
-const userCountRow = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-if (userCountRow && userCountRow.count === 0) {
-  const insertUser = db.prepare(`
-    INSERT INTO users (id, name, username, email, phone, role, avatar, status, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insertUser.run('u1', 'Kalingga Jeandy', 'kalingga.jeandy', 'kalinggajeandy3@gmail.com', '+62 812-8899-1020', 'Administrator', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 08:30');
-  insertUser.run('u2', 'Budi Santoso', 'budi.santoso', 'budi.s@sumas.id', '+62 813-7722-3344', 'Operator', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 09:15');
-  insertUser.run('u3', 'Rina Wijaya', 'rina.wijaya', 'rina.w@sumas.id', '+62 821-4455-6677', 'Operator', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 10:00');
-  insertUser.run('u4', 'Siti Rahma', 'siti.rahma', 'siti.r@sumas.id', '+62 811-9988-7766', 'Operator', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80', 'Aktif', '28 Okt 2026, 11:30');
-}
-
-// Seed initial brands if empty
-const brandCountRow = db.prepare('SELECT COUNT(*) as count FROM brands').get() as { count: number };
-if (brandCountRow && brandCountRow.count === 0) {
-  const insertBrand = db.prepare(`
-    INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, status, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insertBrand.run(
-    'br-sumas',
-    'Sumas',
-    '/assets/brand/logo_horizontal.svg',
-    'u1',
-    'Kalingga Jeandy',
-    'kalinggajeandy3@gmail.com',
-    'Administrator',
-    'Material partisi cubicle toilet, phenolic board tahan air & benturan untuk proyek rumah sakit, bandara, mall, dan fasilitas komersial.',
-    'Material & Konstruksi',
-    'Aktif',
-    '28 Okt 2026, 09:00'
-  );
-  insertBrand.run(
-    'br-assc',
-    'ASSC',
-    '/assets/brand/assc_logo.svg',
-    'u4',
-    'Siti Rahma',
-    'siti.r@sumas.id',
-    'Operator',
-    'Lini streetwear retail eksklusif dengan sistem verifikasi QR code hologram anti-counterfeit dan PIN verifikasi publik.',
-    'Fashion & Streetwear',
-    'Aktif',
-    '23 Mei 2025, 10:00'
-  );
-  insertBrand.run(
-    'br-blimey',
-    'BLIMEY!',
-    '/assets/brand/blimey_logo.svg',
-    'u3',
-    'Budi Santoso',
-    'budi.s@sumas.id',
-    'Operator',
-    'Koleksi fashion premium & casual lifestyle dengan tag serial unik untuk garansi keaslian pakaian.',
-    'Apparel & Lifestyle',
-    'Aktif',
-    '15 Jun 2025, 14:20'
-  );
-}
-
+// Comprehensive Database Seeder (15 complete records per entity)
 try {
-  db.prepare("UPDATE brands SET logo = '/assets/brand/logo_horizontal.svg' WHERE LOWER(name) = 'sumas' OR logo LIKE '%logo_vertikal%' OR logo LIKE '%aistudio%'").run();
-  db.prepare("UPDATE brands SET logo = '/assets/brand/assc_logo.svg' WHERE LOWER(name) = 'assc' OR logo LIKE '%unsplash%'").run();
-  db.prepare("UPDATE brands SET logo = '/assets/brand/blimey_logo.svg' WHERE LOWER(name) = 'blimey!' OR logo LIKE '%unsplash%'").run();
-} catch (_) {}
-
-// Migration: Ensure all users have sharp, local vector avatars
-try {
-  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_kalingga.svg' WHERE id = 'u1'").run();
-  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_budi.svg' WHERE id = 'u2'").run();
-  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_rina.svg' WHERE id = 'u3'").run();
-  db.prepare("UPDATE users SET avatar = '/assets/avatars/user_siti.svg' WHERE id = 'u4'").run();
-  db.prepare("UPDATE password_reset_requests SET avatar = '/assets/avatars/user_budi.svg' WHERE userId = 'u2' OR userName LIKE '%Budi%'").run();
-  db.prepare("UPDATE password_reset_requests SET avatar = '/assets/avatars/user_rina.svg' WHERE userId = 'u3' OR userName LIKE '%Rina%'").run();
-  db.prepare("UPDATE password_reset_requests SET avatar = '/assets/avatars/user_siti.svg' WHERE userId = 'u4' OR userName LIKE '%Siti%'").run();
-} catch (_) {}
-
-// Migration: Ensure products have rich description and creation dates
-try {
-  db.prepare("UPDATE products SET description = 'Partisi panel pintu phenolic 12mm tahan air dan benturan fasilitas komersial', createdAt = '28 Okt 2026, 09:30' WHERE id = 'p1'").run();
-  db.prepare("UPDATE products SET description = 'Lembaran phenolic board high density solid core untuk sekat partisi cubicle', createdAt = '28 Okt 2026, 09:40' WHERE id = 'p2'").run();
-  db.prepare("UPDATE products SET description = 'Set engsel gravity, handle indikator, lock set, dan leg support stainless 304', createdAt = '28 Okt 2026, 09:45' WHERE id = 'p3'").run();
-  db.prepare("UPDATE products SET description = 'Exclusive collection t-shirt dengan tag hologram keaslian dan verifikasi serial', createdAt = '10 Nov 2026, 14:00' WHERE id = 'p4'").run();
-  db.prepare("UPDATE products SET description = 'Heavyweight fleece hoodie dengan cetak sablon rubber premium dan tag pelindung QR', createdAt = '10 Nov 2026, 14:15' WHERE id = 'p5'").run();
-  db.prepare("UPDATE products SET description = 'Polo strapback cap katun twill dengan bordir logo ikonik dan tag fisik', createdAt = '10 Nov 2026, 14:20' WHERE id = 'p6'").run();
-  db.prepare("UPDATE products SET description = 'Edisi terbatas drop t-shirt bertema tipografi grafis dan label barcode verifikasi', createdAt = '12 Nov 2026, 11:00' WHERE id = 'p7'").run();
-  db.prepare("UPDATE products SET description = 'Jacket casual windproof streetwear dengan tag verifikasi digital anti-palsu', createdAt = '12 Nov 2026, 11:30' WHERE id = 'p8'").run();
-} catch (_) {}
-
-// Seed initial products / SKUs if empty
-const productCountRow = db.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number };
-if (productCountRow && productCountRow.count === 0) {
-  const insertProduct = db.prepare(`
-    INSERT INTO products (id, brandId, brandName, sku, category, isB2B)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  insertProduct.run('p1', 'br-sumas', 'Sumas', 'Pintu Cubicle Toilet', 'Material & Konstruksi', 1);
-  insertProduct.run('p2', 'br-sumas', 'Sumas', 'Phenolic Board 12mm Standard', 'Material & Konstruksi', 1);
-  insertProduct.run('p3', 'br-sumas', 'Sumas', 'Cubicle Hardware Set', 'Material & Konstruksi', 1);
-  insertProduct.run('p4', 'br-assc', 'ASSC', 'Dew Drops', 'Fashion & Streetwear', 0);
-  insertProduct.run('p5', 'br-assc', 'ASSC', 'ASSC Classic Hoodie', 'Fashion & Streetwear', 0);
-  insertProduct.run('p6', 'br-assc', 'ASSC', 'Overthinking Cap', 'Fashion & Streetwear', 0);
-  insertProduct.run('p7', 'br-blimey', 'BLIMEY!', 'A LITTLE CLOSER (BLIMEY!)', 'Apparel & Lifestyle', 0);
-  insertProduct.run('p8', 'br-blimey', 'BLIMEY!', 'Oversized Street Jacket', 'Apparel & Lifestyle', 0);
+  const brandsCountRow = db.prepare('SELECT COUNT(*) as count FROM brands').get() as { count: number };
+  const productsCountRow = db.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number };
+  const batchesCountRow = db.prepare('SELECT COUNT(*) as count FROM batches').get() as { count: number };
+  if (brandsCountRow.count < 15 || productsCountRow.count < 15 || batchesCountRow.count < 15) {
+    seedComprehensiveData(db);
+  }
+} catch (err) {
+  console.error('Seeding check notice:', err);
 }
 
 // Seed initial 3-level categories if empty
@@ -864,63 +719,8 @@ const insertBatchTags = db.transaction((tags) => {
 
 // Seed batches and tags in SQLite
 const batchCountRow = db.prepare('SELECT COUNT(*) as count FROM batches').get() as { count: number };
-if (batchCountRow && batchCountRow.count === 0) {
-  const insertBatch = db.prepare(`
-    INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, tags)
-    VALUES (@id, @batchId, @date, @project, @sku, @brand, @qty, @specs, @pinLength, @status, @isB2B, @tags)
-  `);
-
-  insertBatch.run({
-    id: 'b1',
-    batchId: 'SUMAS-BATCH-0001-10',
-    date: '28 Okt 2026, 09:15',
-    project: 'RS Kediri',
-    sku: 'Pintu Cubicle Toilet',
-    brand: 'SUMAS',
-    qty: 10,
-    specs: 'Phenolic Board 12mm',
-    pinLength: 6,
-    status: 'Aktif',
-    isB2B: 1,
-    tags: null
-  });
-
-  const sumasTags = generateTagsForBatch('b1', 'SUMAS', 10, 6, 5, 'RS Kediri', 'Phenolic Board 12mm');
-  insertBatchTags(sumasTags);
-
-  insertBatch.run({
-    id: 'b2',
-    batchId: 'LEGACY-BATCH-0006-07',
-    date: '23 Mei 2025, 11:27',
-    project: null,
-    sku: 'Dew Drops',
-    brand: 'ASSC',
-    qty: 1000,
-    specs: '-',
-    pinLength: 7,
-    status: 'Aktif',
-    isB2B: 0,
-    tags: null
-  });
-
-  const asscTags = generateTagsForBatch('b2', 'ASSC', 1000, 7, 0, '');
-  insertBatchTags(asscTags);
-
-  const insertLog = db.prepare(`
-    INSERT INTO audit_logs (id, batchId, timestamp, user, reason, changes)
-    VALUES (@id, @batchId, @timestamp, @user, @reason, @changes)
-  `);
-
-  insertLog.run({
-    id: 1730260800000,
-    batchId: 'SUMAS-BATCH-0001-10',
-    timestamp: '29 Okt 2026, 10:20',
-    user: 'Administrator',
-    reason: 'Klien meminta penyesuaian ketebalan material karena standar kelembaban ruangan RS berubah.',
-    changes: JSON.stringify([
-      { field: 'Spesifikasi', old: 'Phenolic Board 10mm', new: 'Phenolic Board 12mm' }
-    ])
-  });
+if (batchCountRow && batchCountRow.count < 15) {
+  seedComprehensiveData(db);
 } else {
   // Ensure tags table has rows for any existing batches that may have tags in batches.tags column
   const existingBatches = db.prepare('SELECT id, batchId, brand, qty, pinLength, isB2B, project, specs, tags FROM batches').all() as any[];
@@ -1697,6 +1497,13 @@ app.get('/api/dashboard/stats', (_req, res) => {
     const retailBatches = db.prepare('SELECT COUNT(*) as count FROM batches WHERE isB2B = 0').get() as { count: number };
     const totalLogs = db.prepare('SELECT COUNT(*) as count FROM audit_logs').get() as { count: number };
     
+    const totalProducts = db.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number };
+    const totalBrands = db.prepare('SELECT COUNT(*) as count FROM brands').get() as { count: number };
+    const activeBrands = db.prepare("SELECT COUNT(*) as count FROM brands WHERE status = 'Aktif'").get() as { count: number };
+    const scanSums = db.prepare('SELECT COALESCE(SUM(totalScans), 0) as totalScans, COALESCE(SUM(todayScans), 0) as todayScans FROM scan_points').get() as { totalScans: number; todayScans: number };
+    const cityCount = db.prepare('SELECT COUNT(DISTINCT city) as count, COUNT(*) as totalPoints FROM scan_points').get() as { count: number; totalPoints: number };
+    const scanValid = db.prepare("SELECT COUNT(*) as count FROM scan_points WHERE status = 'valid'").get() as { count: number };
+    
     // Per brand stats
     const brandStats = db.prepare('SELECT brand, COUNT(*) as batchCount, COALESCE(SUM(qty), 0) as totalQty FROM batches GROUP BY brand').all();
 
@@ -1723,6 +1530,14 @@ app.get('/api/dashboard/stats', (_req, res) => {
       b2bBatches: b2bBatches.count,
       retailBatches: retailBatches.count,
       totalLogs: totalLogs.count,
+      totalProducts: totalProducts.count,
+      totalBrands: totalBrands.count,
+      activeBrands: activeBrands.count,
+      totalScans: scanSums.totalScans,
+      todayScans: scanSums.todayScans,
+      distinctCities: cityCount.count,
+      totalScanPoints: cityCount.totalPoints,
+      validScans: scanValid.count,
       brandStats,
       recentLogs,
       recentBatches,
@@ -2009,9 +1824,114 @@ app.get('/api/products', (_req, res) => {
     const rows = db.prepare('SELECT * FROM products ORDER BY brandName ASC, sku ASC').all() as any[];
     const result = rows.map((p) => ({
       ...p,
+      skuCode: p.skuCode || `SKU-${p.id.toUpperCase()}`,
       isB2B: Boolean(p.isB2B)
     }));
     res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// Relational Detail of Product by ID or SKU from real database tables
+app.get('/api/products/:id/relational', (req, res) => {
+  try {
+    const { id } = req.params;
+    let prod = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as any;
+    if (!prod) {
+      prod = db.prepare('SELECT * FROM products WHERE LOWER(sku) = LOWER(?)').get(id) as any;
+    }
+    if (!prod) {
+      return res.status(404).json({ error: 'Produk tidak ditemukan' });
+    }
+
+    const brand = db.prepare('SELECT id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, category, status, description FROM brands WHERE id = ? OR LOWER(name) = LOWER(?)').get(prod.brandId, prod.brandName) as any || null;
+    let user: any = null;
+    if (brand?.ownerId) {
+      user = db.prepare('SELECT id, name, username, email, phone, role, avatar, status FROM users WHERE id = ?').get(brand.ownerId);
+    }
+    if (!user && brand?.ownerName) {
+      user = db.prepare('SELECT id, name, username, email, phone, role, avatar, status FROM users WHERE LOWER(name) = LOWER(?)').get(brand.ownerName);
+    }
+
+    const batches = db.prepare('SELECT id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, redirectUrl, qrType, requirePin, enableGps FROM batches WHERE LOWER(sku) = LOWER(?) AND (LOWER(brand) = LOWER(?) OR LOWER(brand) = LOWER(?)) ORDER BY date DESC').all(prod.sku, prod.brandName, brand?.name || prod.brandName) as any[];
+    const activeBatchesCount = batches.filter(b => b.status !== 'Disuspend').length;
+    const suspendedBatchesCount = batches.filter(b => b.status === 'Disuspend').length;
+
+    const batchIds = batches.map(b => b.id);
+    let tagStats = { totalTags: 0, usedTags: 0, availableTags: 0 };
+    let projects: string[] = [];
+    let warranties: string[] = [];
+    let prodCodes: string[] = [];
+    let sampleAllocatedTags: any[] = [];
+
+    if (batchIds.length > 0) {
+      const placeholders = batchIds.map(() => '?').join(',');
+      const statsRow = db.prepare(`
+        SELECT 
+          COUNT(*) as totalTags,
+          SUM(CASE WHEN status = 'Telah Digunakan' THEN 1 ELSE 0 END) as usedTags,
+          SUM(CASE WHEN status = 'Tersedia' THEN 1 ELSE 0 END) as availableTags
+        FROM tags WHERE batchId IN (${placeholders})
+      `).get(...batchIds) as any;
+      if (statsRow) {
+        tagStats = {
+          totalTags: Number(statsRow.totalTags) || 0,
+          usedTags: Number(statsRow.usedTags) || 0,
+          availableTags: Number(statsRow.availableTags) || 0
+        };
+      }
+
+      const pRows = db.prepare(`SELECT DISTINCT project FROM tags WHERE batchId IN (${placeholders}) AND project IS NOT NULL AND project != '' AND project != '-'`).all(...batchIds) as { project: string }[];
+      projects = pRows.map(r => r.project);
+
+      const wRows = db.prepare(`SELECT DISTINCT warranty FROM tags WHERE batchId IN (${placeholders}) AND warranty IS NOT NULL AND warranty != '' AND warranty != '-'`).all(...batchIds) as { warranty: string }[];
+      warranties = wRows.map(r => r.warranty);
+
+      const pcRows = db.prepare(`SELECT DISTINCT prodCode FROM tags WHERE batchId IN (${placeholders}) AND prodCode IS NOT NULL AND prodCode != '' AND prodCode != '-'`).all(...batchIds) as { prodCode: string }[];
+      prodCodes = pcRows.map(r => r.prodCode);
+
+      sampleAllocatedTags = db.prepare(`
+        SELECT tagNumber, pin, status, project, warranty, prodCode, note, allocatedAt 
+        FROM tags 
+        WHERE batchId IN (${placeholders}) AND status = 'Telah Digunakan' 
+        LIMIT 6
+      `).all(...batchIds);
+    }
+
+    // Scans from scan_points
+    const scanRows = db.prepare(`
+      SELECT city, province, venue, totalScans, todayScans, status, latestTime, deviceInfo 
+      FROM scan_points 
+      WHERE (LOWER(brand) = LOWER(?) OR LOWER(brand) = LOWER(?)) 
+        AND (LOWER(productType) LIKE '%' || LOWER(?) || '%' OR batchId IN (${batchIds.length ? batchIds.map(() => '?').join(',') : "''"}))
+      ORDER BY totalScans DESC
+      LIMIT 4
+    `).all(prod.brandName, brand?.name || prod.brandName, prod.sku, ...(batchIds.length ? batchIds : [])) as any[];
+
+    const totalScans = scanRows.reduce((acc, r) => acc + (Number(r.totalScans) || 0), 0);
+
+    res.json({
+      product: {
+        ...prod,
+        skuCode: prod.skuCode || `SKU-${prod.id.toUpperCase()}`,
+        isB2B: Boolean(prod.isB2B)
+      },
+      brand,
+      user,
+      batches,
+      activeBatchesCount,
+      suspendedBatchesCount,
+      tagStats,
+      projects,
+      warranties,
+      prodCodes,
+      sampleAllocatedTags,
+      scanActivity: {
+        totalScans,
+        locations: scanRows
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: String(error) });
   }
