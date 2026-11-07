@@ -22,6 +22,7 @@ import {
   Check,
   CheckCircle2, 
   ChevronDown, 
+  ChevronUp,
   Edit3, 
   Clock, 
   List, 
@@ -63,7 +64,10 @@ import {
   FileEdit,
   AlertTriangle,
   Sliders,
-  FileText
+  FileText,
+  MapPin,
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 import { ScanLocationMap } from './components/ScanLocationMap';
 import { ScanActivityChart } from './components/ScanActivityChart';
@@ -736,7 +740,7 @@ export default function App() {
 
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth < 1024;
+      return window.innerWidth < 1200;
     }
     return false;
   });
@@ -998,18 +1002,41 @@ export default function App() {
       return res.json();
     },
     async getNotifications() {
-      const res = await fetch('/api/notifications');
-      if (!res.ok) throw new Error('Gagal memuat notifikasi');
-      return res.json();
+      try {
+        const res = await fetch('/api/notifications');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        try {
+          localStorage.setItem('sumas_notifications_cache', JSON.stringify(data));
+        } catch (_) {}
+        return data;
+      } catch (err) {
+        console.warn('Gagal memuat notifikasi dari server, menggunakan cache lokal:', err);
+        try {
+          const cached = localStorage.getItem('sumas_notifications_cache');
+          if (cached) return JSON.parse(cached);
+        } catch (_) {}
+        return {
+          unreadCount: 0,
+          pendingResetCount: 0,
+          counts: { all: 0, scan: 0, edit: 0, reset: 0 },
+          notifications: []
+        };
+      }
     },
     async markNotificationsRead(payload?: { id?: string; all?: boolean; ids?: string[] }) {
-      const res = await fetch('/api/notifications/mark-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload || { all: true }),
-      });
-      if (!res.ok) throw new Error('Gagal menandai notifikasi');
-      return res.json();
+      try {
+        const res = await fetch('/api/notifications/mark-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload || { all: true }),
+        });
+        if (!res.ok) throw new Error('Gagal menandai notifikasi');
+        return await res.json();
+      } catch (err) {
+        console.warn('Gagal menandai notifikasi di server:', err);
+        return { success: true };
+      }
     },
     async respondPasswordReset(id: string, action: 'approve' | 'reject', actionNote?: string) {
       const res = await fetch(`/api/password-resets/${id}/respond`, {
@@ -1340,6 +1367,57 @@ export default function App() {
     totalScanPoints: number;
     validScans: number;
   } | null>(null);
+
+  // ==========================================
+  // STATE KHUSUS AKTIVITAS SCAN & TELEMETRI
+  // ==========================================
+  const [scanPoints, setScanPoints] = useState<any[]>([]);
+  const [scanStats, setScanStats] = useState<{
+    totalLocations: number;
+    totalScans: number;
+    todayScans: number;
+    valid: number;
+    repeated: number;
+    suspicious: number;
+  } | null>(null);
+  const [isScanLoading, setIsScanLoading] = useState(false);
+  const [scanSearch, setScanSearch] = useState('');
+  const [scanStatusFilter, setScanStatusFilter] = useState('all');
+  const [scanBrandFilter, setScanBrandFilter] = useState('all');
+  const [scanSortBy, setScanSortBy] = useState('newest');
+  const [scanPage, setScanPage] = useState(1);
+  const [scanPerPage, setScanPerPage] = useState(10);
+  const [selectedScanDetail, setSelectedScanDetail] = useState<any | null>(null);
+  const [isScanDetailModalOpen, setIsScanDetailModalOpen] = useState(false);
+  const [isScanMapOpen, setIsScanMapOpen] = useState(false);
+
+  const fetchScanData = async () => {
+    try {
+      setIsScanLoading(true);
+      const [ptsRes, stRes] = await Promise.all([
+        fetch('/api/scans/locations'),
+        fetch('/api/scans/stats')
+      ]);
+      if (ptsRes.ok) {
+        const pts = await ptsRes.json();
+        if (Array.isArray(pts)) setScanPoints(pts);
+      }
+      if (stRes.ok) {
+        const st = await stRes.json();
+        setScanStats(st);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil data scan:', err);
+    } finally {
+      setIsScanLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeMenu === 'scan' || activeMenu === 'dashboard') {
+      fetchScanData();
+    }
+  }, [activeMenu]);
 
   // ==========================================
   // STATE KHUSUS SKU / PRODUK MANAGEMENT (CRUD)
@@ -1688,6 +1766,15 @@ export default function App() {
         }
 
         // Tutup modal paling atas terlebih dahulu sesuai hierarki
+        if (isScanDetailModalOpen) {
+          setIsScanDetailModalOpen(false);
+          setSelectedScanDetail(null);
+          return;
+        }
+        if (isScanMapOpen) {
+          setIsScanMapOpen(false);
+          return;
+        }
         if (isAddUserModalOpen) {
           setIsAddUserModalOpen(false);
           return;
@@ -1843,7 +1930,9 @@ export default function App() {
     openDropdownId,
     openBrandDropdownId,
     isMobileMenuOpen,
-    isNotifOpen
+    isNotifOpen,
+    isScanDetailModalOpen,
+    isScanMapOpen
   ]); 
 
   // Membersihkan hoveredTagInfo secara otomatis saat modal detail ditutup atau batch berubah
@@ -1913,20 +2002,46 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Responsiveness: Otomatis minimize sidebar saat lebar layar tablet dan HP (< 1024px)
+  // Responsiveness: Otomatis minimize saat layar mengecil (< 1200px) dan otomatis muncul saat layar melebar (>= 1200px)
   useEffect(() => {
+    const BREAKPOINT = 1200;
+    let prevWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
+
     const handleResize = () => {
-      if (typeof window !== 'undefined') {
-        if (window.innerWidth < 1024) {
-          setIsSidebarMinimized(true);
-        }
-        if (window.innerWidth >= 768) {
-          setIsMobileMenuOpen(false);
-        }
+      if (typeof window === 'undefined') return;
+      const currentWidth = window.innerWidth;
+
+      // Layar mengecil melewati ambang batas -> otomatis minimize
+      if (currentWidth < BREAKPOINT && prevWidth >= BREAKPOINT) {
+        setIsSidebarMinimized(true);
       }
+      // Layar melebar melewati ambang batas -> otomatis munculkan sidebar (expand)
+      else if (currentWidth >= BREAKPOINT && prevWidth < BREAKPOINT) {
+        setIsSidebarMinimized(false);
+      }
+
+      // Jika layar mengecil lebih jauh di bawah breakpoint, pastikan tetap minimize
+      if (currentWidth < prevWidth && currentWidth < BREAKPOINT) {
+        setIsSidebarMinimized(prev => (prev ? prev : true));
+      }
+      // Jika layar melebar lebih jauh pada atau di atas breakpoint, pastikan muncul
+      else if (currentWidth > prevWidth && currentWidth >= BREAKPOINT) {
+        setIsSidebarMinimized(prev => (!prev ? prev : false));
+      }
+
+      // Tutup drawer menu mobile jika ukuran layar melebar ke tampilan tablet/desktop (>= 768px)
+      if (currentWidth >= 768) {
+        setIsMobileMenuOpen(false);
+      }
+
+      prevWidth = currentWidth;
     };
 
-    handleResize();
+    // Sinkronisasi inisial
+    if (typeof window !== 'undefined') {
+      setIsSidebarMinimized(window.innerWidth < BREAKPOINT);
+    }
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -3458,7 +3573,7 @@ export default function App() {
         setNotifCounts(data.counts || { all: 0, scan: 0, edit: 0, reset: 0 });
       }
     } catch (err) {
-      console.error('Gagal memuat notifikasi:', err);
+      console.warn('Pemberitahuan sementara tidak dapat disinkronkan:', err);
     } finally {
       setIsNotifLoading(false);
     }
@@ -4188,7 +4303,7 @@ export default function App() {
 
             {/* CARD 2: TOTAL SCAN AKTIVITAS */}
             <div 
-              onClick={() => setActiveMenu('scans')}
+              onClick={() => setActiveMenu('scan')}
               className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/60 dark:hover:border-emerald-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
             >
               <div className="flex items-center justify-between mb-3">
@@ -4213,7 +4328,7 @@ export default function App() {
 
             {/* CARD 3: BRAND & PORTOFOLIO */}
             <div 
-              onClick={() => setActiveMenu('brands')}
+              onClick={() => setActiveMenu('brand')}
               className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/60 dark:hover:border-indigo-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
             >
               <div className="flex items-center justify-between mb-3">
@@ -4236,7 +4351,7 @@ export default function App() {
 
             {/* CARD 4: SEBARAN WILAYAH SCAN (LEAFLET + OSM) */}
             <div 
-              onClick={() => setActiveMenu('scans')}
+              onClick={() => setActiveMenu('scan')}
               className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-amber-500/60 dark:hover:border-amber-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
             >
               <div className="flex items-center justify-between mb-3">
@@ -5292,6 +5407,696 @@ export default function App() {
     );
   };
 
+  // ==========================================
+  // RENDER HALAMAN AKTIVITAS SCAN (TELEMETRI & AUDIT)
+  // ==========================================
+  const renderScanContent = () => {
+    // Dropdown opsi Brand dari scanPoints & master brands
+    const scanBrandOptions = [
+      { value: 'all', label: 'Semua Brand' },
+      ...Array.from(
+        new Set([
+          ...scanPoints.map((p) => p.brand).filter(Boolean),
+          ...brands.map((b) => b.name).filter(Boolean)
+        ])
+      )
+        .sort()
+        .map((b) => ({ value: b, label: b }))
+    ];
+
+    // Filter dan sort log scan telemetri
+    const q = scanSearch.trim().toLowerCase();
+    const filteredPoints = scanPoints.filter((item) => {
+      if (scanStatusFilter !== 'all' && item.status !== scanStatusFilter) return false;
+      if (scanBrandFilter !== 'all' && item.brand?.toLowerCase() !== scanBrandFilter.toLowerCase()) return false;
+      if (q) {
+        const matchCity = item.city?.toLowerCase().includes(q);
+        const matchProv = item.province?.toLowerCase().includes(q);
+        const matchVenue = item.venue?.toLowerCase().includes(q);
+        const matchBrand = item.brand?.toLowerCase().includes(q);
+        const matchProduct = item.productType?.toLowerCase().includes(q);
+        const matchBatch = item.batchId?.toLowerCase().includes(q);
+        const matchTag = item.latestTagId?.toLowerCase().includes(q);
+        const matchDevice = item.deviceInfo?.toLowerCase().includes(q);
+        const matchAnomaly = item.anomalyReason?.toLowerCase().includes(q);
+        if (!matchCity && !matchProv && !matchVenue && !matchBrand && !matchProduct && !matchBatch && !matchTag && !matchDevice && !matchAnomaly) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // Helper cerdas parsing waktu pemindaian (relatif "x menit lalu" & absolut) agar urutan terbaru presisi
+    const parseScanTimeScore = (item: any): number => {
+      const str = String(item.latestTime || '').trim().toLowerCase();
+      const now = Date.now();
+
+      if (!str || str.includes('baru saja') || str.includes('just now')) {
+        return now;
+      }
+
+      // Format relatif: "X menit yang lalu" / "X mnt lalu"
+      const mMatch = str.match(/(\d+)\s*(?:menit|mnt|m)\s*(?:yang\s*)?lalu/);
+      if (mMatch) {
+        return now - parseInt(mMatch[1], 10) * 60 * 1000;
+      }
+
+      // Format relatif: "X jam yang lalu" / "X j lalu"
+      const hMatch = str.match(/(\d+)\s*(?:jam|j)\s*(?:yang\s*)?lalu/);
+      if (hMatch) {
+        return now - parseInt(hMatch[1], 10) * 3600 * 1000;
+      }
+
+      // Format relatif: "X hari yang lalu" / "X d lalu"
+      const dMatch = str.match(/(\d+)\s*(?:hari|d)\s*(?:yang\s*)?lalu/);
+      if (dMatch) {
+        return now - parseInt(dMatch[1], 10) * 86400 * 1000;
+      }
+
+      // Format tanggal ISO atau database createdAt
+      if (item.createdAt) {
+        const cd = new Date(item.createdAt).getTime();
+        if (!isNaN(cd)) return cd;
+      }
+      const dt = new Date(str).getTime();
+      if (!isNaN(dt)) return dt;
+
+      return 0;
+    };
+
+    // Helper cerdas format tanggal dan jam scan terbaru (wajib tanggal dan jam)
+    const getScanDateTimeDisplay = (item: any) => {
+      const score = parseScanTimeScore(item);
+      const d = new Date(score > 0 ? score : Date.now());
+
+      const dateStr = d.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${minutes} WIB`;
+
+      const rawTime = String(item.latestTime || '').trim();
+      let relativeStr = rawTime;
+      if (!rawTime || rawTime.includes('-') || rawTime.includes('/')) {
+        const diffMins = Math.max(1, Math.floor((Date.now() - d.getTime()) / 60000));
+        if (diffMins < 60) relativeStr = `${diffMins} menit yang lalu`;
+        else if (diffMins < 1440) relativeStr = `${Math.floor(diffMins / 60)} jam yang lalu`;
+        else relativeStr = `${Math.floor(diffMins / 1440)} hari yang lalu`;
+      }
+
+      return { dateStr, timeStr, relativeStr };
+    };
+
+    const sortedPoints = [...filteredPoints].sort((a, b) => {
+      if (scanSortBy === 'most-scans') {
+        return (b.totalScans || 0) - (a.totalScans || 0);
+      }
+      if (scanSortBy === 'today-scans') {
+        return (b.todayScans || 0) - (a.todayScans || 0);
+      }
+      if (scanSortBy === 'city-asc') {
+        return (a.city || '').localeCompare(b.city || '');
+      }
+      // default 'newest': wajib urut berdasarkan pemindaian terbaru ke terlama
+      return parseScanTimeScore(b) - parseScanTimeScore(a);
+    });
+
+    const totalPages = Math.ceil(sortedPoints.length / scanPerPage) || 1;
+    const paginatedPoints = sortedPoints.slice((scanPage - 1) * scanPerPage, scanPage * scanPerPage);
+
+    return (
+      <div 
+        className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300"
+        onScroll={() => {
+          if (openDropdownId) setOpenDropdownId(null);
+        }}
+      >
+        <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
+          {/* TOP STATUS BAR AKTIVITAS SCAN */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+                <Scan size={16} />
+              </div>
+              <div>
+                <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                  Log Pemantauan Aktivitas Scan
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  fetchScanData();
+                  triggerAlert('Diperbarui', 'Data telemetri pemindaian berhasil disinkronkan', 'success');
+                }}
+                disabled={isScanLoading}
+                className="w-full sm:w-auto px-4 py-2 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-750 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={isScanLoading ? 'animate-spin text-[#c28e62]' : 'text-slate-500'} />
+                <span>{isScanLoading ? 'Menyinkronkan...' : 'Segarkan Data'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsScanMapOpen(!isScanMapOpen)}
+                className={`w-full sm:w-auto px-4 py-2 rounded-full text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs ${
+                  isScanMapOpen
+                    ? 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-200 dark:hover:bg-zinc-750'
+                    : 'bg-[#c28e62] hover:bg-[#b07d53] text-white'
+                }`}
+              >
+                <MapPin size={13} />
+                <span>{isScanMapOpen ? 'Tutup Maps' : 'Buka Maps'}</span>
+                {isScanMapOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+            </div>
+          </div>
+
+          {/* ACCORDION PETA PERSEBARAN SCAN LIVE */}
+          {isScanMapOpen && (
+            <div className="overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-top-3">
+              <ScanLocationMap
+                points={scanPoints}
+                isLoading={isScanLoading}
+                onRefresh={() => {
+                  fetchScanData();
+                  triggerAlert('Diperbarui', 'Data telemetri pemindaian berhasil disinkronkan', 'success');
+                }}
+                onClose={() => setIsScanMapOpen(false)}
+              />
+            </div>
+          )}
+
+          {/* TABEL AKTIVITAS SCAN (KONSISTEN DENGAN TABEL LAIN) */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-xs">
+            {/* Filter & Pencarian Bar (Konsisten & Minimalis tanpa judul redundant) */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+                <input
+                  type="text"
+                  value={scanSearch}
+                  onChange={(e) => {
+                    setScanSearch(e.target.value);
+                    setScanPage(1);
+                  }}
+                  placeholder="Cari kota, venue, brand, produk, batch ID, atau serial tag..."
+                  className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-9 pr-9 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+                />
+                {scanSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScanSearch('');
+                      setScanPage(1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Controls Filter & Pengurutan */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Status Filter */}
+                <div className="w-full sm:w-auto min-w-[140px] sm:min-w-[160px]">
+                  <CustomSelect
+                    value={scanStatusFilter}
+                    onChange={(val) => {
+                      setScanStatusFilter(val);
+                      setScanPage(1);
+                    }}
+                    placeholder="Semua Status"
+                    searchable={false}
+                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                    options={[
+                      { value: 'all', label: 'Semua Status' },
+                      { value: 'valid', label: 'Valid' },
+                      { value: 'repeated', label: 'Peringatan' },
+                      { value: 'suspicious', label: 'Berbahaya' },
+                    ]}
+                  />
+                </div>
+
+                {/* Brand Filter */}
+                <div className="w-full sm:w-auto min-w-[140px] sm:min-w-[160px]">
+                  <CustomSelect
+                    value={scanBrandFilter}
+                    onChange={(val) => {
+                      setScanBrandFilter(val);
+                      setScanPage(1);
+                    }}
+                    placeholder="Semua Brand"
+                    searchable={true}
+                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                    options={scanBrandOptions}
+                  />
+                </div>
+
+                {/* Sort Filter */}
+                <div className="w-full sm:w-auto min-w-[140px] sm:min-w-[160px]">
+                  <CustomSelect
+                    value={scanSortBy}
+                    onChange={(val) => {
+                      setScanSortBy(val);
+                      setScanPage(1);
+                    }}
+                    placeholder="Urutkan"
+                    searchable={false}
+                    buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
+                    options={[
+                      { value: 'newest', label: 'Terbaru' },
+                      { value: 'most-scans', label: 'Scan Terbanyak' },
+                      { value: 'today-scans', label: 'Hari Ini Terbanyak' },
+                      { value: 'city-asc', label: 'Kota (A - Z)' },
+                    ]}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Reset filter button if active (seperti di brand & sku) */}
+            {(scanSearch || scanStatusFilter !== 'all' || scanBrandFilter !== 'all' || scanSortBy !== 'newest') && (
+              <div className="px-5 py-2.5 bg-slate-50/60 dark:bg-zinc-800/40 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-zinc-400">
+                  Menampilkan hasil filter: <strong className="text-slate-800 dark:text-zinc-200">{sortedPoints.length}</strong> peristiwa
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScanSearch('');
+                    setScanStatusFilter('all');
+                    setScanBrandFilter('all');
+                    setScanSortBy('newest');
+                    setScanPage(1);
+                  }}
+                  className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+                >
+                  Reset Filter
+                </button>
+              </div>
+            )}
+
+            {/* Table Content */}
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[700px]">
+                <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
+                  <tr>
+                    <th className="px-5 py-3.5 whitespace-nowrap">Waktu Scan</th>
+                    <th className="px-5 py-3.5 whitespace-nowrap">Serial Tag</th>
+                    <th className="px-5 py-3.5">Produk &amp; Brand</th>
+                    <th className="px-5 py-3.5">Lokasi Pemindaian</th>
+                    <th className="px-5 py-3.5 text-center whitespace-nowrap">Status Keamanan</th>
+                    <th className="px-5 py-3.5 text-right whitespace-nowrap">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 text-slate-700 dark:text-zinc-300">
+                  {paginatedPoints.length > 0 ? (
+                    paginatedPoints.map((item) => {
+                      const isSuspicious = item.status === 'suspicious';
+                      const isRepeated = item.status === 'repeated';
+                      const timeInfo = getScanDateTimeDisplay(item);
+                      return (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/60 transition-colors"
+                        >
+                          {/* 1. Waktu Scan (2 Baris: Tanggal di baris 1, Jam • Waktu relatif di baris 2) */}
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="flex items-start gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 dark:bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center shrink-0 mt-0.5">
+                                <Clock size={13} />
+                              </div>
+                              <div className="leading-snug">
+                                {/* Baris 1: Tanggal */}
+                                <div className="font-semibold text-slate-800 dark:text-zinc-200 text-xs">
+                                  {timeInfo.dateStr}
+                                </div>
+                                {/* Baris 2: Jam • Berapa menit yang lalu */}
+                                <div className="flex items-center gap-1.5 mt-0.5 text-xs">
+                                  <span className="font-mono font-bold text-slate-900 dark:text-zinc-100">{timeInfo.timeStr}</span>
+                                  <span className="text-slate-300 dark:text-zinc-600 font-bold">•</span>
+                                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-normal">{timeInfo.relativeStr}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 2. Serial Tag */}
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className="font-mono text-xs font-bold text-[#c28e62] bg-[#c28e62]/10 dark:bg-[#c28e62]/15 px-2.5 py-1 rounded-lg border border-[#c28e62]/20 tracking-wide inline-block">
+                              {item.latestTagId || '-'}
+                            </span>
+                          </td>
+
+                          {/* 3. Produk & Brand */}
+                          <td className="px-5 py-3.5">
+                            <div className="font-semibold text-slate-900 dark:text-zinc-100 leading-tight">
+                              {item.productType}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="text-[11px] font-bold text-[#c28e62] uppercase tracking-wider">
+                                {item.brand}
+                              </span>
+                              {item.batchId && (
+                                <>
+                                  <span className="text-slate-300 dark:text-zinc-600">•</span>
+                                  <span className="font-mono text-[10px] text-slate-400 dark:text-zinc-500">
+                                    {item.batchId}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 4. Lokasi Pemindaian */}
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-zinc-100">
+                              <MapPin size={13} className="text-[#c28e62] shrink-0" />
+                              <span>{item.city}</span>
+                            </div>
+                            {item.venue && (
+                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate max-w-[280px]">
+                                {item.venue}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* 5. Status Keamanan (1 kata: Valid, Peringatan, Berbahaya + Tooltip Penjelasan) */}
+                          <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                            {isSuspicious ? (
+                              <span
+                                data-tooltip="Berbahaya: Terdeteksi anomali pemindaian lebih dari 3x"
+                                data-tooltip-pos="top"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40 cursor-help"
+                              >
+                                <AlertTriangle size={12} className="shrink-0 text-rose-500" />
+                                Berbahaya
+                              </span>
+                            ) : isRepeated ? (
+                              <span
+                                data-tooltip="Peringatan: Pemindaian berulang sebanyak 2-3 kali"
+                                data-tooltip-pos="top"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40 cursor-help"
+                              >
+                                <RotateCcw size={12} className="shrink-0 text-amber-500" />
+                                Peringatan
+                              </span>
+                            ) : (
+                              <span
+                                data-tooltip="Valid: Otentikasi normal dan pemindaian sah pertama kali"
+                                data-tooltip-pos="top"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 cursor-help"
+                              >
+                                <CheckCircle2 size={12} className="shrink-0 text-emerald-500" />
+                                Valid
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 6. Aksi */}
+                          <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedScanDetail(item);
+                                setIsScanDetailModalOpen(true);
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-[#c28e62] hover:text-[#c28e62] font-semibold text-xs cursor-pointer shadow-xs transition-colors"
+                            >
+                              Detail
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-12 text-center text-slate-400 dark:text-zinc-500">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Scan size={28} className="text-slate-300 dark:text-zinc-600" />
+                          <p className="font-semibold text-slate-700 dark:text-zinc-300">
+                            Tidak ada log telemetri yang sesuai
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Coba ubah kata kunci pencarian atau sesuaikan filter status dan brand.
+                          </p>
+                          {(scanSearch || scanStatusFilter !== 'all' || scanBrandFilter !== 'all') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScanSearch('');
+                                setScanStatusFilter('all');
+                                setScanBrandFilter('all');
+                                setScanPage(1);
+                              }}
+                              className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                            >
+                              Reset Semua Filter
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <TablePagination
+              currentPage={scanPage}
+              totalPages={totalPages}
+              totalItems={sortedPoints.length}
+              itemsPerPage={scanPerPage}
+              onPageChange={setScanPage}
+              onItemsPerPageChange={(val) => {
+                setScanPerPage(val);
+                setScanPage(1);
+              }}
+              itemName="peristiwa scan"
+            />
+          </div>
+        </div>
+
+        {/* MODAL DETAIL TELEMETRI PEMINDAIAN */}
+        {isScanDetailModalOpen && selectedScanDetail && createPortal(
+          <div 
+            onClick={(e) => { 
+              if (e.target === e.currentTarget) { 
+                setIsScanDetailModalOpen(false); 
+                setSelectedScanDetail(null); 
+              } 
+            }} 
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          >
+            <div 
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
+                    <Scan size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-zinc-100">
+                      Detail Telemetri Pemindaian
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono">
+                      Tag ID: <span className="text-[#c28e62] font-semibold">{selectedScanDetail.latestTagId || '-'}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setIsScanDetailModalOpen(false); setSelectedScanDetail(null); }}
+                  data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom"
+                  className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-4 text-xs">
+                {/* Alert jika anomali */}
+                {selectedScanDetail.status === 'suspicious' && (
+                  <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl flex items-start gap-3 text-rose-700 dark:text-rose-300">
+                    <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-500" />
+                    <div>
+                      <div className="font-bold text-xs uppercase tracking-wider">Peringatan Anomali Keamanan</div>
+                      <p className="text-xs mt-0.5 leading-relaxed">
+                        {selectedScanDetail.anomalyReason || 'Terdeteksi pemindaian multi-IP dalam interval waktu sangat singkat di luar perimeter logistik.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Ringkasan */}
+                {(() => {
+                  const modalTimeInfo = selectedScanDetail ? getScanDateTimeDisplay(selectedScanDetail) : null;
+                  return (
+                    <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-zinc-400">Status Verifikasi</span>
+                        <div>
+                          {selectedScanDetail.status === 'suspicious' ? (
+                            <span
+                              data-tooltip="Berbahaya: Terdeteksi anomali pemindaian lebih dari 3x"
+                              data-tooltip-pos="top"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 cursor-help"
+                            >
+                              <AlertTriangle size={12} /> Berbahaya
+                            </span>
+                          ) : selectedScanDetail.status === 'repeated' ? (
+                            <span
+                              data-tooltip="Peringatan: Pemindaian berulang sebanyak 2-3 kali"
+                              data-tooltip-pos="top"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 cursor-help"
+                            >
+                              <RotateCcw size={12} /> Peringatan
+                            </span>
+                          ) : (
+                            <span
+                              data-tooltip="Valid: Otentikasi normal dan pemindaian sah pertama kali"
+                              data-tooltip-pos="top"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 cursor-help"
+                            >
+                              <CheckCircle2 size={12} /> Valid
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-zinc-400">Waktu Terakhir</span>
+                        <div className="text-right">
+                          <span className="font-bold text-slate-800 dark:text-zinc-100">
+                            {modalTimeInfo ? `${modalTimeInfo.dateStr} • ${modalTimeInfo.timeStr}` : '-'}
+                          </span>
+                          {modalTimeInfo?.relativeStr && (
+                            <div className="text-[11px] text-slate-500 dark:text-zinc-400">
+                              {modalTimeInfo.relativeStr}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-zinc-400">Total Akumulasi Pemindaian</span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">
+                          {selectedScanDetail.totalScans} kali ({selectedScanDetail.todayScans} hari ini)
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Lokasi & Geografis */}
+                <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80 space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[11px] mb-1">
+                    <MapPin size={14} className="text-[#c28e62]" />
+                    <span>Koordinat &amp; Lokasi Pemindaian</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-zinc-400">Kota / Provinsi</span>
+                    <span className="font-semibold text-slate-800 dark:text-zinc-200 text-right">
+                      {selectedScanDetail.city}, {selectedScanDetail.province}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-zinc-400">Venue / Lokasi</span>
+                    <span className="font-semibold text-slate-800 dark:text-zinc-200 text-right">
+                      {selectedScanDetail.venue || 'Lokasi Terdaftar'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-zinc-400">Geolokasi GPS</span>
+                    <span className="font-mono text-slate-700 dark:text-zinc-300">
+                      {selectedScanDetail.lat.toFixed(5)}, {selectedScanDetail.lng.toFixed(5)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Produk & Batch */}
+                <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80 space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[11px] mb-1">
+                    <Box size={14} className="text-[#c28e62]" />
+                    <span>Produk &amp; Batch Terkait</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-zinc-400">Brand</span>
+                    <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                      {selectedScanDetail.brand}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-zinc-400">Produk</span>
+                    <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                      {selectedScanDetail.productType}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-zinc-400">Batch ID</span>
+                    <span className="font-mono font-bold text-[#c28e62]">
+                      {selectedScanDetail.batchId}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-zinc-400">Device</span>
+                    <span className="text-slate-700 dark:text-zinc-300">
+                      {selectedScanDetail.deviceInfo}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const timeDisp = getScanDateTimeDisplay(selectedScanDetail);
+                    const txt = `[TELEMETRI SUMAS]\nTag ID: ${selectedScanDetail.latestTagId}\nWaktu Scan: ${timeDisp.dateStr} • ${timeDisp.timeStr}\nLokasi: ${selectedScanDetail.city}, ${selectedScanDetail.province}\nKoordinat: ${selectedScanDetail.lat}, ${selectedScanDetail.lng}\nBrand: ${selectedScanDetail.brand}\nBatch: ${selectedScanDetail.batchId}\nStatus: ${selectedScanDetail.status}`;
+                    navigator.clipboard?.writeText(txt);
+                    triggerAlert('Disalin', 'Log telemetri berhasil disalin ke clipboard', 'success');
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  Salin Telemetri
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsScanDetailModalOpen(false);
+                      setSelectedScanDetail(null);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+      </div>
+    );
+  };
+
   const availableCount = tagsAvailableCount || (activeBatch?.availableCount ?? currentTags.filter((t: any) => t.status === 'Tersedia').length);
   const usedCount = tagsUsedCount || (activeBatch?.usedCount ?? currentTags.filter((t: any) => t.status === 'Telah Digunakan').length);
 
@@ -5777,6 +6582,8 @@ export default function App() {
           renderSkuContent()
         ) : activeMenu === 'users' ? (
           renderUsersContent()
+        ) : activeMenu === 'scan' ? (
+          renderScanContent()
         ) : (
           /* KONTEN KOSONG (PLACEHOLDER) UNTUK MENU LAIN */
           <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300">
@@ -6818,14 +7625,17 @@ export default function App() {
               {/* STATS BREADCRUMB / SUMMARY */}
               {(() => {
                 return (
-                  <div className="bg-slate-50 dark:bg-zinc-800 p-3 sm:p-3.5 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 grid grid-cols-2 sm:grid-cols-5 gap-3 flex-shrink-0 text-xs sm:text-sm">
-                    <div>
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Batch ID</span>
-                      <span className="font-bold text-slate-800 dark:text-zinc-100 truncate block font-mono">{activeBatch?.batchId}</span>
+                  <div className="bg-slate-50 dark:bg-zinc-800 p-3 sm:p-3.5 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-4 lg:gap-6 flex-shrink-0 text-xs sm:text-sm">
+                    {/* BATCH ID */}
+                    <div className="shrink-0 min-w-[130px]">
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Batch ID</span>
+                      <span className="font-bold text-slate-800 dark:text-zinc-100 block font-mono mt-0.5">{activeBatch?.batchId}</span>
                     </div>
-                    <div>
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Brand &amp; SKU</span>
-                      <div className="truncate flex items-center gap-1 mt-0.5">
+
+                    {/* BRAND & SKU (MENDAPATKAN RUANG LEBAR AGAR TIDAK TERPOTONG) */}
+                    <div className="flex-1 min-w-[200px] max-w-full">
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Brand &amp; SKU</span>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap sm:flex-nowrap">
                         <button
                           type="button"
                           onClick={() => {
@@ -6835,11 +7645,11 @@ export default function App() {
                               handleOpenDetailBrand(foundBrand);
                             }
                           }}
-                          className="font-bold text-[#c28e62] hover:underline cursor-pointer truncate text-left"
+                          className="font-bold text-[#c28e62] hover:underline cursor-pointer shrink-0 text-left whitespace-nowrap"
                         >
                           {activeBatch?.brand}
                         </button>
-                        <span className="text-slate-400 text-xs">•</span>
+                        <span className="text-slate-300 dark:text-zinc-600 font-bold shrink-0">•</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -6849,23 +7659,30 @@ export default function App() {
                               handleOpenDetailSku(foundSku);
                             }
                           }}
-                          className="font-medium text-slate-700 dark:text-zinc-300 hover:text-[#c28e62] hover:underline cursor-pointer truncate text-left"
+                          className="font-medium text-slate-700 dark:text-zinc-300 hover:text-[#c28e62] hover:underline cursor-pointer text-left truncate"
+                          title={activeBatch?.sku}
                         >
                           {activeBatch?.sku}
                         </button>
                       </div>
                     </div>
-                    <div>
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Total Tag</span>
-                      <span className="font-bold text-slate-800 dark:text-zinc-100">{activeBatch?.qty} Tag</span>
+
+                    {/* TOTAL TAG */}
+                    <div className="shrink-0 whitespace-nowrap">
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Total Tag</span>
+                      <span className="font-bold text-slate-800 dark:text-zinc-100 mt-0.5 block">{activeBatch?.qty} Tag</span>
                     </div>
-                    <div>
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Tersedia (Sisa)</span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400">{availableCount} Tag</span>
+
+                    {/* TERSEDIA (SISA) */}
+                    <div className="shrink-0 whitespace-nowrap">
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Tersedia (Sisa)</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{availableCount} Tag</span>
                     </div>
-                    <div>
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold">Telah Teralokasi</span>
-                      <span className="font-bold text-[#c28e62]">{usedCount} Tag ({activeBatchProjects.length} Proyek)</span>
+
+                    {/* TELAH TERALOKASI */}
+                    <div className="shrink-0 whitespace-nowrap">
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Telah Teralokasi</span>
+                      <span className="font-bold text-[#c28e62] mt-0.5 block">{usedCount} Tag ({activeBatchProjects.length} Proyek)</span>
                     </div>
                   </div>
                 );
@@ -9141,7 +9958,7 @@ export default function App() {
 
                     <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
                       <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                        <Layers size={14} className="text-indigo-500" />
+                        <QrCode size={14} className="text-indigo-500" />
                         <span>Batch Produksi</span>
                       </div>
                       <div className="text-lg font-bold text-slate-800 dark:text-zinc-100">
@@ -9855,11 +10672,11 @@ export default function App() {
                     
                     {/* BAGIAN ATAS: 2 KOLOM (KIRI GAMBAR 1:1, KANAN INFORMASI UTAMA & 3 KARTU RINGKASAN) */}
                     <div className="p-6">
-                      <div className="flex flex-col sm:flex-row gap-6 items-start">
+                      <div className="flex flex-col sm:flex-row gap-6 sm:items-stretch">
                         
-                        {/* KOLOM KIRI: GAMBAR 1:1 DENGAN SKU CODE */}
-                        <div className="w-full sm:w-56 shrink-0 flex flex-col items-center sm:items-start gap-2.5">
-                          <div className="w-full max-w-[220px] sm:max-w-none aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 flex items-center justify-center shadow-xs">
+                        {/* KOLOM KIRI: GAMBAR 1:1 PRODUK */}
+                        <div className="w-full sm:w-44 md:w-48 shrink-0 flex items-center justify-center sm:justify-start sm:self-stretch">
+                          <div className="w-full max-w-[200px] sm:max-w-none h-full min-h-[160px] aspect-square sm:aspect-auto rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 flex items-center justify-center shadow-xs">
                             {prod.image ? (
                               <img 
                                 src={prod.image} 
@@ -9873,15 +10690,10 @@ export default function App() {
                               </div>
                             )}
                           </div>
-                          
-                          {/* SKU CODE (CLEAN, TANPA BADGE B2B) */}
-                          <div className="w-full max-w-[220px] sm:max-w-none text-center px-3 py-1.5 bg-slate-50 dark:bg-zinc-800/70 rounded-xl border border-slate-200/80 dark:border-zinc-700/70 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
-                            {prod.skuCode || `SKU-${prod.id.toUpperCase()}`}
-                          </div>
                         </div>
 
-                        {/* KOLOM KANAN: KATEGORI, NAMA PRODUK, DAN 3 KARTU RINGKAS CEPAT */}
-                        <div className="flex-1 min-w-0 w-full space-y-4">
+                        {/* KOLOM KANAN: KATEGORI, NAMA PRODUK, SKU CODE, DAN 3 KARTU RINGKAS CEPAT */}
+                        <div className="flex-1 min-w-0 w-full flex flex-col justify-between gap-3 sm:gap-3.5">
                           <div>
                             {/* TEKS KATEGORI PRODUK SAJA TANPA ICON & TANPA BADGE */}
                             {categoryParts.length > 0 && (
@@ -9892,10 +10704,17 @@ export default function App() {
                             <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight leading-snug">
                               {prod.sku}
                             </h2>
+
+                            {/* SKU BADGE (HAPUS KATA 'ID', SEHINGGA MENJADI: SKU • KODE) */}
+                            <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-zinc-800/70 rounded-xl border border-slate-200/80 dark:border-zinc-700/70 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
+                              <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">SKU</span>
+                              <span className="text-slate-300 dark:text-zinc-600 font-sans">•</span>
+                              <span>{prod.skuCode || `SKU-${prod.id.toUpperCase()}`}</span>
+                            </div>
                           </div>
 
-                          {/* 3 KARTU RINGKASAN DATA RELASIONAL (BRAND, PENGGUNA, BATCH) */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          {/* 3 KARTU RINGKASAN DATA RELASIONAL (MODEL KONSISTEN DENGAN DETAIL BRAND) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             {/* KARTU 1: BRAND */}
                             <div 
                               onClick={() => {
@@ -9906,21 +10725,25 @@ export default function App() {
                                   handleOpenDetailBrand(brand);
                                 }
                               }}
-                              className={`p-3 rounded-2xl border transition-all ${brand ? 'bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200/80 dark:border-zinc-700/80 hover:border-[#c28e62]/50 hover:bg-[#c28e62]/5 cursor-pointer group' : 'bg-slate-50 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700/80'}`}
+                              className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                                brand 
+                                  ? 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200/80 dark:border-zinc-800 hover:border-[#c28e62]/50 hover:bg-[#c28e62]/5 cursor-pointer group' 
+                                  : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200/80 dark:border-zinc-800'
+                              }`}
                             >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Brand</span>
-                                <Building2 size={14} className="text-slate-400 group-hover:text-[#c28e62] transition-colors" />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-slate-900 dark:text-zinc-100 group-hover:text-[#c28e62] transition-colors truncate">
-                                  {prod.brandName}
-                                </span>
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500">
+                                  <Building2 size={14} className="text-[#c28e62] shrink-0" />
+                                  <span>Brand</span>
+                                </div>
                                 {brand && (
-                                  <span className="text-[11px] font-semibold text-[#c28e62] shrink-0 ml-1">
+                                  <span className="text-[11px] font-semibold text-[#c28e62] group-hover:underline">
                                     Detail →
                                   </span>
                                 )}
+                              </div>
+                              <div className="font-bold text-slate-800 dark:text-zinc-100 group-hover:text-[#c28e62] transition-colors truncate">
+                                {prod.brandName}
                               </div>
                               <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
                                 Status: <span className="text-emerald-600 dark:text-emerald-400 font-medium">{brand?.status || 'Aktif'}</span>
@@ -9937,21 +10760,25 @@ export default function App() {
                                   handleOpenDetailUser(targetUser);
                                 }
                               }}
-                              className={`p-3 rounded-2xl border transition-all ${targetUser ? 'bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200/80 dark:border-zinc-700/80 hover:border-[#c28e62]/50 hover:bg-[#c28e62]/5 cursor-pointer group' : 'bg-slate-50 dark:bg-zinc-800/40 border-slate-200 dark:border-zinc-700/80'}`}
+                              className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                                targetUser 
+                                  ? 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200/80 dark:border-zinc-800 hover:border-[#c28e62]/50 hover:bg-[#c28e62]/5 cursor-pointer group' 
+                                  : 'bg-slate-50 dark:bg-zinc-800/60 border-slate-200/80 dark:border-zinc-800'
+                              }`}
                             >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">PIC Pengguna</span>
-                                <UserCheck size={14} className="text-slate-400 group-hover:text-[#c28e62] transition-colors" />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-slate-900 dark:text-zinc-100 group-hover:text-[#c28e62] transition-colors truncate">
-                                  {targetUser?.name || brand?.ownerName || '-'}
-                                </span>
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500">
+                                  <UserCheck size={14} className="text-indigo-500 shrink-0" />
+                                  <span>PIC Pengguna</span>
+                                </div>
                                 {targetUser && (
-                                  <span className="text-[11px] font-semibold text-[#c28e62] shrink-0 ml-1">
+                                  <span className="text-[11px] font-semibold text-[#c28e62] group-hover:underline">
                                     Detail →
                                   </span>
                                 )}
+                              </div>
+                              <div className="font-bold text-slate-800 dark:text-zinc-100 group-hover:text-[#c28e62] transition-colors truncate">
+                                {targetUser?.name || brand?.ownerName || '-'}
                               </div>
                               <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">
                                 {targetUser?.role || 'Admin'} • <span className="text-emerald-600 dark:text-emerald-400 font-medium">{targetUser?.status || 'Aktif'}</span>
@@ -9959,18 +10786,22 @@ export default function App() {
                             </div>
 
                             {/* KARTU 3: BATCH PRODUKSI */}
-                            <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-700/80">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">Batch Produksi</span>
-                                <Layers size={14} className="text-slate-400" />
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-slate-900 dark:text-zinc-100">
-                                  {batchesList.length} Batch
-                                </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${activeBatchesCount > 0 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40' : 'bg-slate-100 text-slate-500'}`}>
+                            <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between">
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500">
+                                  <QrCode size={14} className="text-emerald-500 shrink-0" />
+                                  <span>Batch Produksi</span>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  activeBatchesCount > 0 
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40' 
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}>
                                   {activeBatchesCount} Aktif
                                 </span>
+                              </div>
+                              <div className="font-bold text-slate-800 dark:text-zinc-100">
+                                {batchesList.length} Batch
                               </div>
                               <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
                                 {suspendedBatchesCount > 0 ? `${suspendedBatchesCount} Disuspend` : 'Semua Beroperasi Normal'}
@@ -10005,17 +10836,11 @@ export default function App() {
 
                             <div className="divide-y divide-slate-100 dark:divide-zinc-800 text-xs">
                               {specs.map((item, idx) => (
-                                <div key={idx} className="flex justify-between py-1.5 first:pt-0">
+                                <div key={idx} className="flex justify-between py-1.5 first:pt-0 last:pb-0">
                                   <span className="text-slate-500 dark:text-zinc-400">{item.key}</span>
                                   <span className="font-semibold text-slate-800 dark:text-zinc-200 text-right">{item.value}</span>
                                 </div>
                               ))}
-                              <div className="flex justify-between py-1.5 last:pb-0">
-                                <span className="text-slate-500 dark:text-zinc-400">Tanggal Registrasi</span>
-                                <span className="font-medium text-slate-600 dark:text-zinc-300">
-                                  {prod.createdAt ? formatDateTimeDisplay(prod.createdAt) : 'Katalog Master'}
-                                </span>
-                              </div>
                             </div>
                           </div>
 
@@ -10038,7 +10863,7 @@ export default function App() {
                           <div className="bg-slate-50/70 dark:bg-zinc-800/40 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80">
                             <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200/60 dark:border-zinc-700/60">
                               <div className="flex items-center gap-2">
-                                <Layers size={16} className="text-[#c28e62]" />
+                                <QrCode size={16} className="text-[#c28e62]" />
                                 <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider">
                                   Riwayat Batch Terhubung
                                 </h4>
@@ -10118,27 +10943,36 @@ export default function App() {
                   </div>
 
                   {/* MODAL FOOTER */}
-                  <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); setSkuRelationalData(null); }}
-                      className="px-4 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
-                    >
-                      Tutup
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const toEdit = prod;
-                        setIsDetailSkuModalOpen(false);
-                        setSkuToView(null);
-                        setSkuRelationalData(null);
-                        handleOpenEditSku(toEdit);
-                      }}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer"
-                    >
-                      Edit SKU
-                    </button>
+                  <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                      <Clock size={14} className="text-[#c28e62] shrink-0" />
+                      <span>Tanggal Registrasi:</span>
+                      <span className="font-semibold text-slate-800 dark:text-zinc-200">
+                        {prod.createdAt ? formatDateTimeDisplay(prod.createdAt) : 'Katalog Master'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2.5 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); setSkuRelationalData(null); }}
+                        className="px-4 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                      >
+                        Tutup
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const toEdit = prod;
+                          setIsDetailSkuModalOpen(false);
+                          setSkuToView(null);
+                          setSkuRelationalData(null);
+                          handleOpenEditSku(toEdit);
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer"
+                      >
+                        Edit SKU
+                      </button>
+                    </div>
                   </div>
                 </>
               );

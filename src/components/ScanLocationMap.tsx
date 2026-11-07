@@ -5,7 +5,9 @@ import {
   RotateCcw, 
   Radio, 
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  RefreshCw,
+  X
 } from 'lucide-react';
 
 export type ScanSecurityStatus = 'valid' | 'repeated' | 'suspicious';
@@ -29,38 +31,57 @@ export interface ScanPoint {
   deviceInfo: string;
 }
 
-export const ScanLocationMap: React.FC = () => {
+export interface ScanLocationMapProps {
+  points?: ScanPoint[];
+  isLoading?: boolean;
+  onRefresh?: () => void;
+  isModal?: boolean;
+  onClose?: () => void;
+}
+
+export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
+  points: propPoints,
+  isLoading: propLoading,
+  onRefresh,
+  isModal = false,
+  onClose
+}) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [id: string]: L.Marker }>({});
   
-  const [points, setPoints] = useState<ScanPoint[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [localPoints, setLocalPoints] = useState<ScanPoint[]>([]);
+  const [localLoading, setLocalLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<'all' | ScanSecurityStatus>('all');
   const [activePointId, setActivePointId] = useState<string | null>(null);
   const [isLegendOpen, setIsLegendOpen] = useState(true);
 
+  const points = (propPoints && propPoints.length > 0) ? propPoints : localPoints;
+  const isLoading = propLoading !== undefined ? propLoading : localLoading;
+
   // Fetch real scan points from SQLite database
   const fetchPoints = async () => {
     try {
-      setIsLoading(true);
+      setLocalLoading(true);
       const res = await fetch('/api/scans/locations');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setPoints(data);
+          setLocalPoints(data);
         }
       }
     } catch (err) {
       console.error('Gagal mengambil titik scan dari database:', err);
     } finally {
-      setIsLoading(false);
+      setLocalLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPoints();
-  }, []);
+    if (!propPoints || propPoints.length === 0) {
+      fetchPoints();
+    }
+  }, [propPoints]);
 
   // Status metrics counts
   const stats = useMemo(() => {
@@ -87,12 +108,12 @@ export const ScanLocationMap: React.FC = () => {
     }
   };
 
-  // Helper teks status
+  // Helper teks status (1 kata)
   const getStatusLabel = (status: ScanSecurityStatus) => {
     switch (status) {
-      case 'valid': return '✓ Asli (Valid)';
-      case 'repeated': return '↺ Berulang Normal';
-      case 'suspicious': return '⚠️ Curiga Anomali';
+      case 'valid': return '✓ Valid';
+      case 'repeated': return '↺ Peringatan';
+      case 'suspicious': return '⚠️ Berbahaya';
     }
   };
 
@@ -266,7 +287,7 @@ export const ScanLocationMap: React.FC = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 lg:p-7 space-y-4">
+    <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-4 sm:p-5 lg:p-6 space-y-4 shadow-xs">
       {/* MAP HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-zinc-800">
         <div>
@@ -287,13 +308,41 @@ export const ScanLocationMap: React.FC = () => {
 
         {/* CONTROLS & ACTIONS */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+              title="Segarkan Data"
+            >
+              <RefreshCw size={13} className={isLoading ? 'animate-spin text-[#c28e62]' : ''} />
+              <span className="hidden sm:inline">Sinkronkan</span>
+            </button>
+          )}
+
           <button
+            type="button"
             onClick={handleResetView}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
           >
             <RotateCcw size={13} />
             <span>Reset Peta</span>
           </button>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              data-tooltip="Tutup Maps"
+              data-tooltip-shortcut="Esc"
+              data-tooltip-pos="bottom"
+              className="p-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 hover:text-slate-800 dark:hover:text-zinc-100 transition-colors cursor-pointer ml-1"
+              title="Tutup Maps (Esc)"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -302,18 +351,24 @@ export const ScanLocationMap: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-800 rounded-full text-xs font-medium overflow-x-auto max-w-full">
             <button
+              type="button"
               onClick={() => setStatusFilter('all')}
+              data-tooltip="Semua: Tampilkan semua titik lokasi pemindaian"
+              data-tooltip-pos="top"
               className={`px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 statusFilter === 'all'
                   ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 font-bold'
                   : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
               }`}
             >
-              Semua Titik ({stats.total})
+              Semua ({stats.total})
             </button>
 
             <button
+              type="button"
               onClick={() => setStatusFilter('valid')}
+              data-tooltip="Valid: Otentikasi normal dan pemindaian sah pertama kali"
+              data-tooltip-pos="top"
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 statusFilter === 'valid'
                   ? 'bg-emerald-600 text-white font-bold'
@@ -321,11 +376,14 @@ export const ScanLocationMap: React.FC = () => {
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Asli ({stats.valid})</span>
+              <span>Valid ({stats.valid})</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setStatusFilter('repeated')}
+              data-tooltip="Peringatan: Pemindaian berulang 2-3x untuk verifikasi berkala"
+              data-tooltip-pos="top"
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 statusFilter === 'repeated'
                   ? 'bg-amber-600 text-white font-bold'
@@ -333,11 +391,14 @@ export const ScanLocationMap: React.FC = () => {
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              <span>Berulang ({stats.repeated})</span>
+              <span>Peringatan ({stats.repeated})</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setStatusFilter('suspicious')}
+              data-tooltip="Berbahaya: Terdeteksi anomali pemindaian lebih dari 3x"
+              data-tooltip-pos="top"
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 statusFilter === 'suspicious'
                   ? 'bg-red-600 text-white font-bold'
@@ -345,7 +406,7 @@ export const ScanLocationMap: React.FC = () => {
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
-              <span>Curiga ({stats.suspicious})</span>
+              <span>Berbahaya ({stats.suspicious})</span>
             </button>
           </div>
 
@@ -401,7 +462,7 @@ export const ScanLocationMap: React.FC = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-800"></span>
-                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Asli (Valid)</span>
+                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Valid</span>
                   </div>
                   <span className="font-mono text-[11px] text-slate-400">{stats.valid} titik</span>
                 </div>
@@ -409,7 +470,7 @@ export const ScanLocationMap: React.FC = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-white dark:border-zinc-800"></span>
-                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Berulang</span>
+                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Peringatan</span>
                   </div>
                   <span className="font-mono text-[11px] text-slate-400">{stats.repeated} titik</span>
                 </div>
@@ -417,7 +478,7 @@ export const ScanLocationMap: React.FC = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-white dark:border-zinc-800 ring-2 ring-red-500/30"></span>
-                    <span className="text-red-600 dark:text-red-400 font-semibold">Curiga (Anomali)</span>
+                    <span className="text-red-600 dark:text-red-400 font-semibold">Berbahaya</span>
                   </div>
                   <span className="font-mono text-[11px] text-red-500 font-semibold">{stats.suspicious} titik</span>
                 </div>
