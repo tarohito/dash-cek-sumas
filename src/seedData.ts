@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { initialScanPoints } from './data/scanTelemetryData.ts';
 
 export function hashPassword(password: string): string {
   if (!password || !password.trim()) return '';
@@ -38,7 +39,47 @@ export function seedComprehensiveData(db: any) {
     insertUser.run({ ...u, password: defaultPassword });
   }
 
-  // 2. OVERHAUL BRANDS (15 records)
+  // 2. OVERHAUL CATEGORIES (SUMAS Architectural & Partisi + Skincare & Dermo-Cosmetics)
+  db.prepare('DELETE FROM categories').run();
+  const insertCategory = db.prepare(`
+    INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const initialCategories = [
+    // === LEVEL 1: KATEGORI UTAMA ===
+    { id: 'cat-sumas', name: 'SUMAS Architectural & Partisi', parentId: null, level: 1, code: 'SMS-B2B', description: 'Sistem partisi toilet komersial, phenolic board tahan air, dan hardware arsitektural SUMAS', status: 'Aktif', itemCount: 3, orderIndex: 1, createdAt: '2026-10-01', specSchema: null },
+    { id: 'cat-skincare', name: 'Skincare & Dermo-Cosmetics', parentId: null, level: 1, code: 'SKN-RET', description: 'Produk perawatan kulit wajah & tubuh, serum aktif, dermo-cosmetics bersertifikasi BPOM', status: 'Aktif', itemCount: 12, orderIndex: 2, createdAt: '2026-10-02', specSchema: null },
+
+    // === LEVEL 2: SUB-KATEGORI SUMAS ===
+    { id: 'cat-sumas-cubicle', name: 'Partisi Cubicle Toilet', parentId: 'cat-sumas', level: 2, code: 'SMS-CUB', description: 'Sistem partisi kubikal toilet modern fasilitas publik, bandara, mall, dan rumah sakit', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-05', specSchema: null },
+    { id: 'cat-sumas-hardware', name: 'Aksesoris & Hardware SUS 304', parentId: 'cat-sumas', level: 2, code: 'SMS-HDW', description: 'Engsel gravity, kunci indikator keterisian, handle, dan bracket stainless steel SUS 304', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-06', specSchema: null },
+    { id: 'cat-sumas-cladding', name: 'Wall Cladding & Panel Phenolic', parentId: 'cat-sumas', level: 2, code: 'SMS-CLD', description: 'Panel phenolic tahan air, tahan api, dan pelapis estetika arsitektur gedung', status: 'Aktif', itemCount: 0, orderIndex: 3, createdAt: '2026-10-07', specSchema: null },
+
+    // === LEVEL 2: SUB-KATEGORI SKINCARE ===
+    { id: 'cat-skin-serum', name: 'Serum & Ampoule', parentId: 'cat-skincare', level: 2, code: 'SKN-SRM', description: 'Serum wajah konsentrat tinggi, pencerah noda hitam, retinol anti-aging, dan barrier booster', status: 'Aktif', itemCount: 4, orderIndex: 1, createdAt: '2026-10-08', specSchema: null },
+    { id: 'cat-skin-cleanser', name: 'Facial Cleanser & Micellar', parentId: 'cat-skincare', level: 2, code: 'SKN-CLN', description: 'Pembersih wajah low-pH gentle cleanser, cleansing foam, dan micellar water pembersih pori', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-09', specSchema: null },
+    { id: 'cat-skin-moist', name: 'Moisturizer & Barrier Cream', parentId: 'cat-skincare', level: 2, code: 'SKN-MST', description: 'Pelembap wajah gel ceramide, hidrasi mendalam hyaluronic acid, dan soothing moisture cream', status: 'Aktif', itemCount: 3, orderIndex: 3, createdAt: '2026-10-10', specSchema: null },
+    { id: 'cat-skin-sun', name: 'Sunscreen & UV Defense', parentId: 'cat-skincare', level: 2, code: 'SKN-SUN', description: 'Tabir surya harian broad-spectrum SPF 50+ PA++++ tekstur seringan air tanpa whitecast', status: 'Aktif', itemCount: 2, orderIndex: 4, createdAt: '2026-10-11', specSchema: null },
+    { id: 'cat-skin-toner', name: 'Toner & Essence', parentId: 'cat-skincare', level: 2, code: 'SKN-TNR', description: 'Hydrating toner, clarifying exfoliation toner BHA/AHA, dan skin essence penyeimbang pH', status: 'Aktif', itemCount: 3, orderIndex: 5, createdAt: '2026-10-12', specSchema: null },
+    { id: 'cat-skin-body', name: 'Body Care & Body Lotion', parentId: 'cat-skincare', level: 2, code: 'SKN-BDY', description: 'Body lotion pencerah dengan UV filter, nourishing body serum, dan brightening body scrub', status: 'Aktif', itemCount: 0, orderIndex: 6, createdAt: '2026-10-13', specSchema: null },
+
+    // === LEVEL 3: SUB-SUB KATEGORI SUMAS ===
+    { id: 'cat-sumas-phn12', name: 'Phenolic Board 12mm Standard', parentId: 'cat-sumas-cubicle', level: 3, code: 'SMS-PHN12', description: 'Papan phenolic kompak 12mm solid core densitas 1450 kg/m³ tahan air 100% dan benturan', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-14', specSchema: null },
+    { id: 'cat-sumas-glass', name: 'Glass Cubicle System 10mm', parentId: 'cat-sumas-cubicle', level: 3, code: 'SMS-GLS10', description: 'Partisi cubicle kaca tempered premium 10mm untuk fasilitas eksekutif dan hotel bintang lima', status: 'Aktif', itemCount: 0, orderIndex: 2, createdAt: '2026-10-15', specSchema: null },
+
+    // === LEVEL 3: SUB-SUB KATEGORI SKINCARE ===
+    { id: 'cat-skin-niac', name: 'Niacinamide & Brightening Serum', parentId: 'cat-skin-serum', level: 3, code: 'SKN-NIA', description: 'Serum pencerah kulit dengan Niacinamide konsentrasi 5%-10% dan ekstrak alami pemudar flek', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-16', specSchema: null },
+    { id: 'cat-skin-ret', name: 'Retinol & Anti-Aging Serum', parentId: 'cat-skin-serum', level: 3, code: 'SKN-RET', description: 'Serum regenerasi sel, peremajaan tekstur kulit dan pendorong kolagen alami', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-17', specSchema: null },
+    { id: 'cat-skin-crm', name: 'Ceramide Barrier Cream', parentId: 'cat-skin-moist', level: 3, code: 'SKN-CRM', description: 'Formula penguat skin barrier dengan 5 tipe Ceramide esensial dan Centella Asiatica', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-18', specSchema: null },
+    { id: 'cat-skin-spf50', name: 'Broad Spectrum SPF 50+ PA++++', parentId: 'cat-skin-sun', level: 3, code: 'SKN-SPF', description: 'Perlindungan maksimal terhadap sinar UVA & UVB dengan formulasi ringan cepat meresap', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-19', specSchema: null }
+  ];
+
+  for (const c of initialCategories) {
+    insertCategory.run(c.id, c.name, c.parentId, c.level, c.code, c.description, c.status, c.itemCount, c.orderIndex, c.createdAt, c.specSchema);
+  }
+
+  // 3. OVERHAUL BRANDS (15 records: SUMAS + 14 Skincare Brands)
   const brands = [
     {
       id: 'br-sumas',
@@ -48,192 +89,192 @@ export function seedComprehensiveData(db: any) {
       ownerName: 'Kalingga Jeandy',
       ownerEmail: 'kalinggajeandy3@gmail.com',
       ownerRole: 'Administrator',
-      description: 'Material partisi cubicle toilet, phenolic board tahan air & benturan untuk proyek rumah sakit, bandara, mall, dan fasilitas komersial.',
-      category: 'Material & Konstruksi',
+      description: 'Material partisi cubicle toilet, phenolic board tahan air & benturan untuk proyek rumah sakit, bandara, mall, dan fasilitas komersial publik.',
+      category: 'SUMAS Architectural & Partisi',
       status: 'Aktif',
       createdAt: '28 Okt 2026, 09:00'
     },
     {
-      id: 'br-assc',
-      name: 'ASSC',
-      logo: '/assets/brand/assc_logo.svg',
+      id: 'br-somethinc',
+      name: 'Somethinc',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%232b3990"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">ST</text></svg>',
       ownerId: 'u4',
       ownerName: 'Siti Rahma',
       ownerEmail: 'siti.r@sumas.id',
       ownerRole: 'Operator',
-      description: 'Lini streetwear retail eksklusif dengan sistem verifikasi QR code hologram anti-counterfeit dan PIN verifikasi publik.',
-      category: 'Pakaian & Fashion',
+      description: 'Brand skincare & kosmetik terkemuka Indonesia dengan formulasi aktif teruji klinis dan sistem verifikasi QR anti-counterfeit konsumen.',
+      category: 'Skincare & Dermo-Cosmetics',
       status: 'Aktif',
-      createdAt: '23 Mei 2025, 10:00'
+      createdAt: '28 Okt 2026, 10:00'
     },
     {
-      id: 'br-blimey',
-      name: 'BLIMEY!',
-      logo: '/assets/brand/blimey_logo.svg',
+      id: 'br-avoskin',
+      name: 'Avoskin',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%233a5a40"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">AV</text></svg>',
       ownerId: 'u2',
       ownerName: 'Budi Santoso',
       ownerEmail: 'budi.s@sumas.id',
       ownerRole: 'Operator',
-      description: 'Koleksi fashion premium & casual lifestyle dengan tag serial unik untuk garansi keaslian pakaian.',
-      category: 'Pakaian & Fashion',
+      description: 'Pionir clean beauty di Indonesia dengan formulasi natural & active ingredients ramah lingkungan berseri serial autentikasi BPOM.',
+      category: 'Skincare & Dermo-Cosmetics',
       status: 'Aktif',
-      createdAt: '15 Jun 2025, 14:20'
+      createdAt: '28 Okt 2026, 11:15'
     },
     {
-      id: 'br-indosteel',
-      name: 'IndoSteel Architectural',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%232b6cb0"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">IS</text></svg>',
+      id: 'br-skintific',
+      name: 'Skintific',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230284c7"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">SK</text></svg>',
       ownerId: 'u3',
       ownerName: 'Rina Wijaya',
       ownerEmail: 'rina.w@sumas.id',
       ownerRole: 'Operator',
-      description: 'Komponen baja struktural, bracket penopang partisi, dan profil stainless SUS 304 tahan beban dinamis.',
-      category: 'Material & Konstruksi',
+      description: 'Formulasi paten TTE (Trilogy Triangle Effect) untuk pemulihan skin barrier cepat dengan teknologi tag QR tamper-proof.',
+      category: 'Skincare & Dermo-Cosmetics',
       status: 'Aktif',
-      createdAt: '28 Okt 2026, 10:30'
+      createdAt: '28 Okt 2026, 14:30'
     },
     {
-      id: 'br-aquatech',
-      name: 'AquaTech Sanitary',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23319795"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">AT</text></svg>',
-      ownerId: 'u7',
-      ownerName: 'Hendra Gunawan',
-      ownerEmail: 'hendra.g@sumas.id',
-      ownerRole: 'Operator',
-      description: 'Kran sensor otomatis cerdas, flush valve komersial, dan sistem sanitasi hemat air fasilitas publik.',
-      category: 'Sanitasi & Perpipaan',
-      status: 'Aktif',
-      createdAt: '29 Okt 2026, 11:00'
-    },
-    {
-      id: 'br-urbanfit',
-      name: 'UrbanFit Apparel',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23805ad5"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">UF</text></svg>',
+      id: 'br-whitelab',
+      name: 'Whitelab',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230f172a"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">WL</text></svg>',
       ownerId: 'u9',
       ownerName: 'Farhan Nugraha',
       ownerEmail: 'farhan.n@sumas.id',
       ownerRole: 'Operator',
-      description: 'Pakaian olahraga teknikal tahan gesek dan breathable dengan serial autentikasi perlindungan brand.',
-      category: 'Pakaian & Fashion',
+      description: 'Dermatologist tested brightening skincare dengan kandungan Niacinamide grade premium dan perlindungan serial verifikasi batch.',
+      category: 'Skincare & Dermo-Cosmetics',
       status: 'Aktif',
-      createdAt: '29 Okt 2026, 14:15'
+      createdAt: '29 Okt 2026, 09:20'
     },
     {
-      id: 'br-lumina',
-      name: 'Lumina Architectural',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23d69e2e"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">LA</text></svg>',
-      ownerId: 'u6',
-      ownerName: 'Dewi Lestari',
-      ownerEmail: 'dewi.l@sumas.id',
-      ownerRole: 'Administrator',
-      description: 'Sistem pencahayaan LED arsitektural komersial, track light museum, dan downlight hemat energi.',
-      category: 'Elektronik & Smart Hardware',
-      status: 'Aktif',
-      createdAt: '30 Okt 2026, 09:00'
-    },
-    {
-      id: 'br-modena',
-      name: 'Modena Systems',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23c53030"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">MS</text></svg>',
-      ownerId: 'u11',
-      ownerName: 'Reza Firmansyah',
-      ownerEmail: 'reza.f@sumas.id',
-      ownerRole: 'Operator',
-      description: 'Perlengkapan kitchen komersial dan perangkat sanitasi higienis berstandar HACCP.',
-      category: 'Material & Konstruksi',
-      status: 'Aktif',
-      createdAt: '30 Okt 2026, 10:40'
-    },
-    {
-      id: 'br-vanguard',
-      name: 'Vanguard Heavy Gear',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%234a5568"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">VG</text></svg>',
-      ownerId: 'u13',
-      ownerName: 'Aditya Wardhana',
-      ownerEmail: 'aditya.w@sumas.id',
-      ownerRole: 'Operator',
-      description: 'Perlengkapan kerja keselamatan industri, rompi taktikal reflektif, dan tas ransel tahan air cordura.',
-      category: 'Aksesoris & Merchandise',
-      status: 'Aktif',
-      createdAt: '30 Okt 2026, 13:20'
-    },
-    {
-      id: 'br-nordic',
-      name: 'Nordic Laboratory',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%232c7a7b"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">NL</text></svg>',
-      ownerId: 'u5',
-      ownerName: 'Dimas Pratama',
-      ownerEmail: 'dimas.p@sumas.id',
-      ownerRole: 'Auditor',
-      description: 'Panel phenolic meja lab tahan bahan kimia keras, asam kuat, dan sterilisasi autoclave ruangan medis.',
-      category: 'Material & Konstruksi',
-      status: 'Aktif',
-      createdAt: '31 Okt 2026, 09:15'
-    },
-    {
-      id: 'br-zenith',
-      name: 'Zenith Wear',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%239f7aea"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">ZW</text></svg>',
-      ownerId: 'u14',
-      ownerName: 'Nabila Salsabila',
-      ownerEmail: 'nabila.s@sumas.id',
-      ownerRole: 'Operator',
-      description: 'Edisi terbatas streetwear kasual dan headwear bertema tipografi grafis dengan sertifikasi digital.',
-      category: 'Pakaian & Fashion',
-      status: 'Aktif',
-      createdAt: '31 Okt 2026, 11:30'
-    },
-    {
-      id: 'br-solartec',
-      name: 'SolarTec Energy',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23dd6b20"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">ST</text></svg>',
-      ownerId: 'u15',
-      ownerName: 'Fajar Ramadhan',
-      ownerEmail: 'fajar.r@sumas.id',
-      ownerRole: 'Administrator',
-      description: 'Modul panel surya atap komersial dan inverter cerdas pemantauan energi gedung hijau.',
-      category: 'Elektronik & Smart Hardware',
-      status: 'Aktif',
-      createdAt: '01 Nov 2026, 09:00'
-    },
-    {
-      id: 'br-titan',
-      name: 'Titan Hardware',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%234c51bf"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">TH</text></svg>',
-      ownerId: 'u2',
-      ownerName: 'Budi Santoso',
-      ownerEmail: 'budi.s@sumas.id',
-      ownerRole: 'Operator',
-      description: 'Kunci pintu mortise digital, akses kartu RFID, dan engsel heavy-duty fasilitas hotel & apartemen.',
-      category: 'Material & Konstruksi',
-      status: 'Aktif',
-      createdAt: '01 Nov 2026, 10:30'
-    },
-    {
-      id: 'br-primefiber',
-      name: 'PrimeFiber Composite',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23285e61"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">PF</text></svg>',
+      id: 'br-originote',
+      name: 'The Originote',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23059669"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">TO</text></svg>',
       ownerId: 'u7',
       ownerName: 'Hendra Gunawan',
       ownerEmail: 'hendra.g@sumas.id',
       ownerRole: 'Operator',
-      description: 'Panel komposit serat fiberglass eksterior tahan cuaca ekstrem dan insulasi termal fasad gedung.',
-      category: 'Material & Konstruksi',
+      description: 'Skincare berkualitas terjangkau dengan jutaan pengguna, dilengkapi proteksi barcode digital anti-tiruan pada kemasan botol & jar.',
+      category: 'Skincare & Dermo-Cosmetics',
       status: 'Aktif',
-      createdAt: '01 Nov 2026, 12:00'
+      createdAt: '29 Okt 2026, 11:45'
     },
     {
-      id: 'br-ecopanel',
-      name: 'EcoPanel Akustik',
-      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%2338a169"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">EP</text></svg>',
+      id: 'br-wardah',
+      name: 'Wardah',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230d9488"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">WD</text></svg>',
+      ownerId: 'u6',
+      ownerName: 'Dewi Lestari',
+      ownerEmail: 'dewi.l@sumas.id',
+      ownerRole: 'Administrator',
+      description: 'Pionir Halal Beauty & Dermo-Cosmetics terbesar di Indonesia dengan standar sertifikasi global dan verifikasi keaslian terdistribusi.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '29 Okt 2026, 14:00'
+    },
+    {
+      id: 'br-azarine',
+      name: 'Azarine',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23ea580c"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">AZ</text></svg>',
+      ownerId: 'u11',
+      ownerName: 'Reza Firmansyah',
+      ownerEmail: 'reza.f@sumas.id',
+      ownerRole: 'Operator',
+      description: 'Suncare & herbal skin nutrition peraih penghargaan nasional dengan teknologi water-based sunscreen dan tag QR verifikasi toko resmi.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '30 Okt 2026, 08:30'
+    },
+    {
+      id: 'br-truetoskin',
+      name: 'True to Skin',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23db2777"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">TS</text></svg>',
       ownerId: 'u10',
       ownerName: 'Anisa Putri',
       ownerEmail: 'anisa.p@sumas.id',
       ownerRole: 'Auditor',
-      description: 'Papan peredam suara ramah lingkungan dari serat polyester daur ulang untuk auditorium dan kantor.',
-      category: 'Material & Konstruksi',
+      description: 'Skincare minimalis berfokus pada single active ingredient seperti Bakuchiol dan Hyaluronic Acid dengan keamanan batch terverifikasi.',
+      category: 'Skincare & Dermo-Cosmetics',
       status: 'Aktif',
-      createdAt: '01 Nov 2026, 14:15'
+      createdAt: '30 Okt 2026, 10:15'
+    },
+    {
+      id: 'br-studiotropik',
+      name: 'Studio Tropik',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%237c3aed"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">ST</text></svg>',
+      ownerId: 'u5',
+      ownerName: 'Dimas Pratama',
+      ownerEmail: 'dimas.p@sumas.id',
+      ownerRole: 'Auditor',
+      description: 'Spesialis priming water, setting spray, dan skin prep inovatif untuk iklim tropis dengan pengawasan nomor batch digital.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '30 Okt 2026, 13:00'
+    },
+    {
+      id: 'br-dearme',
+      name: 'Dear Me Beauty',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23e11d48"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">DM</text></svg>',
+      ownerId: 'u14',
+      ownerName: 'Nabila Salsabila',
+      ownerEmail: 'nabila.s@sumas.id',
+      ownerRole: 'Operator',
+      description: 'Hybrid skincare multipurpose ramah kulit sensitif dengan proteksi hologram anti-counterfeit dan pelacakan QR retail.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '31 Okt 2026, 09:15'
+    },
+    {
+      id: 'br-npure',
+      name: 'NPURE',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%2316a34a"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">NP</text></svg>',
+      ownerId: 'u13',
+      ownerName: 'Aditya Wardhana',
+      ownerEmail: 'aditya.w@sumas.id',
+      ownerRole: 'Operator',
+      description: 'Skincare bahan alami lokal daun Centella Asiatica dan bunga Marigold asli Indonesia dengan autentikasi barcode batch pabrik.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '31 Okt 2026, 11:30'
+    },
+    {
+      id: 'br-biobeautylab',
+      name: 'Bio Beauty Lab',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23d97706"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">BB</text></svg>',
+      ownerId: 'u8',
+      ownerName: 'Maya Anggraini',
+      ownerEmail: 'maya.a@sumas.id',
+      ownerRole: 'Viewer',
+      description: 'Minyak perawatan wajah mewah (luxurious facial treatment oil) dengan segel digital pembuktian keaslian bagi pengguna.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '01 Nov 2026, 08:45'
+    },
+    {
+      id: 'br-lacoco',
+      name: 'Lacoco',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%234f46e5"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">LC</text></svg>',
+      ownerId: 'u12',
+      ownerName: 'Citra Wulandari',
+      ownerEmail: 'citra.w@sumas.id',
+      ownerRole: 'Viewer',
+      description: 'Perawatan kulit intensif formulasi Eropa-Asia En Nature dengan perlindungan PIN verifikasi produk premium bersertifikat BPOM.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '01 Nov 2026, 10:30'
+    },
+    {
+      id: 'br-hadalabo',
+      name: 'Hada Labo',
+      logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%232563eb"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">HL</text></svg>',
+      ownerId: 'u15',
+      ownerName: 'Fajar Ramadhan',
+      ownerEmail: 'fajar.r@sumas.id',
+      ownerRole: 'Administrator',
+      description: 'Filosofi hidrasi kulit Rohto Tokyo dengan multi-molecular Hyaluronic Acid dan sistem anti-pemalsuan retail berskala nasional.',
+      category: 'Skincare & Dermo-Cosmetics',
+      status: 'Aktif',
+      createdAt: '01 Nov 2026, 12:00'
     }
   ];
 
@@ -246,7 +287,7 @@ export function seedComprehensiveData(db: any) {
     insertBrand.run(b);
   }
 
-  // 3. OVERHAUL PRODUCTS (15 records)
+  // 4. OVERHAUL PRODUCTS (15 SKUs: SUMAS B2B Products + Popular Skincare Products)
   const products = [
     {
       id: 'p1',
@@ -254,7 +295,7 @@ export function seedComprehensiveData(db: any) {
       brandName: 'Sumas',
       sku: 'Pintu Cubicle Toilet',
       skuCode: 'SMS-CUB-01',
-      category: 'Material & Konstruksi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard',
+      category: 'SUMAS Architectural & Partisi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard',
       isB2B: 1,
       image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop&q=80',
       createdAt: '28 Okt 2026, 09:30',
@@ -268,7 +309,7 @@ Ketebalan: 12 mm | Material: High Density Solid Phenolic Resin | Finishing: Matt
       brandName: 'Sumas',
       sku: 'Phenolic Board 12mm Standard',
       skuCode: 'SMS-PHN-02',
-      category: 'Material & Konstruksi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard',
+      category: 'SUMAS Architectural & Partisi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard',
       isB2B: 1,
       image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&auto=format&fit=crop&q=80',
       createdAt: '28 Okt 2026, 09:40',
@@ -282,7 +323,7 @@ Ketebalan: 12 mm | Berat Jenis: 1450 kg/m³ | Ketahanan Api: Class B1 Flame Reta
       brandName: 'Sumas',
       sku: 'Cubicle Hardware Set Stainless 304',
       skuCode: 'SMS-HDW-03',
-      category: 'Material & Konstruksi > Aksesoris & Hardware Cubicle > Stainless Steel 304 Luxury',
+      category: 'SUMAS Architectural & Partisi > Aksesoris & Hardware SUS 304',
       isB2B: 1,
       image: 'https://images.unsplash.com/photo-1530124566582-a618bc2615dc?w=400&auto=format&fit=crop&q=80',
       createdAt: '28 Okt 2026, 09:45',
@@ -292,171 +333,171 @@ Material: Stainless Steel SUS 304 | Isi Paket: 2 Engsel, 1 Kunci Indikator, 2 Ka
     },
     {
       id: 'p4',
-      brandId: 'br-assc',
-      brandName: 'ASSC',
-      sku: 'Dew Drops Oversized Tee',
-      skuCode: 'ASC-DED-04',
-      category: 'Pakaian & Fashion > Atasan & T-Shirt > Oversized Boxy Cut Tee',
+      brandId: 'br-somethinc',
+      brandName: 'Somethinc',
+      sku: '5% Niacinamide + Moisture Sabi Beet Serum',
+      skuCode: 'SMT-SRM-04',
+      category: 'Skincare & Dermo-Cosmetics > Serum & Ampoule > Niacinamide & Brightening Serum',
       isB2B: 0,
-      image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400&auto=format&fit=crop&q=80',
-      createdAt: '10 Nov 2026, 14:00',
-      description: `Exclusive collection t-shirt grafis streetwear dengan verifikasi tag hologram anti-counterfeit dan PIN serial unik.
+      image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&auto=format&fit=crop&q=80',
+      createdAt: '28 Okt 2026, 10:15',
+      description: `Serum pencerah kulit dengan kandungan 5% Niacinamide dipadukan dengan SabiWhite® (ekstrak kunyit) dan Beet Extract untuk memudarkan noda hitam serta memperkuat skin barrier.
 
-Material: 100% Cotton Combed 20s | Gramasi: 220 gsm | Sablon: High-Density Plastisol Ink | Potongan: Oversized Drop Shoulder | Fitur: Anti-Pilling & Pre-Shrunk`
+Isi Bersih: 20 ml | Formulasi: Water-based Non-Sticky | Sertifikasi: BPOM NA18201901839 & Halal MUI | Kemasan: Dropper Bottle dengan QR Segel`
     },
     {
       id: 'p5',
-      brandId: 'br-assc',
-      brandName: 'ASSC',
-      sku: 'ASSC Classic Heavyweight Hoodie',
-      skuCode: 'ASC-HOD-05',
-      category: 'Pakaian & Fashion > Outerwear & Jaket > Heavyweight Fleece Hoodie',
+      brandId: 'br-avoskin',
+      brandName: 'Avoskin',
+      sku: 'Miraculous Retinol Toner 100ml',
+      skuCode: 'AVO-TNR-05',
+      category: 'Skincare & Dermo-Cosmetics > Toner & Essence',
       isB2B: 0,
-      image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=400&auto=format&fit=crop&q=80',
-      createdAt: '10 Nov 2026, 14:15',
-      description: `Heavyweight fleece hoodie dengan saku kangguru ganda dan grafis tipografi belakang khas ASSC.
+      image: 'https://images.unsplash.com/photo-1608248597359-0f0f917b2b73?w=400&auto=format&fit=crop&q=80',
+      createdAt: '28 Okt 2026, 11:30',
+      description: `Toner anti-aging dengan kandungan 1% Actosome Retinol, Peptide, Pomegranate, dan Niacinamide untuk memicu pergantian sel kulit mati dan elastisitas kulit.
 
-Material: Katun Fleece Tebal 330 gsm | Lapisan: Brushed Interior Warmth | Tali Hoodie: Flat Drawcord Metal Aglet | Rib: 2x1 Spandex Heavy Ribbing | Label: QR Security Woven Tag`
+Ukuran: 100 ml | Jenis Kulit: Semua jenis kulit dewasa | Cara Pakai: Malam hari secara berkala | BPOM: NA18201206132 | Tag QR: Tamper-proof Label`
     },
     {
       id: 'p6',
-      brandId: 'br-assc',
-      brandName: 'ASSC',
-      sku: 'Overthinking Curved Cap',
-      skuCode: 'ASC-CAP-06',
-      category: 'Aksesoris & Merchandise > Topi & Headwear > 6-Panel Curved Dad Cap',
+      brandId: 'br-skintific',
+      brandName: 'Skintific',
+      sku: '5X Ceramide Barrier Moisture Gel 30g',
+      skuCode: 'SKT-MST-06',
+      category: 'Skincare & Dermo-Cosmetics > Moisturizer & Barrier Cream > Ceramide Barrier Cream',
       isB2B: 0,
-      image: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&auto=format&fit=crop&q=80',
-      createdAt: '10 Nov 2026, 14:20',
-      description: `Topi 6-panel katun twill dengan bordir logo ikonik berdensitas tinggi serta gesper kuningan pengatur ukuran.
+      image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&auto=format&fit=crop&q=80',
+      createdAt: '28 Okt 2026, 14:45',
+      description: `Pelembap gel ringan dengan 5 tipe Ceramide berbeda (NP, NS, AS, EOP, AP) yang meniru struktur skin barrier manusia, diperkaya Centella Asiatica dan Hyaluronic Acid.
 
-Bahan: 100% Premium Cotton Twill | Profil: 6-Panel Low Profile Curved | Pengencang: Antique Brass Buckle Strap | Ukuran: Adjustable All Size (54-60 cm) | Sweatband: Moisture Wicking Cotton`
+Berat: 30 gram | Tekstur: Water-gel Melting | BPOM: NA11210100167 | Fitur Anti-Fake: QR Hologram pada segel kotak luar`
     },
     {
       id: 'p7',
-      brandId: 'br-blimey',
-      brandName: 'BLIMEY!',
-      sku: 'A LITTLE CLOSER (BLIMEY!) Tee',
-      skuCode: 'BLM-ALC-07',
-      category: 'Pakaian & Fashion > Atasan & T-Shirt > Regular Fit Graphic Tee',
+      brandId: 'br-whitelab',
+      brandName: 'Whitelab',
+      sku: 'Brightening Face Serum Niacinamide 10%',
+      skuCode: 'WHL-SRM-07',
+      category: 'Skincare & Dermo-Cosmetics > Serum & Ampoule > Niacinamide & Brightening Serum',
       isB2B: 0,
-      image: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&auto=format&fit=crop&q=80',
-      createdAt: '12 Nov 2026, 11:00',
-      description: `Edisi terbatas drop t-shirt bertema tipografi grafis BLIMEY! dengan label barcode verifikasi cloud redirect.
+      image: 'https://images.unsplash.com/photo-1617897903246-719242758050?w=400&auto=format&fit=crop&q=80',
+      createdAt: '29 Okt 2026, 09:40',
+      description: `Serum konsentrat pencerah dengan 10% Niacinamide, HyaluComplex-10, dan Marine Collagen yang mencerahkan kulit kusam secara merata.
 
-Material: 100% Ring Spun Combed Cotton 24s | Gramasi: 185 gsm | Warna: Vintage Washed Black | Jahitan: Rantai Standar Ekspor Tiga Jarum | Garansi: Autentisitas Terdaftar`
+Ukuran: 20 ml | Target: Hiperpigmentasi & Noda Bekas Jerawat | BPOM: NA18211901142 | Fitur Keamanan: Nomor Serial Unik & PIN Verifikasi`
     },
     {
       id: 'p8',
-      brandId: 'br-blimey',
-      brandName: 'BLIMEY!',
-      sku: 'Oversized Street Denim Jacket',
-      skuCode: 'BLM-JKT-08',
-      category: 'Pakaian & Fashion > Outerwear & Jaket > Denim Trucker Jacket',
+      brandId: 'br-originote',
+      brandName: 'The Originote',
+      sku: 'Hyalucera Moisturizer Gel 50ml',
+      skuCode: 'ORG-MST-08',
+      category: 'Skincare & Dermo-Cosmetics > Moisturizer & Barrier Cream',
       isB2B: 0,
-      image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&auto=format&fit=crop&q=80',
-      createdAt: '12 Nov 2026, 11:30',
-      description: `Jaket trucker denim raw selvedge 14oz berpotongan santai dengan tag verifikasi digital anti-palsu.
+      image: 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=400&auto=format&fit=crop&q=80',
+      createdAt: '29 Okt 2026, 12:00',
+      description: `Moisturizer bening gel dengan perpaduan Hyaluron, Ceramide, dan Chlorelina untuk hidrasi maksimal tanpa rasa lengket pada kulit berminyak.
 
-Material: 14oz Raw Rigid Indigo Selvedge Denim | Hardware: Custom Embossed Shank Buttons | Saku: 2 Saku Dada & 2 Saku Samping Tersembunyi | Perawatan: Dry Clean Only`
+Isi Bersih: 50 ml | Formulasi: Oil-free Soothing Gel | BPOM: NA18210111962 | Pelindung Kemasan: Barcode QR Verifikasi Otentisitas`
     },
     {
       id: 'p9',
-      brandId: 'br-indosteel',
-      brandName: 'IndoSteel Architectural',
-      sku: 'Heavy Beam Connection Bracket',
-      skuCode: 'IDS-BKT-09',
-      category: 'Material & Konstruksi > Aksesoris & Hardware Cubicle > Stainless Steel 304 Luxury',
-      isB2B: 1,
-      image: 'https://images.unsplash.com/photo-1504917599217-d4dc5ebe6122?w=400&auto=format&fit=crop&q=80',
-      createdAt: '14 Nov 2026, 09:15',
-      description: `Bracket siku penopang partisi dan balok gantung berbahan baja canai galvanis anti-karat untuk beban geser tinggi.
+      brandId: 'br-wardah',
+      brandName: 'Wardah',
+      sku: 'UV Shield Essential Sunscreen Gel SPF 50',
+      skuCode: 'WRD-SUN-09',
+      category: 'Skincare & Dermo-Cosmetics > Sunscreen & UV Defense > Broad Spectrum SPF 50+ PA++++',
+      isB2B: 0,
+      image: 'https://images.unsplash.com/photo-1598452963314-b09f397a5c48?w=400&auto=format&fit=crop&q=80',
+      createdAt: '29 Okt 2026, 14:15',
+      description: `Sunscreen gel SPF 50 PA++++ dengan proteksi menyeluruh terhadap sinar UVA, UVB, dan blue light, diperkaya Vitamin C & Glutathione.
 
-Material: Baja Karbon Tinggi Hot-Dip Galvanized | Ketebalan Plat: 4.5 mm | Uji Beban: 8.5 kN Shear Strength | Finishing: Electrostatic Powder Coating | Standar: ASTM A36`
+Netto: 40 ml | Tekstur: Ringan Bebas Alkohol & Paraben | Sertifikat: Halal Grade A & BPOM NA18231700201 | Keamanan: Segel Anti-Palsu`
     },
     {
       id: 'p10',
-      brandId: 'br-aquatech',
-      brandName: 'AquaTech Sanitary',
-      sku: 'Sensor Auto Faucet Pro Series',
-      skuCode: 'AQT-SFT-10',
-      category: 'Sanitasi & Perpipaan',
-      isB2B: 1,
-      image: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&auto=format&fit=crop&q=80',
-      createdAt: '14 Nov 2026, 10:30',
-      description: `Kran air sensor infra-merah tanpa sentuhan berbahan kuningan cor padat dengan katup selenoid hemat air hingga 65%.
+      brandId: 'br-azarine',
+      brandName: 'Azarine',
+      sku: 'Hydrasoothe Sunscreen Gel SPF 45 PA++++',
+      skuCode: 'AZR-SUN-10',
+      category: 'Skincare & Dermo-Cosmetics > Sunscreen & UV Defense',
+      isB2B: 0,
+      image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&auto=format&fit=crop&q=80',
+      createdAt: '30 Okt 2026, 08:45',
+      description: `Tabir surya bertekstur gel air yang dingin dan cepat meresap dengan ekstrak propolis, lidah buaya, green tea, dan delima.
 
-Sensor: Dual Beam Optical Infrared | Catu Daya: AC 220V & DC 4x AA Battery Backup | Material Bodi: Solid Brass Chrome Plated | Waktu Respon: < 0.3 Detik | Aliran: 1.8 Liter/Menit`
+Ukuran: 50 ml | Bebas Minyak & Silikon | BPOM: NA18201700868 | Verifikasi: Dynamic QR Code Resmi Pabrik`
     },
     {
       id: 'p11',
-      brandId: 'br-urbanfit',
-      brandName: 'UrbanFit Apparel',
-      sku: 'Tactical Performance Cargo Jogger',
-      skuCode: 'UBF-JOG-11',
-      category: 'Pakaian & Fashion > Outerwear & Jaket > Denim Trucker Jacket',
+      brandId: 'br-truetoskin',
+      brandName: 'True to Skin',
+      sku: 'Bakuchiol Anti-Aging Miracle Serum 20ml',
+      skuCode: 'TTS-SRM-11',
+      category: 'Skincare & Dermo-Cosmetics > Serum & Ampoule > Retinol & Anti-Aging Serum',
       isB2B: 0,
-      image: 'https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=400&auto=format&fit=crop&q=80',
-      createdAt: '15 Nov 2026, 13:00',
-      description: `Celana cargo jogger teknikal berfitur 4-way stretch water repellent DWR coating dengan saku ritsleting YKK.
+      image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&auto=format&fit=crop&q=80',
+      createdAt: '30 Okt 2026, 10:30',
+      description: `Serum alternatif retinol alami berbahan dasar 1% Bakuchiol murni dan Probiotics yang aman digunakan bagi ibu hamil dan menyusui.
 
-Komposisi: 88% Nylon Ripstop, 12% Spandex | Fitur: DWR Water Repellent & Quick Dry | Ritsleting: YKK AquaGuard Waterproof | Pinggang: Elastic Waistband dengan Sabuk Fidlock`
+Ukuran: 20 ml | Target: Garis Halus & Tekstur Kulit Kasar | BPOM: NA18202000388 | Garansi: Autentisitas Terdaftar Cloud`
     },
     {
       id: 'p12',
-      brandId: 'br-lumina',
-      brandName: 'Lumina Architectural',
-      sku: 'Architectural Track Light 15W COB',
-      skuCode: 'LMN-TRK-12',
-      category: 'Elektronik & Smart Hardware',
-      isB2B: 1,
-      image: 'https://images.unsplash.com/photo-1565814329452-e1efa11c5b89?w=400&auto=format&fit=crop&q=80',
-      createdAt: '16 Nov 2026, 09:45',
-      description: `Lampu track light sorot komersial museum dan galeri dengan indeks rendering warna ultra tinggi CRI > 95.
+      brandId: 'br-studiotropik',
+      brandName: 'Studio Tropik',
+      sku: 'Herbitus Skin Tonic 100ml',
+      skuCode: 'STP-TNC-12',
+      category: 'Skincare & Dermo-Cosmetics > Toner & Essence',
+      isB2B: 0,
+      image: 'https://images.unsplash.com/photo-1608248597359-0f0f917b2b73?w=400&auto=format&fit=crop&q=80',
+      createdAt: '30 Okt 2026, 13:20',
+      description: `Toner penyegar formulasi herbal Centella Asiatica dan Mugwort yang meredakan kemerahan, menenangkan iritasi, serta menyeimbangkan sebum.
 
-Daya: 15 Watt | Sudut Sorot: 24 Derajat Adjustable | Temperatur Warna: 3000K Warm White | CRI: Ra > 95 | Umur Pakai: 50.000 Jam L70`
+Isi: 100 ml | Jenis Kulit: Sensitif & Cenderung Berjerawat | BPOM: NA18211200389 | Fitur: Serial Tag Keamanan Digital`
     },
     {
       id: 'p13',
-      brandId: 'br-titan',
-      brandName: 'Titan Hardware',
-      sku: 'Smart Digital Mortise Lock SUS 304',
-      skuCode: 'TTN-DLK-13',
-      category: 'Material & Konstruksi > Aksesoris & Hardware Cubicle > Stainless Steel 304 Luxury',
-      isB2B: 1,
-      image: 'https://images.unsplash.com/photo-1558002038-1055907df827?w=400&auto=format&fit=crop&q=80',
-      createdAt: '16 Nov 2026, 11:20',
-      description: `Kunci pintu cerdas mortise stainless 304 dengan verifikasi PIN layar sentuh, kartu RFID Mifare, dan kunci mekanis darurat.
+      brandId: 'br-dearme',
+      brandName: 'Dear Me Beauty',
+      sku: 'Skin Barrier Water Cream 30g',
+      skuCode: 'DMB-MST-13',
+      category: 'Skincare & Dermo-Cosmetics > Moisturizer & Barrier Cream > Ceramide Barrier Cream',
+      isB2B: 0,
+      image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&auto=format&fit=crop&q=80',
+      createdAt: '31 Okt 2026, 09:30',
+      description: `Krim pelembap water-burst dengan 5% Niacinamide, Ceramide, dan Peptide yang melepaskan partikel kelembapan mikro saat diaplikasikan.
 
-Konektivitas: RFID 13.56MHz & Touch Keypad | Body Mortise: SUS 304 Anti-Cungkil Class C | Sumber Daya: 4x Baterai AA (12 Bulan Standby) | Fitur Darurat: Port USB-C Power Bank`
+Berat: 30 gram | BPOM: NA18210100729 | Segel: Tamper-Evident Security Seal dengan QR Scan`
     },
     {
       id: 'p14',
-      brandId: 'br-primefiber',
-      brandName: 'PrimeFiber Composite',
-      sku: 'Architectural Exterior Cladding 4mm',
-      skuCode: 'PFB-WCL-14',
-      category: 'Material & Konstruksi > Wall Cladding & Plafon > Exterior Architectural Cladding',
-      isB2B: 1,
-      image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&auto=format&fit=crop&q=80',
-      createdAt: '17 Nov 2026, 14:00',
-      description: `Panel pelapis dinding luar gedung berbahan komposit serat polimer resin tahan sinar ultraviolet dan cuaca tropis basah.
+      brandId: 'br-npure',
+      brandName: 'NPURE',
+      sku: 'Centella Asiatica Face Wash 100ml',
+      skuCode: 'NPR-CLN-14',
+      category: 'Skincare & Dermo-Cosmetics > Facial Cleanser & Micellar',
+      isB2B: 0,
+      image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&auto=format&fit=crop&q=80',
+      createdAt: '31 Okt 2026, 11:45',
+      description: `Sabun pembersih wajah berbusa lembut dengan daun Centella Asiatica asli di dalam botol, Green Tea, dan Vitamin B3 untuk membersihkan kotoran.
 
-Ketebalan: 4 mm | Lapisan Luar: PVDF Fluorocarbon 3-Layer Coating | Inti: Mineral Fire-Retardant Core | Dimensi: 1220 x 2440 mm | Garansi Warna: 15 Tahun Anti Pudar`
+Ukuran: 100 ml | pH Balanced 5.5 | BPOM: NA18201203883 | Perlindungan: Barcode Verifikasi Keaslian`
     },
     {
       id: 'p15',
-      brandId: 'br-ecopanel',
-      brandName: 'EcoPanel Akustik',
-      sku: 'Polyester Acoustic Wall Panel 9mm',
-      skuCode: 'ECO-SND-15',
-      category: 'Material & Konstruksi > Wall Cladding & Plafon > Interior Decorative Panel',
-      isB2B: 1,
-      image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&auto=format&fit=crop&q=80',
-      createdAt: '17 Nov 2026, 15:30',
-      description: `Papan peredam gema ruangan berbahan 100% serat daur ulang polyester tahan api dengan nilai NRC peredaman 0.85.
+      brandId: 'br-hadalabo',
+      brandName: 'Hada Labo',
+      sku: 'Gokujyun Premium Hyaluronic Acid Lotion',
+      skuCode: 'HDL-LTN-15',
+      category: 'Skincare & Dermo-Cosmetics > Toner & Essence',
+      isB2B: 0,
+      image: 'https://images.unsplash.com/photo-1608248597359-0f0f917b2b73?w=400&auto=format&fit=crop&q=80',
+      createdAt: '01 Nov 2026, 12:15',
+      description: `Lotion hidrasi intensif dengan 7 tipe Hyaluronic Acid berbobot molekul variatif yang menembus hingga ke lapisan terdalam epidermis kulit.
 
-Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | Sertifikasi Emisi: Formaldehyde Free E0 | Pemotongan: Beveled Edge 45 Derajat`
+Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: Verifikasi Keaslian Distributor Nasional`
     }
   ];
 
@@ -469,22 +510,22 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
     insertProduct.run(p);
   }
 
-  // 4. OVERHAUL BATCHES (15 records)
+  // 5. OVERHAUL BATCHES (15 Batches: SUMAS B2B with isB2B: 1, Skincare Retail with isB2B: 0)
   const batches = [
     { id: 'b1', batchId: 'SUMAS-BATCH-0001-10', date: '28 Okt 2026, 09:15', project: 'RS Kediri', sku: 'Pintu Cubicle Toilet', brand: 'Sumas', qty: 50, specs: 'Phenolic Board 12mm Standard', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b2', batchId: 'BATCH-ASSC-082', date: '29 Okt 2026, 11:27', project: 'Grand Indonesia Store Drop', sku: 'Dew Drops Oversized Tee', brand: 'ASSC', qty: 250, specs: 'Cotton Combed 20s Heavyweight', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b3', batchId: 'BATCH-BLM-041', date: '30 Okt 2026, 14:20', project: 'Canggu Coastal Hub Drop', sku: 'A LITTLE CLOSER (BLIMEY!) Tee', brand: 'BLIMEY!', qty: 150, specs: 'Vintage Washed Combed 24s', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b2', batchId: 'BATCH-SMT-082', date: '29 Okt 2026, 11:27', project: 'Distribusi Retail Nasional', sku: '5% Niacinamide + Moisture Sabi Beet Serum', brand: 'Somethinc', qty: 250, specs: 'Niacinamide 5% + Sabi Beet 20ml', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b3', batchId: 'BATCH-AVO-041', date: '30 Okt 2026, 14:20', project: 'Sociolla & Beauty Store Drop', sku: 'Miraculous Retinol Toner 100ml', brand: 'Avoskin', qty: 150, specs: 'Actosome Retinol 1% 100ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
     { id: 'b4', batchId: 'SUMAS-BATCH-0002-25', date: '31 Okt 2026, 10:00', project: 'IKN Gedung Kemenko', sku: 'Phenolic Board 12mm Standard', brand: 'Sumas', qty: 120, specs: 'High Density Solid Phenolic Resin', pinLength: 8, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b5', batchId: 'BATCH-ASSC-104', date: '01 Nov 2026, 13:45', project: 'Paris Van Java Boutique', sku: 'ASSC Classic Heavyweight Hoodie', brand: 'ASSC', qty: 100, specs: 'Fleece 330gsm Terry', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b6', batchId: 'BATCH-BLM-058', date: '02 Nov 2026, 09:30', project: 'Seminyak Square Flagship', sku: 'Oversized Street Denim Jacket', brand: 'BLIMEY!', qty: 80, specs: '14oz Raw Rigid Selvedge', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b5', batchId: 'BATCH-SKT-104', date: '01 Nov 2026, 13:45', project: 'Official Store & Watsons Network', sku: '5X Ceramide Barrier Moisture Gel 30g', brand: 'Skintific', qty: 300, specs: '5X Ceramide + Centella Gel 30g', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b6', batchId: 'BATCH-WHL-058', date: '02 Nov 2026, 09:30', project: 'Guardian & Apotek Modern', sku: 'Brightening Face Serum Niacinamide 10%', brand: 'Whitelab', qty: 200, specs: 'Niacinamide 10% + HyaluComplex 20ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
     { id: 'b7', batchId: 'SUMAS-BATCH-0003-40', date: '02 Nov 2026, 11:15', project: 'Bandara Juanda T2 Surabaya', sku: 'Cubicle Hardware Set Stainless 304', brand: 'Sumas', qty: 200, specs: 'Stainless Steel SUS 304 Luxury', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b8', batchId: 'BATCH-IDS-012', date: '03 Nov 2026, 08:45', project: 'Pakuwon Mall Surabaya', sku: 'Heavy Beam Connection Bracket', brand: 'IndoSteel Architectural', qty: 300, specs: 'Hot-Dip Galvanized 4.5mm', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b9', batchId: 'BATCH-AQT-008', date: '03 Nov 2026, 14:00', project: 'RS Siloam Yogyakarta', sku: 'Sensor Auto Faucet Pro Series', brand: 'AquaTech Sanitary', qty: 60, specs: 'Dual Beam Optical Infrared', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b10', batchId: 'BATCH-UBF-033', date: '04 Nov 2026, 10:10', project: 'Trans Studio Mall Makassar', sku: 'Tactical Performance Cargo Jogger', brand: 'UrbanFit Apparel', qty: 150, specs: '88% Nylon Ripstop 4-Way Stretch', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b11', batchId: 'BATCH-LMN-019', date: '04 Nov 2026, 15:30', project: 'Museum Seni Rupa Jakarta', sku: 'Architectural Track Light 15W COB', brand: 'Lumina Architectural', qty: 120, specs: 'CRI Ra>95 3000K Warm White', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b12', batchId: 'BATCH-TTN-005', date: '05 Nov 2026, 09:20', project: 'Hotel Tentrem Semarang', sku: 'Smart Digital Mortise Lock SUS 304', brand: 'Titan Hardware', qty: 90, specs: 'RFID & Touch Keypad SUS 304', pinLength: 8, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b13', batchId: 'BATCH-PFB-014', date: '05 Nov 2026, 13:50', project: 'Podomoro City Medan', sku: 'Architectural Exterior Cladding 4mm', brand: 'PrimeFiber Composite', qty: 250, specs: 'PVDF 3-Layer Mineral Core', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b14', batchId: 'BATCH-ECO-022', date: '06 Nov 2026, 11:00', project: 'Auditorium Universitas Brawijaya Malang', sku: 'Polyester Acoustic Wall Panel 9mm', brand: 'EcoPanel Akustik', qty: 180, specs: '100% Recycled PET NRC 0.85', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b8', batchId: 'BATCH-ORG-012', date: '03 Nov 2026, 08:45', project: 'TikTok Shop & Shopee Mall Batch', sku: 'Hyalucera Moisturizer Gel 50ml', brand: 'The Originote', qty: 400, specs: 'Hyaluron + Ceramide Gel 50ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b9', batchId: 'BATCH-WRD-008', date: '03 Nov 2026, 14:00', project: 'Departemen Store & Wardah Beauty House', sku: 'UV Shield Essential Sunscreen Gel SPF 50', brand: 'Wardah', qty: 350, specs: 'Broad Spectrum SPF 50 PA++++ 40ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b10', batchId: 'BATCH-AZR-033', date: '04 Nov 2026, 10:10', project: 'Modern Trade & Supermarket Drop', sku: 'Hydrasoothe Sunscreen Gel SPF 45 PA++++', brand: 'Azarine', qty: 280, specs: 'Hydrasoothe Water Gel SPF 45 50ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b11', batchId: 'BATCH-TTS-019', date: '04 Nov 2026, 15:30', project: 'Clean Beauty Retail Partner', sku: 'Bakuchiol Anti-Aging Miracle Serum 20ml', brand: 'True to Skin', qty: 120, specs: 'Bakuchiol 1% + Probiotics 20ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b12', batchId: 'BATCH-STP-005', date: '05 Nov 2026, 09:20', project: 'Sephora Indonesia & Official Launch', sku: 'Herbitus Skin Tonic 100ml', brand: 'Studio Tropik', qty: 90, specs: 'Centella Asiatica + Mugwort 100ml', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b13', batchId: 'BATCH-DMB-014', date: '05 Nov 2026, 13:50', project: 'Flagship Store & E-Commerce Batch', sku: 'Skin Barrier Water Cream 30g', brand: 'Dear Me Beauty', qty: 180, specs: 'Water Burst Barrier Cream 30g', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b14', batchId: 'BATCH-NPR-022', date: '06 Nov 2026, 11:00', project: 'Retail Chain & Dermo Store', sku: 'Centella Asiatica Face Wash 100ml', brand: 'NPURE', qty: 160, specs: 'Gentle Cleanser Centella Leaf 100ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
     { id: 'b15', batchId: 'SUMAS-BATCH-0004-50', date: '06 Nov 2026, 16:15', project: 'PIK 2 Central Market', sku: 'Pintu Cubicle Toilet', brand: 'Sumas', qty: 150, specs: 'Phenolic Board 12mm Standard', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 }
   ];
 
@@ -497,7 +538,7 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
     insertBatch.run(b);
   }
 
-  // 5. OVERHAUL TAGS (15 tags per batch = 225 tags total, all fields complete)
+  // 6. OVERHAUL TAGS (15 tags per batch = 225 tags total, all fields complete)
   db.prepare('DELETE FROM tags').run();
   const insertTag = db.prepare(`
     INSERT INTO tags (id, batchId, tagNumber, pin, status, project, specs, codeType, warranty, prodCode, note, allocatedAt)
@@ -510,6 +551,7 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
 
   const insertAllTagsTx = db.transaction(() => {
     for (const b of batches) {
+      const isSumas = b.brand.toLowerCase() === 'sumas';
       const brandPrefix = b.brand.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
       for (let i = 1; i <= 15; i++) {
         let tagNumber = '';
@@ -523,7 +565,9 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
         let pin = '';
         for (let p = 0; p < b.pinLength; p++) pin += pinDigits.charAt(Math.floor(Math.random() * pinDigits.length));
 
-        const isAllocated = i <= 8;
+        // For SUMAS batches, some tags are allocated to B2B projects.
+        // For retail skincare brands, tags are consumer verification items (Tersedia / Siap Verifikasi).
+        const isAllocated = isSumas ? i <= 8 : false;
 
         insertTag.run({
           id: `tag-${b.id}-${tagNumber}`,
@@ -531,12 +575,12 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
           tagNumber,
           pin,
           status: isAllocated ? 'Telah Digunakan' : 'Tersedia',
-          project: isAllocated ? b.project : 'Alokasi Cadangan Gudang',
+          project: isAllocated ? b.project : (isSumas ? 'Alokasi Cadangan Gudang' : 'Stok Retail Siap Verifikasi'),
           specs: b.specs || 'Standard Factory Spec',
-          codeType: `${brandPrefix}-${b.isB2B ? 'B2B' : 'RET'}-2026`,
-          warranty: b.isB2B ? '5 Tahun Garansi Resmi' : 'Garansi Keaslian Seumur Hidup',
+          codeType: `${brandPrefix}-${b.isB2B ? 'B2B' : 'SKN'}-2026`,
+          warranty: b.isB2B ? '5 Tahun Garansi Resmi' : 'Garansi Keaslian BPOM Resmi',
           prodCode: `PRD-${brandPrefix}-${String(i).padStart(3, '0')}`,
-          note: isAllocated ? `Pemasangan & verifikasi area ${b.project}` : 'Unit QC Passed siap distribusi',
+          note: isAllocated ? `Pemasangan & verifikasi area ${b.project}` : (isSumas ? 'Unit QC Passed siap distribusi' : 'Kemasan tersegel siap scan keaslian oleh konsumen'),
           allocatedAt: isAllocated ? b.date : '06 Nov 2026, 17:00'
         });
       }
@@ -544,320 +588,68 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
   });
   insertAllTagsTx();
 
-  // 6. OVERHAUL SCAN POINTS (15 records)
-  const scanPoints = [
-    {
-      id: 'sp-1',
-      city: 'Jakarta Pusat',
-      province: 'DKI Jakarta',
-      venue: 'Grand Indonesia & Plaza Indonesia',
-      lat: -6.1950,
-      lng: 106.8230,
-      totalScans: 4820,
-      todayScans: 184,
-      brand: 'ASSC',
-      productType: 'Dew Drops Oversized Tee',
-      batchId: 'BATCH-ASSC-082',
-      latestTagId: 'ASC-84920',
-      latestTime: '2 menit yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'iPhone 15 Pro • Safari Mobile iOS 17.5',
-      createdAt: '2026-10-20'
-    },
-    {
-      id: 'sp-2',
-      city: 'Jakarta Utara',
-      province: 'DKI Jakarta',
-      venue: 'PIK 2 Central Market & Commercial Hub',
-      lat: -6.1025,
-      lng: 106.7212,
-      totalScans: 2150,
-      todayScans: 92,
-      brand: 'Sumas',
-      productType: 'Pintu Cubicle Toilet',
-      batchId: 'SUMAS-BATCH-0004-50',
-      latestTagId: 'SMS-PIK-001',
-      latestTime: '4 menit yang lalu',
-      isB2B: 1,
-      status: 'suspicious',
-      anomalyReason: 'Duplikasi scan simultan dengan Surabaya (selisih 4 mnt)',
-      deviceInfo: 'Samsung Galaxy S24 Ultra • Chrome v124',
-      createdAt: '2026-10-21'
-    },
-    {
-      id: 'sp-3',
-      city: 'Surabaya',
-      province: 'Jawa Timur',
-      venue: 'Tunjungan Plaza 6 & Pakuwon Mall',
-      lat: -7.2625,
-      lng: 112.7381,
-      totalScans: 3420,
-      todayScans: 142,
-      brand: 'Sumas',
-      productType: 'Cubicle Hardware Set Stainless 304',
-      batchId: 'SUMAS-BATCH-0003-40',
-      latestTagId: 'SMS-SBY-049',
-      latestTime: '8 menit yang lalu',
-      isB2B: 1,
-      status: 'suspicious',
-      anomalyReason: 'Duplikasi scan lokasi terpisah 780 km dengan Jakarta',
-      deviceInfo: 'Xiaomi Redmi Note 13 Pro • Mi Browser',
-      createdAt: '2026-10-22'
-    },
-    {
-      id: 'sp-4',
-      city: 'Bandung',
-      province: 'Jawa Barat',
-      venue: 'Paris Van Java & Jalan Dago Boutique',
-      lat: -6.8893,
-      lng: 107.5960,
-      totalScans: 2890,
-      todayScans: 110,
-      brand: 'ASSC',
-      productType: 'ASSC Classic Heavyweight Hoodie',
-      batchId: 'BATCH-ASSC-104',
-      latestTagId: 'ASC-77319',
-      latestTime: '24 menit yang lalu',
-      isB2B: 0,
-      status: 'repeated',
-      anomalyReason: 'Scan Berulang Normal: Konsumen melakukan verifikasi keaslian ke-4 kalinya pada item yang sama.',
-      deviceInfo: 'iPhone 14 Pro • Safari iOS 17.2',
-      createdAt: '2026-10-23'
-    },
-    {
-      id: 'sp-5',
-      city: 'Denpasar & Badung',
-      province: 'Bali',
-      venue: 'Seminyak Square & Canggu Coastal Hub',
-      lat: -8.6882,
-      lng: 115.1565,
-      totalScans: 2340,
-      todayScans: 98,
-      brand: 'BLIMEY!',
-      productType: 'A LITTLE CLOSER (BLIMEY!) Tee',
-      batchId: 'BATCH-BLM-041',
-      latestTagId: 'BLM-92814',
-      latestTime: '15 menit yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Google Pixel 8 Pro • Chrome Mobile',
-      createdAt: '2026-10-24'
-    },
-    {
-      id: 'sp-6',
-      city: 'Penajam Paser / IKN',
-      province: 'Kalimantan Timur',
-      venue: 'Gedung Kemenko & Rumah Susun ASN',
-      lat: -0.9610,
-      lng: 116.7020,
-      totalScans: 1980,
-      todayScans: 76,
-      brand: 'Sumas',
-      productType: 'Phenolic Board 12mm Standard',
-      batchId: 'SUMAS-BATCH-0002-25',
-      latestTagId: 'SMS-IKN-0042',
-      latestTime: '31 menit yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'iPad Air (5th gen) • Chrome iOS',
-      createdAt: '2026-10-25'
-    },
-    {
-      id: 'sp-7',
-      city: 'Medan',
-      province: 'Sumatera Utara',
-      venue: 'Podomoro City Deli Park & Sun Plaza',
-      lat: 3.5852,
-      lng: 98.6750,
-      totalScans: 1750,
-      todayScans: 65,
-      brand: 'PrimeFiber Composite',
-      productType: 'Architectural Exterior Cladding 4mm',
-      batchId: 'BATCH-PFB-014',
-      latestTagId: 'PFB-MDN-081',
-      latestTime: '45 menit yang lalu',
-      isB2B: 1,
-      status: 'repeated',
-      anomalyReason: 'Pengecekan Ulang Proyek: Tim kontraktor melakukan audit checklist berkala untuk material terpasang.',
-      deviceInfo: 'Samsung Tab S9 Ultra • Edge Mobile',
-      createdAt: '2026-10-25'
-    },
-    {
-      id: 'sp-8',
-      city: 'Semarang',
-      province: 'Jawa Tengah',
-      venue: 'Kawasan Simpang Lima & Hotel Tentrem',
-      lat: -6.9932,
-      lng: 110.4203,
-      totalScans: 1180,
-      todayScans: 43,
-      brand: 'Titan Hardware',
-      productType: 'Smart Digital Mortise Lock SUS 304',
-      batchId: 'BATCH-TTN-005',
-      latestTagId: 'TTN-SMG-012',
-      latestTime: '1 jam yang lalu',
-      isB2B: 1,
-      status: 'suspicious',
-      anomalyReason: 'Percobaan PIN salah 7x dalam 10 menit',
-      deviceInfo: 'Unknown Device (Proxy IP Terdeteksi)',
-      createdAt: '2026-10-26'
-    },
-    {
-      id: 'sp-9',
-      city: 'Makassar',
-      province: 'Sulawesi Selatan',
-      venue: 'Trans Studio Mall & Mall Panakkukang',
-      lat: -5.1477,
-      lng: 119.4327,
-      totalScans: 1420,
-      todayScans: 54,
-      brand: 'UrbanFit Apparel',
-      productType: 'Tactical Performance Cargo Jogger',
-      batchId: 'BATCH-UBF-033',
-      latestTagId: 'UBF-MKS-055',
-      latestTime: '1 jam yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Oppo Find N3 Flip • Chrome Mobile',
-      createdAt: '2026-10-26'
-    },
-    {
-      id: 'sp-10',
-      city: 'Yogyakarta',
-      province: 'DI Yogyakarta',
-      venue: 'Ambarrukmo Plaza & RS Siloam',
-      lat: -7.7828,
-      lng: 110.4011,
-      totalScans: 1290,
-      todayScans: 51,
-      brand: 'AquaTech Sanitary',
-      productType: 'Sensor Auto Faucet Pro Series',
-      batchId: 'BATCH-AQT-008',
-      latestTagId: 'AQT-YGY-119',
-      latestTime: '2 jam yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'iPhone 13 • Safari iOS',
-      createdAt: '2026-10-27'
-    },
-    {
-      id: 'sp-11',
-      city: 'Kediri',
-      province: 'Jawa Timur',
-      venue: 'RSUD Gambiran & Proyek RS Kediri',
-      lat: -7.8228,
-      lng: 112.0118,
-      totalScans: 890,
-      todayScans: 38,
-      brand: 'Sumas',
-      productType: 'Pintu Cubicle Toilet',
-      batchId: 'SUMAS-BATCH-0001-10',
-      latestTagId: 'SMS-KDR-0001',
-      latestTime: '10 menit yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Samsung Galaxy A54 • Chrome Mobile',
-      createdAt: '2026-10-28'
-    },
-    {
-      id: 'sp-12',
-      city: 'Palembang',
-      province: 'Sumatera Selatan',
-      venue: 'Palembang Icon & Bandara SMB II',
-      lat: -2.9761,
-      lng: 104.7754,
-      totalScans: 960,
-      todayScans: 35,
-      brand: 'BLIMEY!',
-      productType: 'Oversized Street Denim Jacket',
-      batchId: 'BATCH-BLM-058',
-      latestTagId: 'BLM-PLM-442',
-      latestTime: '3 jam yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Vivo V29 5G • Chrome Mobile',
-      createdAt: '2026-10-28'
-    },
-    {
-      id: 'sp-13',
-      city: 'Batam',
-      province: 'Kepulauan Riau',
-      venue: 'Mega Mall Batam Centre & Kawasan Nagoya',
-      lat: 1.1293,
-      lng: 104.0526,
-      totalScans: 850,
-      todayScans: 31,
-      brand: 'IndoSteel Architectural',
-      productType: 'Heavy Beam Connection Bracket',
-      batchId: 'BATCH-IDS-012',
-      latestTagId: 'IDS-BTM-019',
-      latestTime: '3 jam yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'ASUS Zenfone 10 • Chrome Mobile',
-      createdAt: '2026-10-29'
-    },
-    {
-      id: 'sp-14',
-      city: 'Balikpapan',
-      province: 'Kalimantan Timur',
-      venue: 'Pentacity Mall & Bandara Sepinggan',
-      lat: -1.2654,
-      lng: 116.8312,
-      totalScans: 1120,
-      todayScans: 48,
-      brand: 'Sumas',
-      productType: 'Phenolic Board 12mm Standard',
-      batchId: 'SUMAS-BATCH-0002-25',
-      latestTagId: 'SMS-BPN-094',
-      latestTime: '4 jam yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'iPhone 15 Plus • Safari iOS',
-      createdAt: '2026-10-29'
-    },
-    {
-      id: 'sp-15',
-      city: 'Malang',
-      province: 'Jawa Timur',
-      venue: 'Mall Olympic Garden & Universitas Brawijaya',
-      lat: -7.9786,
-      lng: 112.6318,
-      totalScans: 780,
-      todayScans: 29,
-      brand: 'EcoPanel Akustik',
-      productType: 'Polyester Acoustic Wall Panel 9mm',
-      batchId: 'BATCH-ECO-022',
-      latestTagId: 'ECO-MLG-088',
-      latestTime: '5 jam yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Xiaomi 13T • Chrome Mobile',
-      createdAt: '2026-10-30'
-    }
-  ];
+  // 7. OVERHAUL SCAN POINTS (Per-Tag Individual Telemetry Records with PIN & Multi-Scan History)
+  const scanPoints = initialScanPoints;
 
-  db.prepare('DELETE FROM scan_points').run();
+  db.prepare("DELETE FROM scan_points").run();
   const insertScanPoint = db.prepare(`
-    INSERT INTO scan_points (id, city, province, venue, lat, lng, totalScans, todayScans, brand, productType, batchId, latestTagId, latestTime, isB2B, status, anomalyReason, deviceInfo, createdAt)
-    VALUES (@id, @city, @province, @venue, @lat, @lng, @totalScans, @todayScans, @brand, @productType, @batchId, @latestTagId, @latestTime, @isB2B, @status, @anomalyReason, @deviceInfo, @createdAt)
+    INSERT INTO scan_points (id, city, province, venue, lat, lng, totalScans, todayScans, brand, productType, batchId, latestTagId, pin, latestTime, isB2B, status, anomalyReason, deviceInfo, scanHistory, createdAt)
+    VALUES (@id, @city, @province, @venue, @lat, @lng, @totalScans, @todayScans, @brand, @productType, @batchId, @latestTagId, @pin, @latestTime, @isB2B, @status, @anomalyReason, @deviceInfo, @scanHistory, @createdAt)
   `);
   for (const sp of scanPoints) {
-    insertScanPoint.run(sp);
+    insertScanPoint.run({
+      ...sp,
+      pin: sp.pin || "12345678",
+      anomalyReason: sp.anomalyReason || null,
+      isB2B: sp.brand.toLowerCase() === 'sumas' ? 1 : 0,
+      createdAt: (sp as any).createdAt || "2026-11-07",
+      scanHistory: JSON.stringify(sp.scanHistory || [])
+    });
   }
 
-  // 7. OVERHAUL AUDIT LOGS (15 records)
+  // 8. OVERHAUL SCAN ACTIVITIES (Chart timeline)
+  db.prepare('DELETE FROM scan_activities').run();
+  const insertActivity = db.prepare(`
+    INSERT INTO scan_activities (rangeType, label, fullDate, scans, valid, topBrand, sortOrder)
+    VALUES (@rangeType, @label, @fullDate, @scans, @valid, @topBrand, @sortOrder)
+  `);
+
+  const initialActivities = [
+    // 7 Days
+    { rangeType: '7d', label: 'Sen (26/10)', fullDate: '26 Okt 2026', scans: 520, valid: 519, topBrand: 'Sumas', sortOrder: 1 },
+    { rangeType: '7d', label: 'Sel (27/10)', fullDate: '27 Okt 2026', scans: 680, valid: 679, topBrand: 'Somethinc', sortOrder: 2 },
+    { rangeType: '7d', label: 'Rab (28/10)', fullDate: '28 Okt 2026', scans: 610, valid: 608, topBrand: 'Skintific', sortOrder: 3 },
+    { rangeType: '7d', label: 'Kam (29/10)', fullDate: '29 Okt 2026', scans: 790, valid: 788, topBrand: 'Sumas', sortOrder: 4 },
+    { rangeType: '7d', label: 'Jum (30/10)', fullDate: '30 Okt 2026', scans: 940, valid: 938, topBrand: 'Avoskin', sortOrder: 5 },
+    { rangeType: '7d', label: 'Sab (31/10)', fullDate: '31 Okt 2026', scans: 1120, valid: 1118, topBrand: 'Somethinc', sortOrder: 6 },
+    { rangeType: '7d', label: 'Min (01/11)', fullDate: '01 Nov 2026', scans: 860, valid: 859, topBrand: 'Whitelab', sortOrder: 7 },
+
+    // 30 Days
+    { rangeType: '30d', label: 'Minggu 1', fullDate: '01 - 07 Okt 2026', scans: 3450, valid: 3442, topBrand: 'Sumas', sortOrder: 1 },
+    { rangeType: '30d', label: 'Minggu 2', fullDate: '08 - 14 Okt 2026', scans: 4120, valid: 4110, topBrand: 'Somethinc', sortOrder: 2 },
+    { rangeType: '30d', label: 'Minggu 3', fullDate: '15 - 21 Okt 2026', scans: 4890, valid: 4881, topBrand: 'Sumas', sortOrder: 3 },
+    { rangeType: '30d', label: 'Minggu 4', fullDate: '22 - 28 Okt 2026', scans: 5410, valid: 5402, topBrand: 'Skintific', sortOrder: 4 },
+    { rangeType: '30d', label: 'Minggu 5', fullDate: '29 Okt - 01 Nov', scans: 2920, valid: 2915, topBrand: 'Somethinc', sortOrder: 5 },
+
+    // 12 Months
+    { rangeType: '12m', label: 'Jan', fullDate: 'Januari 2026', scans: 8900, valid: 8880, topBrand: 'Sumas', sortOrder: 1 },
+    { rangeType: '12m', label: 'Feb', fullDate: 'Februari 2026', scans: 10400, valid: 10380, topBrand: 'Sumas', sortOrder: 2 },
+    { rangeType: '12m', label: 'Mar', fullDate: 'Maret 2026', scans: 12100, valid: 12075, topBrand: 'Somethinc', sortOrder: 3 },
+    { rangeType: '12m', label: 'Apr', fullDate: 'April 2026', scans: 11800, valid: 11770, topBrand: 'Avoskin', sortOrder: 4 },
+    { rangeType: '12m', label: 'Mei', fullDate: 'Mei 2026', scans: 13900, valid: 13865, topBrand: 'Sumas', sortOrder: 5 },
+    { rangeType: '12m', label: 'Jun', fullDate: 'Juni 2026', scans: 14500, valid: 14470, topBrand: 'Somethinc', sortOrder: 6 },
+    { rangeType: '12m', label: 'Jul', fullDate: 'Juli 2026', scans: 15800, valid: 15760, topBrand: 'Skintific', sortOrder: 7 },
+    { rangeType: '12m', label: 'Agt', fullDate: 'Agustus 2026', scans: 17200, valid: 17160, topBrand: 'Sumas', sortOrder: 8 },
+    { rangeType: '12m', label: 'Sep', fullDate: 'September 2026', scans: 16900, valid: 16860, topBrand: 'Whitelab', sortOrder: 9 },
+    { rangeType: '12m', label: 'Okt', fullDate: 'Oktober 2026', scans: 18492, valid: 18450, topBrand: 'Sumas', sortOrder: 10 },
+    { rangeType: '12m', label: 'Nov', fullDate: 'November 2026', scans: 4820, valid: 4812, topBrand: 'Somethinc', sortOrder: 11 }
+  ];
+
+  for (const a of initialActivities) {
+    insertActivity.run(a);
+  }
+
+  // 9. OVERHAUL AUDIT LOGS (15 records)
   const auditLogs = [
     {
       id: 1730260800000,
@@ -869,19 +661,19 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
     },
     {
       id: 1730264400000,
-      batchId: 'BATCH-ASSC-082',
+      batchId: 'BATCH-SMT-082',
       timestamp: '29 Okt 2026, 14:15',
       user: 'Siti Rahma',
-      reason: 'Penambahan alokasi stok untuk gerai Flagship Store Grand Indonesia drop eksklusif.',
+      reason: 'Penambahan alokasi stok untuk gerai Flagship Store Somethinc Grand Indonesia.',
       changes: JSON.stringify([{ field: 'Quantity', old: '200 Tag', new: '250 Tag' }])
     },
     {
       id: 1730350800000,
-      batchId: 'BATCH-BLM-041',
+      batchId: 'BATCH-AVO-041',
       timestamp: '30 Okt 2026, 11:30',
       user: 'Budi Santoso',
-      reason: 'Perubahan alamat verifikasi QR Cloud Redirect ke domain keamanan resmi cek.sumas.id.',
-      changes: JSON.stringify([{ field: 'Redirect URL', old: 'http://legacy.blimey.id', new: 'https://cek.sumas.id/' }])
+      reason: 'Pembaruan alamat verifikasi QR Cloud Redirect ke domain keamanan resmi cek.sumas.id.',
+      changes: JSON.stringify([{ field: 'Redirect URL', old: 'http://legacy.avoskin.id', new: 'https://cek.sumas.id/' }])
     },
     {
       id: 1730358000000,
@@ -893,67 +685,67 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
     },
     {
       id: 1730437200000,
-      batchId: 'BATCH-ASSC-104',
+      batchId: 'BATCH-SKT-104',
       timestamp: '31 Okt 2026, 09:50',
       user: 'Dewi Lestari',
-      reason: 'Pemberian nomor garansi resmi keaslian dan proteksi anti-counterfeit PIN 8 digit.',
+      reason: 'Pemberian nomor garansi resmi keaslian dan proteksi anti-counterfeit PIN 8 digit Skintific.',
       changes: JSON.stringify([{ field: 'PIN Length', old: '6 Digit', new: '8 Digit' }])
     },
     {
       id: 1730444400000,
-      batchId: 'BATCH-IDS-012',
+      batchId: 'BATCH-WHL-058',
       timestamp: '31 Okt 2026, 14:20',
       user: 'Rina Wijaya',
-      reason: 'Pemeriksaan kepatuhan standar uji beban tarik ASTM A36 bracket baja IndoSteel.',
-      changes: JSON.stringify([{ field: 'Standar Mutu', old: 'SNI 07-0052', new: 'ASTM A36 Heavy Duty' }])
+      reason: 'Pemeriksaan kepatuhan standar BPOM kemasan serum Whitelab 20ml.',
+      changes: JSON.stringify([{ field: 'Standar Mutu', old: 'BPOM Pending', new: 'BPOM NA18211901142' }])
     },
     {
       id: 1730523600000,
-      batchId: 'BATCH-AQT-008',
+      batchId: 'BATCH-ORG-012',
       timestamp: '01 Nov 2026, 10:10',
       user: 'Hendra Gunawan',
-      reason: 'Penyesuaian spesifikasi sensor infra-merah dual beam hemat air RS Siloam.',
-      changes: JSON.stringify([{ field: 'Sensor Type', old: 'Single Beam', new: 'Dual Beam Optical Infrared' }])
+      reason: 'Peningkatan kapasitas kuota tag kemasan gel The Originote untuk peluncuran Shopee Mall.',
+      changes: JSON.stringify([{ field: 'Quantity', old: '300 Tag', new: '400 Tag' }])
     },
     {
       id: 1730530800000,
-      batchId: 'BATCH-UBF-033',
+      batchId: 'BATCH-WRD-008',
       timestamp: '01 Nov 2026, 16:30',
       user: 'Farhan Nugraha',
-      reason: 'Pembaruan catatan instruksi perawatan celana tactical performance cargo jogger.',
-      changes: JSON.stringify([{ field: 'Catatan Batch', old: 'Standar Tekstil', new: 'Lapisan DWR Water Repellent Anti-Air' }])
+      reason: 'Pembaruan catatan instruksi penyimpanan sunscreen Wardah UV Shield di gerai ritel.',
+      changes: JSON.stringify([{ field: 'Catatan Batch', old: 'Suhu Kamar', new: 'Hindarkan dari Sinar Matahari Langsung' }])
     },
     {
       id: 1730610000000,
-      batchId: 'BATCH-LMN-019',
+      batchId: 'BATCH-AZR-033',
       timestamp: '02 Nov 2026, 08:45',
       user: 'Dewi Lestari',
-      reason: 'Verifikasi sertifikat CRI > 95 untuk pencahayaan ruang pameran museum seni rupa.',
-      changes: JSON.stringify([{ field: 'CRI Rating', old: 'Ra > 80', new: 'Ra > 95 High Fidelity' }])
+      reason: 'Verifikasi sertifikat SPF 45 PA++++ uji laboratorium independen Azarine.',
+      changes: JSON.stringify([{ field: 'Rating SPF', old: 'SPF 30', new: 'SPF 45 PA++++ Water Gel' }])
     },
     {
       id: 1730617200000,
-      batchId: 'BATCH-TTN-005',
+      batchId: 'BATCH-TTS-019',
       timestamp: '02 Nov 2026, 13:15',
       user: 'Budi Santoso',
-      reason: 'Konfigurasi frekuensi RFID Mifare 13.56MHz kunci pintu digital Hotel Tentrem.',
-      changes: JSON.stringify([{ field: 'Frekuensi Kunci', old: '125 KHz', new: '13.56 MHz High Security' }])
+      reason: 'Konfigurasi tag kemasan botol pipet Bakuchiol True to Skin.',
+      changes: JSON.stringify([{ field: 'Tipe Label', old: 'Stiker Biasa', new: 'Tamper-Evident QR Label' }])
     },
     {
       id: 1730696400000,
-      batchId: 'BATCH-PFB-014',
+      batchId: 'BATCH-STP-005',
       timestamp: '03 Nov 2026, 11:00',
       user: 'Hendra Gunawan',
-      reason: 'Penambahan kuota tag fisik proyek cladding fasad Podomoro City Medan.',
-      changes: JSON.stringify([{ field: 'Quantity', old: '200 Tag', new: '250 Tag' }])
+      reason: 'Penambahan kuota tag botol Herbitus Skin Tonic Studio Tropik Sephora batch.',
+      changes: JSON.stringify([{ field: 'Quantity', old: '60 Tag', new: '90 Tag' }])
     },
     {
       id: 1730703600000,
-      batchId: 'BATCH-ECO-022',
+      batchId: 'BATCH-DMB-014',
       timestamp: '03 Nov 2026, 15:20',
       user: 'Anisa Putri',
-      reason: 'Penerbitan laporan uji serap suara laboratorium akustik akustik auditorium UB Malang.',
-      changes: JSON.stringify([{ field: 'Nilai NRC', old: '0.70', new: '0.85 Sound Absorber' }])
+      reason: 'Penerbitan laporan uji stabilitas tekstur water cream Dear Me Beauty.',
+      changes: JSON.stringify([{ field: 'Hasil Uji', old: 'Uji Stabilitas', new: 'Lolos Uji Stabilitas 40°C' }])
     },
     {
       id: 1730782800000,
@@ -969,14 +761,14 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
       timestamp: '04 Nov 2026, 14:00',
       user: 'Dimas Pratama',
       reason: 'Audit fisik berkala material engsel stainless steel SUS 304 Bandara Juanda T2.',
-      changes: JSON.stringify([{ field: 'Hasil Audit', old: 'Menunggu', new: 'Lulus Uji Ketahanan Korosi' }])
+      changes: JSON.stringify([{ field: 'Hasil Audit', old: 'Menunggu', new: 'Lulus Uji Ketahanan Korosi SUS 304' }])
     },
     {
       id: 1730876400000,
-      batchId: 'BATCH-BLM-058',
+      batchId: 'BATCH-NPR-022',
       timestamp: '05 Nov 2026, 10:45',
       user: 'Budi Santoso',
-      reason: 'Verifikasi pelabelan QR security hologram batch jaket denim raw selvedge 14oz.',
+      reason: 'Verifikasi pelabelan QR security hologram batch botol face wash daun Centella Asiatica.',
       changes: JSON.stringify([{ field: 'Label QR', old: 'Stiker Biasa', new: 'Hologram Tamper-Evident' }])
     }
   ];
@@ -990,12 +782,12 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
     insertAuditLog.run(log);
   }
 
-  // 8. OVERHAUL PASSWORD RESET REQUESTS (15 records)
+  // 10. OVERHAUL PASSWORD RESET REQUESTS (15 records)
   const resetRequests = [
     { id: 'pr-1', userId: 'u2', userName: 'Budi Santoso', userEmail: 'budi.s@sumas.id', userRole: 'Operator', avatar: '/assets/avatars/user_budi.svg', requestedAt: '15 menit yang lalu', status: 'Menunggu', actionNote: 'Lupa kata sandi saat mencoba akses dari tablet lapangan proyek RSUD Kediri', isRead: 0 },
-    { id: 'pr-2', userId: 'u4', userName: 'Siti Rahma', userEmail: 'siti.r@sumas.id', userRole: 'Operator', avatar: '/assets/avatars/user_siti.svg', requestedAt: '45 menit yang lalu', status: 'Menunggu', actionNote: 'Permintaan reset PIN dan kata sandi berkala perangkat brand operasional', isRead: 0 },
+    { id: 'pr-2', userId: 'u4', userName: 'Siti Rahma', userEmail: 'siti.r@sumas.id', userRole: 'Operator', avatar: '/assets/avatars/user_siti.svg', requestedAt: '45 menit yang lalu', status: 'Menunggu', actionNote: 'Permintaan reset PIN dan kata sandi berkala perangkat brand operasional Somethinc', isRead: 0 },
     { id: 'pr-3', userId: 'u3', userName: 'Rina Wijaya', userEmail: 'rina.w@sumas.id', userRole: 'Operator', avatar: '/assets/avatars/user_rina.svg', requestedAt: '2 jam yang lalu', status: 'Disetujui', actionNote: 'Tautan reset sandi 1-kali pakai telah dikirim otomatis ke email terdaftar', isRead: 1 },
-    { id: 'pr-4', userId: 'u5', userName: 'Dimas Pratama', userEmail: 'dimas.p@sumas.id', userRole: 'Auditor', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80', requestedAt: '3 jam yang lalu', status: 'Disetujui', actionNote: 'Permintaan reset sandi diverifikasi melalui otentikasi WhatsApp dinas kantor', isRead: 1 },
+    { id: 'pr-4', userId: 'u5', userName: 'Dimas Pratama', userEmail: 'dimas.p@sumas.id', userRole: 'Auditor', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80', requestedAt: '3 jam yang lalu', status: 'Disetujui', actionNote: 'Permintaan reset sandi diverifikasi melalui otentikasi dinas kantor', isRead: 1 },
     { id: 'pr-5', userId: 'u7', userName: 'Hendra Gunawan', userEmail: 'hendra.g@sumas.id', userRole: 'Operator', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80', requestedAt: '5 jam yang lalu', status: 'Selesai', actionNote: 'Sandi baru telah diaktifkan oleh pengguna secara mandiri', isRead: 1 },
     { id: 'pr-6', userId: 'u8', userName: 'Maya Anggraini', userEmail: 'maya.a@sumas.id', userRole: 'Viewer', avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&auto=format&fit=crop&q=80', requestedAt: 'Kemarin, 09:20', status: 'Selesai', actionNote: 'Sandi sementara telah direset dan diverifikasi', isRead: 1 },
     { id: 'pr-7', userId: 'u9', userName: 'Farhan Nugraha', userEmail: 'farhan.n@sumas.id', userRole: 'Operator', avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80', requestedAt: 'Kemarin, 11:45', status: 'Ditolak', actionNote: 'Permintaan ditolak karena pengguna salah memasukkan email verifikasi 3 kali berturut-turut', isRead: 1 },
@@ -1017,11 +809,4 @@ Ketebalan: 9 mm | Densitas: 1900 g/m² | Koefisien Reduksi Suara (NRC): 0.85 | S
   for (const pr of resetRequests) {
     insertResetReq.run(pr);
   }
-
-  // 9. ENSURE CATEGORIES ARE COMPLETE
-  try {
-    db.prepare("UPDATE categories SET description = 'Material partisi toilet, phenolic board tahan air, dan perlengkapan arsitektural komersial Sumas', status = 'Aktif' WHERE id = 'cat-mat'").run();
-    db.prepare("UPDATE categories SET description = 'Koleksi fashion retail, streetwear, dan apparel kasual berseri tag keaslian', status = 'Aktif' WHERE id = 'cat-app'").run();
-    db.prepare("UPDATE categories SET description = 'Aksesoris pelengkap, tas, topi, dan barang merchandise resmi brand', status = 'Aktif' WHERE id = 'cat-acc'").run();
-  } catch (_) {}
 }

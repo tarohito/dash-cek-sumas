@@ -6,11 +6,26 @@ import {
   Radio, 
   ChevronDown,
   ChevronUp,
-  RefreshCw,
   X
 } from 'lucide-react';
 
 export type ScanSecurityStatus = 'valid' | 'repeated' | 'suspicious';
+
+export interface ScanHistoryItem {
+  scanNumber: number;
+  scannedAt: string;
+  city: string;
+  province: string;
+  venue?: string;
+  lat: number;
+  lng: number;
+  ipAddress: string;
+  isp?: string;
+  device: string;
+  browser?: string;
+  status: ScanSecurityStatus;
+  statusNote?: string;
+}
 
 export interface ScanPoint {
   id: string;
@@ -25,10 +40,12 @@ export interface ScanPoint {
   productType: string;
   batchId: string;
   latestTagId: string;
+  pin?: string;
   latestTime: string;
   status: ScanSecurityStatus;
   anomalyReason?: string;
   deviceInfo: string;
+  scanHistory?: ScanHistoryItem[];
 }
 
 export interface ScanLocationMapProps {
@@ -308,19 +325,6 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
 
         {/* CONTROLS & ACTIONS */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {onRefresh && (
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
-              title="Segarkan Data"
-            >
-              <RefreshCw size={13} className={isLoading ? 'animate-spin text-[#c28e62]' : ''} />
-              <span className="hidden sm:inline">Sinkronkan</span>
-            </button>
-          )}
-
           <button
             type="button"
             onClick={handleResetView}

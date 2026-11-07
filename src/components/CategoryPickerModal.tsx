@@ -421,7 +421,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-full border border-slate-200 dark:border-zinc-700 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
             >
               Batal
             </button>
@@ -429,7 +429,7 @@ export const CategoryPickerModal: React.FC<CategoryPickerModalProps> = ({
               type="button"
               onClick={handleApply}
               disabled={!previewPath}
-              className="px-5 py-2 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center shadow-2xs"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center shadow-xs"
             >
               <span>Gunakan Kategori Ini</span>
             </button>

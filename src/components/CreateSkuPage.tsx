@@ -542,7 +542,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
             <button
               type="button"
               onClick={handleCancelClick}
-              className="px-4 sm:px-5 py-2 rounded-full border border-slate-200 dark:border-zinc-700 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
             >
               Batal
             </button>
@@ -550,7 +550,7 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="px-5 sm:px-6 py-2 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center shadow-xs"
+              className="px-5 sm:px-6 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center shadow-xs"
             >
               {isSubmitting ? (
                 <span>Menyimpan...</span>
@@ -583,18 +583,18 @@ export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
             
-            {/* KOLOM KIRI: GAMBAR PRODUK (TINGGI SAMA RATA DENGAN KOLOM KANAN) */}
-            <div className="lg:col-span-5 flex flex-col h-full">
+            {/* KOLOM KIRI: GAMBAR PRODUK (RASIO WAJIB 1:1 SQUARE DENGAN AUTO-CROP) */}
+            <div className="lg:col-span-5 flex flex-col items-center">
 
-              <div className="w-full h-full min-h-[300px] sm:min-h-[340px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/40 relative overflow-hidden group flex flex-col items-center justify-center text-center p-4 transition-all hover:border-[#c28e62]">
+              <div className="w-full aspect-square max-w-[360px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/40 relative overflow-hidden group flex flex-col items-center justify-center text-center p-2 transition-all hover:border-[#c28e62]">
                 {productImage ? (
                   <>
                     <img 
                       src={productImage} 
                       alt="Pratinjau Produk" 
-                      className="w-full h-full object-contain rounded-xl"
+                      className="w-full h-full object-cover rounded-xl"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <button

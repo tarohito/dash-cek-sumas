@@ -974,7 +974,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setDeleteModalOpen(false)}
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -982,7 +982,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleConfirmDelete}
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                className="flex-1 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs disabled:opacity-50"
               >
                 {isSubmitting ? 'Menghapus...' : 'Ya, Hapus'}
               </button>

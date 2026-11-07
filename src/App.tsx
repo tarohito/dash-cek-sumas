@@ -180,6 +180,12 @@ const formatDateTimeDisplay = (dateVal?: string | null, idVal?: string | null): 
   return dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+// Algoritma penentu batch SUMAS: hanya batch milik SUMAS yang dapat mengalokasikan tag ke proyek
+export const isSumasBatch = (batch?: { brand?: string } | null): boolean => {
+  if (!batch?.brand) return false;
+  return batch.brand.trim().toLowerCase() === 'sumas';
+};
+
 const NewBadge: React.FC<{ 
   date?: string | null; 
   id?: string | null; 
@@ -1110,7 +1116,7 @@ export default function App() {
   // State master kategori produk dari database SQLite (untuk resolusi hirarki 3 layer)
   const [categories, setCategories] = useState<{ id: string; name: string; level: number; parentId?: string | null; code?: string | null; specSchema?: string | null }[]>([]);
 
-  // Helper resolusi teks kategori 3 layer (misal: "Material & Konstruksi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard")
+  // Helper resolusi teks kategori 3 layer (misal: "SUMAS Architectural & Partisi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard")
   const resolveCategoryHierarchy = (categoryStr: string, categoriesList?: { id: string; name: string; level: number; parentId?: string | null }[]) => {
     if (!categoryStr) return null;
     const trimmed = categoryStr.trim();
@@ -1348,7 +1354,7 @@ export default function App() {
     logo: '',
     ownerId: '',
     description: '',
-    category: 'Material & Konstruksi',
+    category: 'Skincare & Dermo-Cosmetics',
     status: 'Aktif' as 'Aktif' | 'Nonaktif'
   });
 
@@ -1390,6 +1396,7 @@ export default function App() {
   const [selectedScanDetail, setSelectedScanDetail] = useState<any | null>(null);
   const [isScanDetailModalOpen, setIsScanDetailModalOpen] = useState(false);
   const [isScanMapOpen, setIsScanMapOpen] = useState(false);
+  const [hasMapEverOpened, setHasMapEverOpened] = useState(false);
 
   const fetchScanData = async () => {
     try {
@@ -1589,12 +1596,8 @@ export default function App() {
   ];
 
   const brandCategoriesList = [
-    'Material & Konstruksi',
-    'Fashion & Streetwear',
-    'Apparel & Lifestyle',
-    'Elektronik & Hardware',
-    'FMCG & Konsumsi',
-    'Umum'
+    'SUMAS Architectural & Partisi',
+    'Skincare & Dermo-Cosmetics'
   ];
 
   const presetUserAvatars = [
@@ -1606,11 +1609,12 @@ export default function App() {
 
   const [logoInputTab, setLogoInputTab] = useState<'upload' | 'url' | 'preset'>('upload');
 
-  // Preset foto/logo brand arsitektural siap pakai (100% lokal SVG)
+  // Preset foto/logo brand arsitektural & skincare siap pakai (100% lokal SVG)
   const presetBrandLogos = [
-    { label: 'Sumas / Architectural & Material', url: '/assets/brand/logo_horizontal.svg' },
-    { label: 'ASSC / Streetwear & Fashion', url: '/assets/brand/assc_logo.svg' },
-    { label: 'BLIMEY! / Apparel & Lifestyle', url: '/assets/brand/blimey_logo.svg' },
+    { label: 'Sumas / Architectural & Partisi', url: '/assets/brand/logo_horizontal.svg' },
+    { label: 'Somethinc / Skincare & Kosmetik', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%232b3990"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">ST</text></svg>' },
+    { label: 'Avoskin / Natural & Active Skincare', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%233a5a40"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">AV</text></svg>' },
+    { label: 'Skintific / Skin Barrier Solution', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230284c7"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">SK</text></svg>' },
   ];
 
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
@@ -2070,7 +2074,7 @@ export default function App() {
       logo: '',
       ownerId: defaultOwnerId,
       description: '',
-      category: 'Material & Konstruksi',
+      category: 'Skincare & Dermo-Cosmetics',
       status: 'Aktif'
     });
     setLogoInputTab('upload');
@@ -2099,7 +2103,7 @@ export default function App() {
       logo: brand.logo || '',
       ownerId: targetOwnerId,
       description: brand.description || '',
-      category: brand.category || 'Material & Konstruksi',
+      category: brand.category || (brand.name.toLowerCase() === 'sumas' ? 'SUMAS Architectural & Partisi' : 'Skincare & Dermo-Cosmetics'),
       status: brand.status
     });
     setLogoInputTab(brand.logo ? (brand.logo.startsWith('data:') ? 'upload' : 'url') : 'upload');
@@ -2974,6 +2978,7 @@ export default function App() {
   };
 
   const toggleTagSelection = (tagId: string) => {
+    if (!isSumasBatch(activeBatch)) return;
     setSelectedTagsToAllocate(prev =>
       prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
     );
@@ -3037,6 +3042,7 @@ export default function App() {
   };
 
   const handleQuickSelectAvailable = (count: number) => {
+    if (!isSumasBatch(activeBatch)) return;
     const availableTagIds = currentTags
       .filter(t => t.status === 'Tersedia')
       .map(t => t.id);
@@ -3049,6 +3055,7 @@ export default function App() {
   };
 
   const handleSaveAllocation = async () => {
+    if (!isSumasBatch(activeBatch)) return;
     if (!allocationForm.project.trim() || !allocationForm.specs.trim() || !activeBatch) return;
     if (selectedTagsToAllocate.length === 0) return;
 
@@ -3489,7 +3496,8 @@ export default function App() {
   const openDetailModal = async (batch: any, initialTab = 'tags') => {
     setHoveredTagInfo(null);
     setActiveBatch(batch);
-    setActiveTab(initialTab);
+    const targetTab = (!isSumasBatch(batch) && initialTab === 'projects') ? 'tags' : initialTab;
+    setActiveTab(targetTab);
     setTagSearch('');
     setSelectedTagsToAllocate([]);
     setTagProjectFilter('all');
@@ -4418,10 +4426,11 @@ export default function App() {
             </button>
           </div>
 
-          {/* SEARCH & FILTER CONTROLS */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-              <div className="relative flex-1 max-w-md">
+          {/* BRAND TABLE & CONTROLS (TERPADU DALAM SATU CARD SEPERTI TABEL SCAN) */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-xs">
+            {/* Filter & Pencarian Bar */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px]">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                 <input
                   type="text"
@@ -4468,7 +4477,6 @@ export default function App() {
                   />
                 </div>
 
-
                 {/* Dropdown Custom Semua Status (Tanpa Pencarian) */}
                 <div className="w-full sm:w-auto min-w-[130px] sm:min-w-[150px]">
                   <CustomSelect
@@ -4492,25 +4500,28 @@ export default function App() {
 
             {/* Reset filter button if active (seperti di halaman tag qrcode) */}
             {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setBrandSearch('');
-                  setBrandFilterStatus('all');
-                  setBrandSortBy('newest');
-                  setBrandPage(1);
-                }}
-                className="text-xs text-[#c28e62] hover:underline font-semibold self-center sm:self-auto cursor-pointer"
-              >
-                Reset Filter
-              </button>
+              <div className="px-5 py-2.5 bg-slate-50/60 dark:bg-zinc-800/40 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-zinc-400">
+                  Menampilkan hasil filter: <strong className="text-slate-800 dark:text-zinc-200">{filteredBrands.length}</strong> brand
+                  {brandSearch && <span> untuk kata kunci "{brandSearch}"</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrandSearch('');
+                    setBrandFilterStatus('all');
+                    setBrandSortBy('newest');
+                    setBrandPage(1);
+                  }}
+                  className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+                >
+                  Reset Filter
+                </button>
+              </div>
             )}
-          </div>
 
-          {/* BRAND TABLE DISPLAY */}
-          {filteredBrands.length > 0 ? (
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto scrollbar-thin">
+            {/* BRAND TABLE DISPLAY */}
+            <div className="overflow-x-auto scrollbar-thin">
                 <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[700px]">
                 <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                   <tr>
@@ -4673,59 +4684,63 @@ export default function App() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ))}
+
+                    {currentBrands.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 dark:text-zinc-500 text-xs sm:text-sm">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Building2 size={28} className="text-slate-300 dark:text-zinc-600" />
+                            <p className="font-semibold text-slate-700 dark:text-zinc-300">
+                              {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') ? 'Tidak Ada Brand yang Cocok' : 'Belum Ada Brand Terdaftar'}
+                            </p>
+                            <p className="text-xs text-slate-400 max-w-sm">
+                              {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest')
+                                ? 'Tidak ditemukan merk dengan filter atau kata kunci saat ini.'
+                                : 'Mulai dengan menambahkan merk pertama Anda beserta foto logo dan PIC pemilik akun.'}
+                            </p>
+                            {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') ? (
+                              <button
+                                type="button"
+                                onClick={() => { setBrandSearch(''); setBrandFilterStatus('all'); setBrandSortBy('newest'); setBrandPage(1); }}
+                                className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                              >
+                                Reset Filter
+                              </button>
+                            ) : (
+                              <button
+                                onClick={handleOpenCreateBrand}
+                                className="mt-1 px-5 py-2.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <span>Tambah Brand / Merk Sekarang</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                 </tbody>
               </table>
             </div>
 
             {/* HIGH-PERFORMANCE PAGINATION CONTROLS */}
-            <TablePagination
-              currentPage={brandPage}
-              totalPages={totalBrandPages}
-              totalItems={filteredBrands.length}
-              itemsPerPage={brandPerPage}
-              onPageChange={setBrandPage}
-              onItemsPerPageChange={(val) => {
-                setBrandPerPage(val);
-                setBrandPage(1);
-              }}
-              itemName="brand"
-            />
-          </div>
-        ) : (
-          /* EMPTY STATE */
-          <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-3xl p-8 sm:p-12 text-center flex flex-col items-center">
-            <div className="w-16 h-16 rounded-full bg-[#fcf7f3] dark:bg-zinc-800 text-[#c28e62] flex items-center justify-center mb-4">
-              <Building2 size={32} />
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-200 mb-1">
-              {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') ? 'Tidak Ada Brand yang Cocok' : 'Belum Ada Brand Terdaftar'}
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-400 dark:text-zinc-500 max-w-sm mb-5">
-              {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest')
-                ? 'Tidak ditemukan merk dengan filter atau kata kunci saat ini. Coba ubah kata kunci atau reset filter.'
-                : 'Mulai dengan menambahkan merk pertama Anda beserta foto logo dan PIC pemilik akun.'}
-            </p>
-            {(brandSearch || brandFilterStatus !== 'all' || brandSortBy !== 'newest') ? (
-              <button
-                type="button"
-                onClick={() => { setBrandSearch(''); setBrandFilterStatus('all'); setBrandSortBy('newest'); setBrandPage(1); }}
-                className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
-              >
-                Reset Filter
-              </button>
-            ) : (
-              <button
-                onClick={handleOpenCreateBrand}
-                className="px-5 py-2.5 bg-[#c28e62] hover:bg-[#b37f54] text-white rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <span>Tambah Brand / Merk Sekarang</span>
-              </button>
+            {filteredBrands.length > 0 && (
+              <TablePagination
+                currentPage={brandPage}
+                totalPages={totalBrandPages}
+                totalItems={filteredBrands.length}
+                itemsPerPage={brandPerPage}
+                onPageChange={setBrandPage}
+                onItemsPerPageChange={(val) => {
+                  setBrandPerPage(val);
+                  setBrandPage(1);
+                }}
+                itemName="brand"
+              />
             )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
   );
 };
 
@@ -4769,10 +4784,11 @@ export default function App() {
             )}
           </div>
 
-          {/* SEARCH & FILTER CONTROLS */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-              <div className="relative flex-1 max-w-md">
+          {/* USERS TABLE & CONTROLS (TERPADU DALAM SATU CARD SEPERTI TABEL SCAN) */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-xs">
+            {/* Filter & Pencarian Bar */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px]">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                 <input
                   type="text"
@@ -4841,25 +4857,28 @@ export default function App() {
 
             {/* Reset filter button if active (seperti di halaman tag qrcode) */}
             {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setUserSearch('');
-                  setUserFilterRole('all');
-                  setUserSortBy('newest');
-                  setUserPage(1);
-                }}
-                className="text-xs text-[#c28e62] hover:underline font-semibold self-center sm:self-auto cursor-pointer"
-              >
-                Reset Filter
-              </button>
+              <div className="px-5 py-2.5 bg-slate-50/60 dark:bg-zinc-800/40 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-zinc-400">
+                  Menampilkan hasil filter: <strong className="text-slate-800 dark:text-zinc-200">{filteredUsers.length}</strong> pengguna
+                  {userSearch && <span> untuk kata kunci "{userSearch}"</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserSearch('');
+                    setUserFilterRole('all');
+                    setUserSortBy('newest');
+                    setUserPage(1);
+                  }}
+                  className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+                >
+                  Reset Filter
+                </button>
+              </div>
             )}
-          </div>
 
-          {/* USERS TABLE */}
-          {filteredUsers.length > 0 ? (
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto scrollbar-thin">
+            {/* USERS TABLE */}
+            <div className="overflow-x-auto scrollbar-thin">
                 <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[640px]">
                 <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                   <tr>
@@ -5009,58 +5028,62 @@ export default function App() {
                       </tr>
                     );
                   })}
+
+                  {currentUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400 dark:text-zinc-500 text-xs sm:text-sm">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Users size={28} className="text-slate-300 dark:text-zinc-600" />
+                          <p className="font-semibold text-slate-700 dark:text-zinc-300">
+                            {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') ? 'Tidak Ada Pengguna yang Cocok' : 'Belum Ada Pengguna'}
+                          </p>
+                          <p className="text-xs text-slate-400 max-w-sm">
+                            {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest')
+                              ? 'Tidak ditemukan akun dengan filter atau kata kunci saat ini. Coba ubah kata kunci atau reset filter.'
+                              : 'Mulai dengan menambahkan akun pengguna pertama untuk mengelola brand dan sistem.'}
+                          </p>
+                          {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') ? (
+                            <button
+                              type="button"
+                              onClick={() => { setUserSearch(''); setUserFilterRole('all'); setUserSortBy('newest'); setUserPage(1); }}
+                              className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                            >
+                              Reset Filter
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleOpenCreateUser}
+                              className="mt-1 px-5 py-2.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                              <span>Daftarkan Akun Pengguna Sekarang</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
             {/* HIGH-PERFORMANCE PAGINATION CONTROLS */}
-            <TablePagination
-              currentPage={userPage}
-              totalPages={totalUserPages}
-              totalItems={filteredUsers.length}
-              itemsPerPage={userPerPage}
-              onPageChange={setUserPage}
-              onItemsPerPageChange={(val) => {
-                setUserPerPage(val);
-                setUserPage(1);
-              }}
-              itemName="pengguna"
-            />
-          </div>
-        ) : (
-          /* EMPTY STATE */
-          <div className="bg-white dark:bg-zinc-900 border border-dashed border-slate-300 dark:border-zinc-700 rounded-3xl p-8 sm:p-12 text-center flex flex-col items-center">
-            <div className="w-16 h-16 rounded-full bg-[#fcf7f3] dark:bg-zinc-800 text-[#c28e62] flex items-center justify-center mb-4">
-              <Users size={32} />
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-200 mb-1">
-              {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') ? 'Tidak Ada Pengguna yang Cocok' : 'Belum Ada Pengguna'}
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-400 dark:text-zinc-500 max-w-sm mb-5">
-              {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest')
-                ? 'Tidak ditemukan akun dengan filter atau kata kunci saat ini. Coba ubah kata kunci atau reset filter.'
-                : 'Mulai dengan menambahkan akun pengguna pertama untuk mengelola brand dan sistem.'}
-            </p>
-            {(userSearch || userFilterRole !== 'all' || userSortBy !== 'newest') ? (
-              <button
-                type="button"
-                onClick={() => { setUserSearch(''); setUserFilterRole('all'); setUserSortBy('newest'); setUserPage(1); }}
-                className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
-              >
-                Reset Filter
-              </button>
-            ) : (
-              <button
-                onClick={handleOpenCreateUser}
-                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b37f54] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <span>Daftarkan Akun Pengguna Sekarang</span>
-              </button>
+            {filteredUsers.length > 0 && (
+              <TablePagination
+                currentPage={userPage}
+                totalPages={totalUserPages}
+                totalItems={filteredUsers.length}
+                itemsPerPage={userPerPage}
+                onPageChange={setUserPage}
+                onItemsPerPageChange={(val) => {
+                  setUserPerPage(val);
+                  setUserPage(1);
+                }}
+                itemName="pengguna"
+              />
             )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
   );
 };
 
@@ -5141,10 +5164,11 @@ export default function App() {
             </button>
           </div>
 
-          {/* SEARCH & FILTER CONTROLS (CLEAN & MINIMAL) */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-              <div className="relative flex-1 max-w-md">
+          {/* SKU TABLE & CONTROLS (TERPADU DALAM SATU CARD SEPERTI TABEL SCAN) */}
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-xs">
+            {/* Filter & Pencarian Bar */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="relative flex-1 min-w-[240px]">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                 <input
                   type="text"
@@ -5206,25 +5230,28 @@ export default function App() {
 
             {/* Reset Filter Button */}
             {isFilterActive && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSkuSearch('');
-                  setSkuFilterBrand('all');
-                  setSkuSortBy('newest');
-                  setSkuPage(1);
-                }}
-                className="text-xs text-[#c28e62] hover:underline font-semibold self-center sm:self-auto cursor-pointer"
-              >
-                Reset Filter
-              </button>
+              <div className="px-5 py-2.5 bg-slate-50/60 dark:bg-zinc-800/40 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-zinc-400">
+                  Menampilkan hasil filter: <strong className="text-slate-800 dark:text-zinc-200">{filteredProducts.length}</strong> produk
+                  {skuSearch && <span> untuk kata kunci "{skuSearch}"</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSkuSearch('');
+                    setSkuFilterBrand('all');
+                    setSkuSortBy('newest');
+                    setSkuPage(1);
+                  }}
+                  className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+                >
+                  Reset Filter
+                </button>
+              </div>
             )}
-          </div>
 
-          {/* SKU TABLE DISPLAY (RINGKAS, DATA PENTING DI DEPAN, CLEAN) */}
-          {currentProducts.length > 0 ? (
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto scrollbar-thin">
+            {/* SKU TABLE DISPLAY (RINGKAS, DATA PENTING DI DEPAN, CLEAN) */}
+            <div className="overflow-x-auto scrollbar-thin">
                 <table className="w-full text-left text-xs sm:text-sm min-w-[760px]">
                   <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                     <tr>
@@ -5245,22 +5272,42 @@ export default function App() {
                           key={prod.id}
                           className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/40 transition-colors group/sku"
                         >
-                          {/* KOLOM 1: SKU & NAMA PRODUK (KLIK AREA NAMA PRODUK UNTUK DETAIL SKU) */}
-                          <td className="px-5 py-3.5">
+                          {/* KOLOM 1: SKU & NAMA PRODUK (DILENGKAPI FOTO 1:1 DI SAMPING KIRI NAMA PRODUK) */}
+                          <td className="px-5 py-3.5 whitespace-normal">
                             <div 
                               onClick={() => handleOpenDetailSku(prod)}
-                              className="min-w-0 inline-block cursor-pointer group/sku-name text-left"
+                              className="min-w-0 flex items-center gap-3 cursor-pointer group/sku-name text-left"
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm group-hover/sku-name:text-[#c28e62] group-hover/sku-name:underline underline-offset-2 transition-colors">
-                                  {prod.sku}
-                                </span>
-                                {isRecentlyCreated(prod.createdAt, prod.id, 5) && (
-                                  <NewBadge date={prod.createdAt} id={prod.id} />
+                              {/* FOTO 1:1 PRODUK */}
+                              <div className="w-10 h-10 rounded-xl overflow-hidden aspect-square shrink-0 bg-slate-100 dark:bg-zinc-800 border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-center group-hover/sku-name:border-[#c28e62]/50 transition-colors shadow-2xs">
+                                {prod.image ? (
+                                  <img 
+                                    src={prod.image} 
+                                    alt={prod.sku} 
+                                    className="w-full h-full object-cover" 
+                                  />
+                                ) : (
+                                  <Box size={18} className="text-slate-400 dark:text-zinc-500" />
                                 )}
                               </div>
-                              <div className="text-[11px] sm:text-xs font-mono font-medium text-slate-500 dark:text-zinc-400 mt-0.5 tracking-tight group-hover/sku-name:text-slate-700 dark:group-hover/sku-name:text-zinc-300">
-                                {prod.skuCode || `SKU-${prod.id.toUpperCase()}`}
+
+                              <div className="min-w-0 max-w-[260px] sm:max-w-[340px]">
+                                <div className="flex items-start gap-2">
+                                  <span 
+                                    className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm group-hover/sku-name:text-[#c28e62] group-hover/sku-name:underline underline-offset-2 transition-colors line-clamp-2 leading-snug break-words whitespace-normal"
+                                    title={prod.sku}
+                                  >
+                                    {prod.sku}
+                                  </span>
+                                  {isRecentlyCreated(prod.createdAt, prod.id, 5) && (
+                                    <span className="shrink-0 mt-0.5">
+                                      <NewBadge date={prod.createdAt} id={prod.id} />
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] sm:text-xs font-mono font-medium text-slate-500 dark:text-zinc-400 mt-1 tracking-tight group-hover/sku-name:text-slate-700 dark:group-hover/sku-name:text-zinc-300 truncate">
+                                  {prod.skuCode || `SKU-${prod.id.toUpperCase()}`}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -5347,61 +5394,66 @@ export default function App() {
                         </tr>
                       );
                     })}
+
+                    {currentProducts.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 dark:text-zinc-500 text-xs sm:text-sm">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Box size={28} className="text-slate-300 dark:text-zinc-600" />
+                            <p className="font-semibold text-slate-700 dark:text-zinc-300">
+                              {isFilterActive ? 'Tidak Ada SKU yang Sesuai' : 'Belum Ada SKU Terdaftar'}
+                            </p>
+                            <p className="text-xs text-slate-400 max-w-md">
+                              {isFilterActive
+                                ? 'Tidak ditemukan SKU produk dengan kriteria pencarian atau filter saat ini. Coba ubah kata kunci atau klik tombol reset filter di bawah.'
+                                : 'Mulai dengan mendaftarkan kode SKU produk pertama ke katalog master sistem untuk memulai registrasi batch dan pembuatan tag fisik.'}
+                            </p>
+                            {isFilterActive ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSkuSearch('');
+                                  setSkuFilterBrand('all');
+                                  setSkuSortBy('newest');
+                                  setSkuPage(1);
+                                }}
+                                className="mt-1 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
+                              >
+                                Reset Filter
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleOpenCreateSku}
+                                className="mt-1 px-5 py-2.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                              >
+                                <span>Daftarkan SKU Produk Sekarang</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* PAGINATION CONTROLS */}
-              <TablePagination
-                currentPage={skuPage}
-                totalPages={totalSkuPages}
-                totalItems={filteredProducts.length}
-                itemsPerPage={skuPerPage}
-                onPageChange={setSkuPage}
-                onItemsPerPageChange={(items) => {
-                  setSkuPerPage(items);
-                  setSkuPage(1);
-                }}
-                itemName="SKU Produk"
-              />
-            </div>
-          ) : (
-            <div className="p-8 sm:p-12 rounded-3xl border border-dashed border-slate-300 dark:border-zinc-700 bg-white/60 dark:bg-zinc-900/40 flex flex-col items-center justify-center text-center max-w-xl mx-auto my-8">
-              <div className="w-16 h-16 mx-auto bg-slate-50 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4 text-[#c28e62] border border-slate-200 dark:border-zinc-700">
-                <Box size={28} />
-              </div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-100 mb-2">
-                {isFilterActive ? 'Tidak Ada SKU yang Sesuai' : 'Belum Ada SKU Terdaftar'}
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 max-w-md mb-4">
-                {isFilterActive
-                  ? 'Tidak ditemukan SKU produk dengan kriteria pencarian atau filter saat ini. Coba ubah kata kunci atau klik tombol reset filter di bawah.'
-                  : 'Mulai dengan mendaftarkan kode SKU produk pertama ke katalog master sistem untuk memulai registrasi batch dan pembuatan tag fisik.'}
-              </p>
-              {isFilterActive ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSkuSearch('');
-                    setSkuFilterBrand('all');
-                    setSkuSortBy('newest');
+              {filteredProducts.length > 0 && (
+                <TablePagination
+                  currentPage={skuPage}
+                  totalPages={totalSkuPages}
+                  totalItems={filteredProducts.length}
+                  itemsPerPage={skuPerPage}
+                  onPageChange={setSkuPage}
+                  onItemsPerPageChange={(items) => {
+                    setSkuPerPage(items);
                     setSkuPage(1);
                   }}
-                  className="px-5 py-2 rounded-full bg-slate-100 dark:bg-zinc-800 text-[#c28e62] hover:underline text-xs font-semibold cursor-pointer"
-                >
-                  Reset Filter
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleOpenCreateSku}
-                  className="px-5 py-2.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  Daftarkan SKU Produk Sekarang
-                </button>
+                  itemName="SKU Produk"
+                />
               )}
             </div>
-          )}
         </div>
       </div>
     );
@@ -5437,9 +5489,10 @@ export default function App() {
         const matchProduct = item.productType?.toLowerCase().includes(q);
         const matchBatch = item.batchId?.toLowerCase().includes(q);
         const matchTag = item.latestTagId?.toLowerCase().includes(q);
+        const matchPin = item.pin?.toLowerCase().includes(q);
         const matchDevice = item.deviceInfo?.toLowerCase().includes(q);
         const matchAnomaly = item.anomalyReason?.toLowerCase().includes(q);
-        if (!matchCity && !matchProv && !matchVenue && !matchBrand && !matchProduct && !matchBatch && !matchTag && !matchDevice && !matchAnomaly) {
+        if (!matchCity && !matchProv && !matchVenue && !matchBrand && !matchProduct && !matchBatch && !matchTag && !matchPin && !matchDevice && !matchAnomaly) {
           return false;
         }
       }
@@ -5511,6 +5564,40 @@ export default function App() {
       return { dateStr, timeStr, relativeStr };
     };
 
+    // Helper riwayat lengkap sesi pemindaian per-tag
+    const getScanHistoryList = (item: any): any[] => {
+      if (item?.scanHistory && Array.isArray(item.scanHistory) && item.scanHistory.length > 0) {
+        return item.scanHistory;
+      }
+      const count = Number(item?.totalScans) || 1;
+      const list: any[] = [];
+      for (let i = 1; i <= count; i++) {
+        const isFirst = i === 1;
+        const isExcess = i > 3;
+        const status = isFirst ? 'valid' : isExcess ? 'suspicious' : 'repeated';
+        list.push({
+          scanNumber: i,
+          scannedAt: isFirst ? (item?.createdAt ? `${item.createdAt}, 10:20:14 WIB` : '06 Nov 2026, 10:20:14 WIB') : `${item?.latestTime || 'Hari ini'}`,
+          city: item?.city || 'Jakarta Pusat',
+          province: item?.province || 'DKI Jakarta',
+          venue: item?.venue || 'Lokasi Terdaftar',
+          lat: item?.lat || -6.195,
+          lng: item?.lng || 106.823,
+          ipAddress: isFirst ? '180.252.12.84' : `114.124.${30 + i}.${15 + i * 4}`,
+          isp: isFirst ? 'Telkomsel Seluler' : 'Indosat Ooredoo',
+          device: item?.deviceInfo || 'iPhone 15 Pro • Safari Mobile',
+          browser: 'Safari Mobile 17.5',
+          status,
+          statusNote: isFirst 
+            ? 'Scan Pertama Sah (Aktivasi Keaslian Asli)' 
+            : isExcess 
+              ? `Berbahaya: Scan ke-${i} melebihi batas aman 3x` 
+              : `Scan Berulang ke-${i}`
+        });
+      }
+      return list;
+    };
+
     const sortedPoints = [...filteredPoints].sort((a, b) => {
       if (scanSortBy === 'most-scans') {
         return (b.totalScans || 0) - (a.totalScans || 0);
@@ -5557,42 +5644,47 @@ export default function App() {
                   triggerAlert('Diperbarui', 'Data telemetri pemindaian berhasil disinkronkan', 'success');
                 }}
                 disabled={isScanLoading}
-                className="w-full sm:w-auto px-4 py-2 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-750 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
               >
-                <RefreshCw size={13} className={isScanLoading ? 'animate-spin text-[#c28e62]' : 'text-slate-500'} />
+                <RefreshCw size={15} className={isScanLoading ? 'animate-spin text-[#c28e62]' : 'text-slate-500'} />
                 <span>{isScanLoading ? 'Menyinkronkan...' : 'Segarkan Data'}</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setIsScanMapOpen(!isScanMapOpen)}
-                className={`w-full sm:w-auto px-4 py-2 rounded-full text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs ${
-                  isScanMapOpen
-                    ? 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 hover:bg-slate-200 dark:hover:bg-zinc-750'
-                    : 'bg-[#c28e62] hover:bg-[#b07d53] text-white'
-                }`}
+                onClick={() => {
+                  if (!hasMapEverOpened) setHasMapEverOpened(true);
+                  setIsScanMapOpen(!isScanMapOpen);
+                }}
+                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
               >
-                <MapPin size={13} />
+                <MapPin size={15} />
                 <span>{isScanMapOpen ? 'Tutup Maps' : 'Buka Maps'}</span>
-                {isScanMapOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                {isScanMapOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
               </button>
             </div>
           </div>
 
-          {/* ACCORDION PETA PERSEBARAN SCAN LIVE */}
-          {isScanMapOpen && (
-            <div className="overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-top-3">
-              <ScanLocationMap
-                points={scanPoints}
-                isLoading={isScanLoading}
-                onRefresh={() => {
-                  fetchScanData();
-                  triggerAlert('Diperbarui', 'Data telemetri pemindaian berhasil disinkronkan', 'success');
-                }}
-                onClose={() => setIsScanMapOpen(false)}
-              />
+          {/* ACCORDION PETA PERSEBARAN SCAN LIVE (SMOOTH FLUID ANIMATION) */}
+          <div
+            className={`grid transition-[grid-template-rows,opacity,margin] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              isScanMapOpen
+                ? 'grid-rows-[1fr] opacity-100'
+                : 'grid-rows-[0fr] opacity-0 pointer-events-none -mt-5 sm:-mt-6'
+            }`}
+          >
+            <div className="overflow-hidden min-h-0">
+              <div className="pt-0.5 pb-1">
+                {hasMapEverOpened && (
+                  <ScanLocationMap
+                    points={scanPoints}
+                    isLoading={isScanLoading}
+                    onClose={() => setIsScanMapOpen(false)}
+                  />
+                )}
+              </div>
             </div>
-          )}
+          </div>
 
           {/* TABEL AKTIVITAS SCAN (KONSISTEN DENGAN TABEL LAIN) */}
           <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-xs">
@@ -5608,7 +5700,7 @@ export default function App() {
                     setScanSearch(e.target.value);
                     setScanPage(1);
                   }}
-                  placeholder="Cari kota, venue, brand, produk, batch ID, atau serial tag..."
+                  placeholder="Cari tag ID, PIN, brand, produk, kota, atau batch..."
                   className="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-9 pr-9 py-2 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
                 />
                 {scanSearch && (
@@ -5706,16 +5798,15 @@ export default function App() {
               </div>
             )}
 
-            {/* Table Content */}
+            {/* Table Content (Ringkas, Rapi & Konsisten) */}
             <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[700px]">
+              <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[760px]">
                 <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                   <tr>
                     <th className="px-5 py-3.5 whitespace-nowrap">Waktu Scan</th>
-                    <th className="px-5 py-3.5 whitespace-nowrap">Serial Tag</th>
-                    <th className="px-5 py-3.5">Produk &amp; Brand</th>
-                    <th className="px-5 py-3.5">Lokasi Pemindaian</th>
-                    <th className="px-5 py-3.5 text-center whitespace-nowrap">Status Keamanan</th>
+                    <th className="px-5 py-3.5 whitespace-nowrap">Tag / QRCode</th>
+                    <th className="px-5 py-3.5">Nama Produk &amp; Brand</th>
+                    <th className="px-5 py-3.5 text-center whitespace-nowrap">Status &amp; Jumlah Scan</th>
                     <th className="px-5 py-3.5 text-right whitespace-nowrap">Aksi</th>
                   </tr>
                 </thead>
@@ -5730,118 +5821,123 @@ export default function App() {
                           key={item.id}
                           className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/60 transition-colors"
                         >
-                          {/* 1. Waktu Scan (2 Baris: Tanggal di baris 1, Jam • Waktu relatif di baris 2) */}
+                          {/* 1. Waktu Scan */}
                           <td className="px-5 py-3.5 whitespace-nowrap">
-                            <div className="flex items-start gap-2.5">
-                              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 dark:bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center shrink-0 mt-0.5">
-                                <Clock size={13} />
+                            <div className="leading-tight">
+                              <div className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm">
+                                {timeInfo.dateStr}
                               </div>
-                              <div className="leading-snug">
-                                {/* Baris 1: Tanggal */}
-                                <div className="font-semibold text-slate-800 dark:text-zinc-200 text-xs">
-                                  {timeInfo.dateStr}
-                                </div>
-                                {/* Baris 2: Jam • Berapa menit yang lalu */}
-                                <div className="flex items-center gap-1.5 mt-0.5 text-xs">
-                                  <span className="font-mono font-bold text-slate-900 dark:text-zinc-100">{timeInfo.timeStr}</span>
-                                  <span className="text-slate-300 dark:text-zinc-600 font-bold">•</span>
-                                  <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-normal">{timeInfo.relativeStr}</span>
-                                </div>
+                              <div className="flex items-center gap-1.5 mt-1 text-[11px] sm:text-xs text-slate-400 dark:text-zinc-500">
+                                <span className="font-mono font-medium text-slate-600 dark:text-zinc-300">{timeInfo.timeStr}</span>
+                                <span>•</span>
+                                <span>{timeInfo.relativeStr}</span>
                               </div>
                             </div>
                           </td>
 
-                          {/* 2. Serial Tag */}
+                          {/* 2. Tag / QRCode & PIN */}
                           <td className="px-5 py-3.5 whitespace-nowrap">
-                            <span className="font-mono text-xs font-bold text-[#c28e62] bg-[#c28e62]/10 dark:bg-[#c28e62]/15 px-2.5 py-1 rounded-lg border border-[#c28e62]/20 tracking-wide inline-block">
-                              {item.latestTagId || '-'}
-                            </span>
-                          </td>
-
-                          {/* 3. Produk & Brand */}
-                          <td className="px-5 py-3.5">
-                            <div className="font-semibold text-slate-900 dark:text-zinc-100 leading-tight">
-                              {item.productType}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className="text-[11px] font-bold text-[#c28e62] uppercase tracking-wider">
-                                {item.brand}
+                            <div>
+                              <span className="font-mono text-xs font-bold text-[#c28e62] bg-[#c28e62]/10 dark:bg-[#c28e62]/15 px-2.5 py-1 rounded-lg border border-[#c28e62]/20 tracking-wide inline-block">
+                                {item.latestTagId || '-'}
                               </span>
-                              {item.batchId && (
-                                <>
-                                  <span className="text-slate-300 dark:text-zinc-600">•</span>
-                                  <span className="font-mono text-[10px] text-slate-400 dark:text-zinc-500">
-                                    {item.batchId}
-                                  </span>
-                                </>
+                              {item.pin && (
+                                <div className="flex items-center gap-1.5 mt-1 text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 font-mono">
+                                  <span className="text-slate-400 dark:text-zinc-500 font-sans">PIN:</span>
+                                  <span className="font-semibold tracking-wider text-slate-700 dark:text-zinc-300">{item.pin}</span>
+                                </div>
                               )}
                             </div>
                           </td>
 
-                          {/* 4. Lokasi Pemindaian */}
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-zinc-100">
-                              <MapPin size={13} className="text-[#c28e62] shrink-0" />
-                              <span>{item.city}</span>
-                            </div>
-                            {item.venue && (
-                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate max-w-[280px]">
-                                {item.venue}
+                          {/* 3. Nama Produk & Brand (Tanpa Gambar, Maksimal 2 Baris) */}
+                          <td className="px-5 py-3.5 whitespace-normal">
+                            <div className="max-w-[240px] sm:max-w-[320px]">
+                              <div 
+                                className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm leading-snug line-clamp-2 break-words whitespace-normal" 
+                                title={item.productType}
+                              >
+                                {item.productType}
                               </div>
-                            )}
+                              <div className="flex items-center gap-1.5 mt-1 text-[11px] sm:text-xs">
+                                <span className="font-bold text-[#c28e62] uppercase tracking-wider text-xs">
+                                  {item.brand}
+                                </span>
+                                {item.batchId && (
+                                  <>
+                                    <span className="text-slate-300 dark:text-zinc-600">•</span>
+                                    <span className="font-mono text-[11px] sm:text-xs text-slate-400 dark:text-zinc-500 truncate max-w-[140px]">
+                                      {item.batchId}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </td>
 
-                          {/* 5. Status Keamanan (1 kata: Valid, Peringatan, Berbahaya + Tooltip Penjelasan) */}
+                          {/* 4. Status & Jumlah Scan (Selaras dengan Penamaan di Peta) */}
                           <td className="px-5 py-3.5 text-center whitespace-nowrap">
-                            {isSuspicious ? (
-                              <span
-                                data-tooltip="Berbahaya: Terdeteksi anomali pemindaian lebih dari 3x"
-                                data-tooltip-pos="top"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40 cursor-help"
-                              >
-                                <AlertTriangle size={12} className="shrink-0 text-rose-500" />
-                                Berbahaya
-                              </span>
-                            ) : isRepeated ? (
-                              <span
-                                data-tooltip="Peringatan: Pemindaian berulang sebanyak 2-3 kali"
-                                data-tooltip-pos="top"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40 cursor-help"
-                              >
-                                <RotateCcw size={12} className="shrink-0 text-amber-500" />
-                                Peringatan
-                              </span>
-                            ) : (
-                              <span
-                                data-tooltip="Valid: Otentikasi normal dan pemindaian sah pertama kali"
-                                data-tooltip-pos="top"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 cursor-help"
-                              >
-                                <CheckCircle2 size={12} className="shrink-0 text-emerald-500" />
-                                Valid
-                              </span>
-                            )}
+                            <div className="flex flex-col items-center gap-1">
+                              <div>
+                                {isSuspicious ? (
+                                  <span
+                                    data-tooltip={`Berbahaya: Terdeteksi ${item.totalScans}x scan (melebihi batas aman 3x)`}
+                                    data-tooltip-pos="top"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40 cursor-help"
+                                  >
+                                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-ping"></span>
+                                    <span>Berbahaya</span>
+                                  </span>
+                                ) : isRepeated ? (
+                                  <span
+                                    data-tooltip={`Peringatan: Pemindaian berulang sebanyak ${item.totalScans}x`}
+                                    data-tooltip-pos="top"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40 cursor-help"
+                                  >
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                                    <span>Peringatan</span>
+                                  </span>
+                                ) : (
+                                  <span
+                                    data-tooltip="Valid: Pemindaian pertama sah (Otentikasi 1x)"
+                                    data-tooltip-pos="top"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 cursor-help"
+                                  >
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                    <span>Valid</span>
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1 justify-center mt-0.5">
+                                <span className="font-semibold text-slate-700 dark:text-zinc-300 font-mono">{item.totalScans}x scan</span>
+                              </div>
+                            </div>
                           </td>
 
-                          {/* 6. Aksi */}
+                          {/* 5. Aksi: Button Bulat Icon Mata Saja (Desain Hover Samakan Button Aksi, Tooltip Persingkat Jelas) */}
                           <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedScanDetail(item);
-                                setIsScanDetailModalOpen(true);
-                              }}
-                              className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-[#c28e62] hover:text-[#c28e62] font-semibold text-xs cursor-pointer shadow-xs transition-colors"
-                            >
-                              Detail
-                            </button>
+                            <div className="flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedScanDetail(item);
+                                  setIsScanDetailModalOpen(true);
+                                }}
+                                data-tooltip="Detail"
+                                data-tooltip-pos="left"
+                                aria-label="Detail"
+                                className="p-2 rounded-full transition-colors cursor-pointer text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center justify-center"
+                              >
+                                <Eye size={16} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-5 py-12 text-center text-slate-400 dark:text-zinc-500">
+                      <td colSpan={5} className="px-5 py-12 text-center text-slate-400 dark:text-zinc-500">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <Scan size={28} className="text-slate-300 dark:text-zinc-600" />
                           <p className="font-semibold text-slate-700 dark:text-zinc-300">
@@ -5888,7 +5984,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* MODAL DETAIL TELEMETRI PEMINDAIAN */}
+        {/* MODAL DETAIL RIWAYAT PEMINDAIAN PER-TAG LENGKAP */}
         {isScanDetailModalOpen && selectedScanDetail && createPortal(
           <div 
             onClick={(e) => { 
@@ -5900,22 +5996,29 @@ export default function App() {
             className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
           >
             <div 
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
               <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
-                    <Scan size={18} />
+                  <div className="w-9 h-9 rounded-xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
+                    <Scan size={20} />
                   </div>
                   <div>
                     <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-zinc-100">
-                      Detail Telemetri Pemindaian
+                      Riwayat Telemetri Pemindaian Tag
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono">
-                      Tag ID: <span className="text-[#c28e62] font-semibold">{selectedScanDetail.latestTagId || '-'}</span>
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5 text-xs">
+                      <span className="font-mono font-bold text-[#c28e62] bg-[#c28e62]/10 dark:bg-[#c28e62]/15 px-2 py-0.5 rounded">
+                        {selectedScanDetail.latestTagId || '-'}
+                      </span>
+                      {selectedScanDetail.pin && (
+                        <span className="font-mono text-slate-500 dark:text-zinc-400">
+                          PIN: <strong className="text-slate-800 dark:text-zinc-200">{selectedScanDetail.pin}</strong>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <button
@@ -5929,135 +6032,181 @@ export default function App() {
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 overflow-y-auto space-y-4 text-xs">
-                {/* Alert jika anomali */}
-                {selectedScanDetail.status === 'suspicious' && (
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs">
+                {/* Status Keamanan Banner Sesuai Frekuensi Pemindaian */}
+                {selectedScanDetail.totalScans > 3 ? (
                   <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl flex items-start gap-3 text-rose-700 dark:text-rose-300">
                     <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-500" />
                     <div>
-                      <div className="font-bold text-xs uppercase tracking-wider">Peringatan Anomali Keamanan</div>
-                      <p className="text-xs mt-0.5 leading-relaxed">
-                        {selectedScanDetail.anomalyReason || 'Terdeteksi pemindaian multi-IP dalam interval waktu sangat singkat di luar perimeter logistik.'}
+                      <div className="font-bold text-xs uppercase tracking-wider">
+                        Peringatan Keamanan: Terdeteksi {selectedScanDetail.totalScans}x Pemindaian (&gt;3x Batas Aman)
+                      </div>
+                      <p className="text-xs mt-1 leading-relaxed">
+                        Tag ini telah dipindai sebanyak <strong>{selectedScanDetail.totalScans} kali</strong>. Batas toleransi wajar adalah maksimal 3x pemindaian. Terdeteksi potensi pemalsuan fisik, penyalinan QR Code, atau kode PIN telah disebarkan secara tidak sah.
+                      </p>
+                    </div>
+                  </div>
+                ) : selectedScanDetail.totalScans >= 2 ? (
+                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-2xl flex items-start gap-3 text-amber-700 dark:text-amber-300">
+                    <RotateCcw size={18} className="shrink-0 mt-0.5 text-amber-500" />
+                    <div>
+                      <div className="font-bold text-xs uppercase tracking-wider">
+                        Peringatan: Pemindaian Berulang ({selectedScanDetail.totalScans}x Scan)
+                      </div>
+                      <p className="text-xs mt-1 leading-relaxed">
+                        Tag ini telah dipindai sebanyak <strong>{selectedScanDetail.totalScans} kali</strong>. Pemindaian berulang 2–3x wajar jika dilakukan oleh konsumen atau pihak kontraktor untuk verifikasi berkala.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl flex items-start gap-3 text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-emerald-500" />
+                    <div>
+                      <div className="font-bold text-xs uppercase tracking-wider">
+                        Status Valid: Pemindaian Pertama Sah (1x Scan)
+                      </div>
+                      <p className="text-xs mt-1 leading-relaxed">
+                        Tag otentik asli terverifikasi untuk pertama kalinya. Unit produk telah terdaftar sah dan garansi resmi aktif.
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* Status Ringkasan */}
-                {(() => {
-                  const modalTimeInfo = selectedScanDetail ? getScanDateTimeDisplay(selectedScanDetail) : null;
-                  return (
-                    <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 dark:text-zinc-400">Status Verifikasi</span>
-                        <div>
-                          {selectedScanDetail.status === 'suspicious' ? (
-                            <span
-                              data-tooltip="Berbahaya: Terdeteksi anomali pemindaian lebih dari 3x"
-                              data-tooltip-pos="top"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 cursor-help"
-                            >
-                              <AlertTriangle size={12} /> Berbahaya
-                            </span>
-                          ) : selectedScanDetail.status === 'repeated' ? (
-                            <span
-                              data-tooltip="Peringatan: Pemindaian berulang sebanyak 2-3 kali"
-                              data-tooltip-pos="top"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60 cursor-help"
-                            >
-                              <RotateCcw size={12} /> Peringatan
-                            </span>
-                          ) : (
-                            <span
-                              data-tooltip="Valid: Otentikasi normal dan pemindaian sah pertama kali"
-                              data-tooltip-pos="top"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 cursor-help"
-                            >
-                              <CheckCircle2 size={12} /> Valid
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 dark:text-zinc-400">Waktu Terakhir</span>
-                        <div className="text-right">
-                          <span className="font-bold text-slate-800 dark:text-zinc-100">
-                            {modalTimeInfo ? `${modalTimeInfo.dateStr} • ${modalTimeInfo.timeStr}` : '-'}
-                          </span>
-                          {modalTimeInfo?.relativeStr && (
-                            <div className="text-[11px] text-slate-500 dark:text-zinc-400">
-                              {modalTimeInfo.relativeStr}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-500 dark:text-zinc-400">Total Akumulasi Pemindaian</span>
-                        <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">
-                          {selectedScanDetail.totalScans} kali ({selectedScanDetail.todayScans} hari ini)
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Lokasi & Geografis */}
-                <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80 space-y-2">
-                  <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[11px] mb-1">
-                    <MapPin size={14} className="text-[#c28e62]" />
-                    <span>Koordinat &amp; Lokasi Pemindaian</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">Kota / Provinsi</span>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-200 text-right">
-                      {selectedScanDetail.city}, {selectedScanDetail.province}
+                {/* Ringkasan Informasi Tag & Produk (Grid 4 Kolom) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Total Pemindaian</span>
+                    <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 font-mono mt-0.5 block">
+                      {selectedScanDetail.totalScans} Kali
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">Venue / Lokasi</span>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-200 text-right">
-                      {selectedScanDetail.venue || 'Lokasi Terdaftar'}
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Status Saat Ini</span>
+                    <span className={`text-xs font-bold mt-0.5 inline-block ${
+                      selectedScanDetail.totalScans > 3 ? 'text-rose-600 dark:text-rose-400' : selectedScanDetail.totalScans >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {selectedScanDetail.totalScans > 3 ? 'Berbahaya (>3x)' : selectedScanDetail.totalScans >= 2 ? 'Peringatan (2-3x)' : 'Valid (1x Sah)'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">Geolokasi GPS</span>
-                    <span className="font-mono text-slate-700 dark:text-zinc-300">
-                      {selectedScanDetail.lat.toFixed(5)}, {selectedScanDetail.lng.toFixed(5)}
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Brand &amp; Produk</span>
+                    <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 truncate mt-0.5 block" title={selectedScanDetail.productType}>
+                      {selectedScanDetail.brand} • {selectedScanDetail.productType}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Batch Produksi</span>
+                    <span className="text-xs font-mono font-bold text-[#c28e62] truncate mt-0.5 block">
+                      {selectedScanDetail.batchId || '-'}
                     </span>
                   </div>
                 </div>
 
-                {/* Produk & Batch */}
-                <div className="bg-slate-50 dark:bg-zinc-800/60 rounded-2xl p-4 border border-slate-200/80 dark:border-zinc-700/80 space-y-2">
-                  <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider text-[11px] mb-1">
-                    <Box size={14} className="text-[#c28e62]" />
-                    <span>Produk &amp; Batch Terkait</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">Brand</span>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-200">
-                      {selectedScanDetail.brand}
+                {/* TIMELINE RIWAYAT LENGKAP SEMUA SCAN (#1, #2, #3, ...) */}
+                <div className="pt-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Clock size={15} className="text-[#c28e62]" />
+                      <h4 className="font-bold text-slate-900 dark:text-zinc-100 text-xs sm:text-sm">
+                        Riwayat Lengkap Sesi Pemindaian ({getScanHistoryList(selectedScanDetail).length} Sesi Terdeteksi)
+                      </h4>
+                    </div>
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                      Kronologis per-sesi scan
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">Produk</span>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-200">
-                      {selectedScanDetail.productType}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">Batch ID</span>
-                    <span className="font-mono font-bold text-[#c28e62]">
-                      {selectedScanDetail.batchId}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 dark:text-zinc-400">Device</span>
-                    <span className="text-slate-700 dark:text-zinc-300">
-                      {selectedScanDetail.deviceInfo}
-                    </span>
+
+                  <div className="space-y-3 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-slate-200 dark:before:bg-zinc-800">
+                    {getScanHistoryList(selectedScanDetail).map((historyItem: any, idx: number) => {
+                      const isFirst = historyItem.scanNumber === 1;
+                      const isDanger = historyItem.scanNumber > 3 || historyItem.status === 'suspicious';
+                      const isWarn = !isDanger && (historyItem.scanNumber >= 2 || historyItem.status === 'repeated');
+
+                      return (
+                        <div 
+                          key={idx} 
+                          className="relative pl-10 group"
+                        >
+                          {/* Timeline node icon */}
+                          <div className={`absolute left-1.5 top-3 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-xs z-10 ${
+                            isDanger 
+                              ? 'bg-rose-500 ring-4 ring-rose-100 dark:ring-rose-950/60' 
+                              : isWarn 
+                                ? 'bg-amber-500 ring-4 ring-amber-100 dark:ring-amber-950/60' 
+                                : 'bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-950/60'
+                          }`}>
+                            {historyItem.scanNumber}
+                          </div>
+
+                          {/* Timeline Card */}
+                          <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80 hover:border-[#c28e62]/50 transition-colors">
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-200/60 dark:border-zinc-700/60">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm">
+                                  Pemindaian Ke-{historyItem.scanNumber}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                  isDanger 
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/60' 
+                                    : isWarn 
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-900/60' 
+                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900/60'
+                                }`}>
+                                  {isFirst ? '✓ Scan Pertama Sah' : isDanger ? '⚠️ Anomali (>3x Scan)' : '↺ Scan Berulang'}
+                                </span>
+                              </div>
+                              <span className="font-mono text-slate-500 dark:text-zinc-400 text-xs">
+                                {historyItem.scannedAt}
+                              </span>
+                            </div>
+
+                            {/* Details Grid: Lokasi & Jaringan */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              {/* Lokasi */}
+                              <div className="flex items-start gap-2">
+                                <MapPin size={14} className="text-[#c28e62] shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="font-semibold text-slate-800 dark:text-zinc-200">
+                                    {historyItem.city}, {historyItem.province}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 dark:text-zinc-400">
+                                    {historyItem.venue}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 mt-0.5">
+                                    GPS: {Number(historyItem.lat).toFixed(4)}, {Number(historyItem.lng).toFixed(4)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* IP & Device */}
+                              <div className="flex items-start gap-2">
+                                <Globe size={14} className="text-[#c28e62] shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="font-mono font-semibold text-slate-800 dark:text-zinc-200">
+                                    IP: {historyItem.ipAddress}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 dark:text-zinc-400">
+                                    ISP: {historyItem.isp || 'Provider Seluler'}
+                                  </div>
+                                  <div className="text-[11px] text-slate-600 dark:text-zinc-300 mt-0.5 flex items-center gap-1">
+                                    <span>Perangkat:</span>
+                                    <span className="font-medium text-slate-800 dark:text-zinc-200">{historyItem.device}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Catatan Sesi */}
+                            {historyItem.statusNote && (
+                              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
+                                <span className="text-slate-400">Status Sesi:</span>
+                                <span className="font-medium text-slate-700 dark:text-zinc-300">{historyItem.statusNote}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -6067,14 +6216,17 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    const timeDisp = getScanDateTimeDisplay(selectedScanDetail);
-                    const txt = `[TELEMETRI SUMAS]\nTag ID: ${selectedScanDetail.latestTagId}\nWaktu Scan: ${timeDisp.dateStr} • ${timeDisp.timeStr}\nLokasi: ${selectedScanDetail.city}, ${selectedScanDetail.province}\nKoordinat: ${selectedScanDetail.lat}, ${selectedScanDetail.lng}\nBrand: ${selectedScanDetail.brand}\nBatch: ${selectedScanDetail.batchId}\nStatus: ${selectedScanDetail.status}`;
+                    const history = getScanHistoryList(selectedScanDetail);
+                    let txt = `[TELEMETRI TAG SUMAS]\nTag ID: ${selectedScanDetail.latestTagId}\nPIN: ${selectedScanDetail.pin || '-'}\nProduk: ${selectedScanDetail.productType}\nBrand: ${selectedScanDetail.brand}\nBatch: ${selectedScanDetail.batchId || '-'}\nTotal Scan: ${selectedScanDetail.totalScans} kali\nStatus: ${selectedScanDetail.status}\n\nRIWAYAT SESI PEMINDAIAN:\n`;
+                    history.forEach((h: any) => {
+                      txt += `\n--- SCAN #${h.scanNumber} ---\nWaktu: ${h.scannedAt}\nLokasi: ${h.city}, ${h.province} (${h.venue || '-'})\nKoordinat GPS: ${h.lat}, ${h.lng}\nIP Address: ${h.ipAddress} (${h.isp || '-'})\nPerangkat: ${h.device}\nStatus: ${h.statusNote || h.status}\n`;
+                    });
                     navigator.clipboard?.writeText(txt);
-                    triggerAlert('Disalin', 'Log telemetri berhasil disalin ke clipboard', 'success');
+                    triggerAlert('Disalin', 'Seluruh log riwayat telemetri berhasil disalin ke clipboard', 'success');
                   }}
-                  className="px-3.5 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                  className="px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
                 >
-                  Salin Telemetri
+                  Salin Seluruh Log Riwayat
                 </button>
                 <div className="flex items-center gap-2">
                   <button
@@ -6083,7 +6235,7 @@ export default function App() {
                       setIsScanDetailModalOpen(false);
                       setSelectedScanDetail(null);
                     }}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer"
+                    className="bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
                   >
                     Tutup
                   </button>
@@ -6239,11 +6391,11 @@ export default function App() {
               </button>
             </div>
 
-            {/* SEARCH & SORT BY CONTROLS */}
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-                {/* Search Input */}
-                <div className="relative flex-1 max-w-md">
+            {/* TABEL RIWAYAT BATCH (TERPADU DALAM SATU CARD SEPERTI TABEL SCAN) */}
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 overflow-hidden shadow-xs">
+              {/* SEARCH & SORT BY CONTROLS (HEADER CARD) */}
+              <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div className="relative flex-1 min-w-[240px]">
                   <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                   <input
                     type="text"
@@ -6271,7 +6423,7 @@ export default function App() {
                 {/* Sort By & Filter Status Controls */}
                 <div className="flex flex-wrap items-center gap-2.5">
                   {/* Dropdown Sort By (Tanpa Pencarian) */}
-                  <div className="w-full sm:w-auto min-w-[170px] sm:min-w-[195px]">
+                  <div className="w-full sm:w-auto min-w-[160px] sm:min-w-[190px]">
                     <CustomSelect
                       value={batchSortBy}
                       onChange={(val) => {
@@ -6318,23 +6470,25 @@ export default function App() {
 
               {/* Reset filter button if active */}
               {(batchSearch || batchFilterStatus !== 'all' || batchSortBy !== 'newest') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBatchSearch('');
-                    setBatchFilterStatus('all');
-                    setBatchSortBy('newest');
-                    setCurrentPage(1);
-                  }}
-                  className="text-xs text-[#c28e62] hover:underline font-semibold self-center sm:self-auto cursor-pointer"
-                >
-                  Reset Filter
-                </button>
+                <div className="px-5 py-2.5 bg-slate-50/60 dark:bg-zinc-800/40 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 dark:text-zinc-400">
+                    Menampilkan hasil filter: <strong className="text-slate-800 dark:text-zinc-200">{filteredAndSortedBatches.length}</strong> batch
+                    {batchSearch && <span> untuk kata kunci "{batchSearch}"</span>}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchSearch('');
+                      setBatchFilterStatus('all');
+                      setBatchSortBy('newest');
+                      setCurrentPage(1);
+                    }}
+                    className="text-xs text-[#c28e62] hover:underline font-semibold cursor-pointer"
+                  >
+                    Reset Filter
+                  </button>
+                </div>
               )}
-            </div>
-
-            {/* TABEL RIWAYAT BATCH */}
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 overflow-hidden">
               {batchSearch && (
                 <div className="px-4 sm:px-6 py-2.5 border-b border-slate-100 dark:border-zinc-700 text-xs text-[#c28e62] font-medium bg-slate-50/60 dark:bg-zinc-800/40">
                   Hasil pencarian untuk "{batchSearch}"
@@ -6409,6 +6563,7 @@ export default function App() {
                             </button>
                           </div>
                           {(() => {
+                            if (!isSumasBatch(batch)) return null;
                             const distinctProjects = batch.tags 
                               ? Array.from(new Set(batch.tags.filter((t: any) => t.project).map((t: any) => t.project)))
                               : (batch.project ? batch.project.split(',').map((p: string) => p.trim()) : []);
@@ -7068,7 +7223,7 @@ export default function App() {
               <button 
                 type="button"
                 onClick={() => setIsCreateBatchModalOpen(false)} 
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -7076,7 +7231,7 @@ export default function App() {
                 type="button"
                 onClick={handleGenerateBatch}
                 disabled={!selectedSku || !formQty} 
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
               >
                 Generate Batch
               </button>
@@ -7146,7 +7301,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsEditUrlModalOpen(false)}
-                className="px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -7154,7 +7309,7 @@ export default function App() {
                 type="button"
                 onClick={handleSaveRedirectUrl}
                 disabled={isUpdatingUrl || !editRedirectUrlInput.trim()}
-                className="px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
               >
                 {isUpdatingUrl ? (
                   <span>Menyimpan...</span>
@@ -7344,7 +7499,7 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={() => setIsEditProjectModalOpen(false)} 
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -7352,9 +7507,9 @@ export default function App() {
                   type="button"
                   onClick={handleSaveEditProject}
                   disabled={!editProjectForm.name.trim() || !editProjectForm.reason.trim()}
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
                 >
-                  <span>Simpan Perubahan</span>
+                  Simpan Perubahan
                 </button>
               </div>
             </div>
@@ -7382,7 +7537,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setDeallocatingProject(null)}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -7393,7 +7548,7 @@ export default function App() {
                   setDeallocatingProject(null);
                   await handleDeallocateProject(projName);
                 }}
-                className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-full transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
               >
                 Ya, Lepas Alokasi
               </button>
@@ -7523,11 +7678,11 @@ export default function App() {
             
             {/* MODAL FOOTER */}
             <div className="px-5 sm:px-6 py-4 bg-slate-50/90 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end flex-shrink-0">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button 
                   type="button"
                   onClick={() => setIsAllocateModalOpen(false)} 
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -7535,7 +7690,7 @@ export default function App() {
                   type="button"
                   onClick={handleSaveAllocation}
                   disabled={!allocationForm.project || !allocationForm.specs}
-                  className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-[#c28e62] to-[#b37f54] hover:opacity-95 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed-[#c28e62]/20 cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
                 >
                   <span>Simpan & Alokasikan</span>
                 </button>
@@ -7604,13 +7759,15 @@ export default function App() {
                   <QrCode size={15} />
                   <span>Daftar Tag ({(tagsTotalCount || activeBatch?.actualTagCount || activeBatch?.qty || currentTags.length).toLocaleString('id-ID')})</span>
                 </button>
-                <button 
+                {isSumasBatch(activeBatch) && (
+                  <button 
                     onClick={() => { setActiveTab('projects'); setHoveredTagInfo(null); }}
                     className={`pb-3 px-1 border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${activeTab === 'projects' ? 'border-[#c28e62] text-[#c28e62] font-bold' : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200'}`}
                   >
                     <Building2 size={15} />
                     <span>Alokasi Proyek ({activeBatchProjects.length})</span>
                   </button>
+                )}
                 <button 
                   onClick={() => { setActiveTab('history'); setHoveredTagInfo(null); }}
                   className={`pb-3 px-1 border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${activeTab === 'history' ? 'border-[#c28e62] text-[#c28e62] font-bold' : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200'}`}
@@ -7846,69 +8003,88 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* QUICK SELECTION BAR / ALLOCATED STATUS */}
-                  {activeBatch?.status !== 'Disuspend' && (
-                    availableCount > 0 ? (
-                      <div className="bg-[#fcf7f3] dark:bg-zinc-800/60 border border-[#cd9a6f]/30 rounded-xl px-3 py-2 mb-3 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 text-xs">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-slate-600 dark:text-zinc-400 font-semibold">Pilih Cepat Tag Tersedia:</span>
-                          {[5, 10, 20].filter(qty => qty <= availableCount).map(qty => (
-                            <button
-                              key={qty}
-                              onClick={() => handleQuickSelectAvailable(qty)}
-                              className="px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-[#c28e62] hover:text-white text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-full font-medium transition-colors cursor-pointer"
-                            >
-                              +{qty} Tag
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => handleQuickSelectAvailable(-1)}
-                            className="px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-[#c28e62] hover:text-white text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-full font-medium transition-colors cursor-pointer"
-                          >
-                            Pilih Semua Sisa ({availableCount})
-                          </button>
-                        </div>
+                  {/* KONTROL TAG KHUSUS SUMAS VS BRAND SKINCARE RETAIL */}
+                  {isSumasBatch(activeBatch) ? (
+                    <>
+                      {/* QUICK SELECTION BAR / ALLOCATED STATUS (KHUSUS SUMAS) */}
+                      {activeBatch?.status !== 'Disuspend' && (
+                        availableCount > 0 ? (
+                          <div className="bg-[#fcf7f3] dark:bg-zinc-800/60 border border-[#cd9a6f]/30 rounded-xl px-3 py-2 mb-3 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 text-xs">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-slate-600 dark:text-zinc-400 font-semibold">Pilih Cepat Tag Tersedia:</span>
+                              {[5, 10, 20].filter(qty => qty <= availableCount).map(qty => (
+                                <button
+                                  key={qty}
+                                  onClick={() => handleQuickSelectAvailable(qty)}
+                                  className="px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-[#c28e62] hover:text-white text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-full font-medium transition-colors cursor-pointer"
+                                >
+                                  +{qty} Tag
+                                </button>
+                              ))}
+                              <button
+                                onClick={() => handleQuickSelectAvailable(-1)}
+                                className="px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-[#c28e62] hover:text-white text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-full font-medium transition-colors cursor-pointer"
+                              >
+                                Pilih Semua Sisa ({availableCount})
+                              </button>
+                            </div>
 
-                        {selectedTagsToAllocate.length > 0 && (
-                          <button
-                            onClick={() => setSelectedTagsToAllocate([])}
-                            className="text-red-600 dark:text-red-400 hover:underline font-medium cursor-pointer"
-                          >
-                            Batal Pilih ({selectedTagsToAllocate.length})
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl px-3.5 py-2.5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300">
-                          <CheckCircle2 size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                          <span><strong>Semua Tag Telah Teralokasi:</strong> Seluruh {currentTags.length} PIN pada batch ini sudah dialokasikan ke proyek. PIN abu-abu tidak dapat dipilih ulang agar tidak terjadi duplikasi tag fisik di lapangan.</span>
+                            {selectedTagsToAllocate.length > 0 && (
+                              <button
+                                onClick={() => setSelectedTagsToAllocate([])}
+                                className="text-red-600 dark:text-red-400 hover:underline font-medium cursor-pointer"
+                              >
+                                Batal Pilih ({selectedTagsToAllocate.length})
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl px-3.5 py-2.5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300">
+                              <CheckCircle2 size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                              <span><strong>Semua Tag Telah Teralokasi:</strong> Seluruh {currentTags.length} PIN pada batch ini sudah dialokasikan ke proyek. PIN abu-abu tidak dapat dipilih ulang agar tidak terjadi duplikasi tag fisik di lapangan.</span>
+                            </div>
+                            <button 
+                              onClick={() => setActiveTab('projects')} 
+                              className="text-xs font-semibold text-[#c28e62] hover:underline whitespace-nowrap self-start sm:self-auto cursor-pointer"
+                            >
+                              Kelola di Tab Proyek →
+                            </button>
+                          </div>
+                        )
+                      )}
+                      
+                      {/* LEGENDA STATUS TAG SUMAS */}
+                      <div className="flex items-center gap-4 text-xs font-semibold mb-2.5 px-1 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3.5 h-3.5 rounded border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 dark:border-emerald-400"></div>
+                          <span className="text-emerald-700 dark:text-emerald-300 font-bold">Tersedia (Siap Alokasi)</span>
                         </div>
-                        <button 
-                          onClick={() => setActiveTab('projects')} 
-                          className="text-xs font-semibold text-[#c28e62] hover:underline whitespace-nowrap self-start sm:self-auto cursor-pointer"
-                        >
-                          Kelola di Tab Proyek →
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3.5 h-3.5 rounded border border-[#8a5b35] dark:border-amber-400 bg-[#c28e62]"></div>
+                          <span className="text-[#c28e62] dark:text-amber-300 font-bold">Terpilih (Diproses)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-zinc-800 bg-slate-200/90 dark:bg-zinc-950/90"></div>
+                          <span className="text-slate-400 dark:text-zinc-500 font-medium">Terpakai (Teralokasi)</span>
+                        </div>
                       </div>
-                    )
+                    </>
+                  ) : (
+                    <>
+                      {/* LEGENDA STATUS TAG RETAIL SKINCARE */}
+                      <div className="flex items-center gap-4 text-xs font-semibold mb-2.5 px-1 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3.5 h-3.5 rounded border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 dark:border-emerald-400"></div>
+                          <span className="text-emerald-700 dark:text-emerald-300 font-bold">Siap Edar / Verifikasi Konsumen</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-zinc-800 bg-slate-200/90 dark:bg-zinc-950/90"></div>
+                          <span className="text-slate-400 dark:text-zinc-500 font-medium">Tervalidasi / Terdistribusi</span>
+                        </div>
+                      </div>
+                    </>
                   )}
-                  
-                  {/* LEGENDA STATUS TAG */}
-                  <div className="flex items-center gap-4 text-xs font-semibold mb-2.5 px-1 flex-wrap">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3.5 h-3.5 rounded border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 dark:border-emerald-400"></div>
-                        <span className="text-emerald-700 dark:text-emerald-300 font-bold">Tersedia (Siap Alokasi)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3.5 h-3.5 rounded border border-[#8a5b35] dark:border-amber-400 bg-[#c28e62]"></div>
-                        <span className="text-[#c28e62] dark:text-amber-300 font-bold">Terpilih (Diproses)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-zinc-800 bg-slate-200/90 dark:bg-zinc-950/90"></div>
-                        <span className="text-slate-400 dark:text-zinc-500 font-medium">Terpakai (Teralokasi)</span>
-                      </div>
-                    </div>
 
                   {/* GRID PIN TAG PAS 8 KOLOM (SIMETRIS & IMBANG KIRI-KANAN) */}
                   <div 
@@ -7930,14 +8106,18 @@ export default function App() {
                         {filteredTags.map((tag) => {
                           const isAvailable = tag.status === 'Tersedia';
                           const isSelected = selectedTagsToAllocate.includes(tag.id);
-                          const isInteractive = activeBatch?.status !== 'Disuspend' && isAvailable;
+                          const canAllocate = isSumasBatch(activeBatch);
+                          const isInteractive = canAllocate && activeBatch?.status !== 'Disuspend' && isAvailable;
 
                           return (
                             <div 
                               key={tag.id}
-                              onClick={() => {
-                                setHoveredTagInfo(null);
-                                if (isInteractive) toggleTagSelection(tag.id);
+                              onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setHoveredTagInfo({ tag, rect });
+                                if (isInteractive) {
+                                  toggleTagSelection(tag.id);
+                                }
                               }}
                               onMouseEnter={(e) => {
                                 const rect = e.currentTarget.getBoundingClientRect();
@@ -7945,11 +8125,11 @@ export default function App() {
                               }}
                               onMouseLeave={() => setHoveredTagInfo(null)}
                               className={`
-                                relative flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center font-mono select-none transition-all w-full
-                                ${isInteractive ? 'cursor-pointer hover:-translate-y-0.5' : 'cursor-default'}
+                                relative flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center font-mono select-none transition-all w-full cursor-pointer
+                                ${isInteractive ? 'hover:-translate-y-0.5' : 'hover:scale-[1.02]'}
                                 ${
                                   !isAvailable 
-                                    ? 'bg-slate-200/90 dark:bg-zinc-950/90 border-slate-300/80 dark:border-zinc-800 text-slate-400 dark:text-zinc-600 opacity-70 cursor-not-allowed' 
+                                    ? 'bg-slate-200/90 dark:bg-zinc-950/90 border-slate-300/80 dark:border-zinc-800 text-slate-400 dark:text-zinc-600 opacity-70' 
                                     : isSelected
                                       ? 'bg-[#c28e62] dark:bg-[#c28e62] border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10 ' 
                                       : 'bg-emerald-50/70 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-500/60 text-emerald-800 dark:text-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60'
@@ -8171,7 +8351,7 @@ export default function App() {
               <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-end">
                 <button 
                   onClick={() => { setIsDetailModalOpen(false); setSelectedTagsToAllocate([]); }} 
-                  className="px-5 py-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Tutup
                 </button>
@@ -8182,17 +8362,16 @@ export default function App() {
                       openDownloadModal(activeBatch);
                     }
                   }}
-                  className="px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] dark:bg-[#c28e62] dark:hover:bg-[#b07d53] rounded-full transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
                   data-tooltip="Unduh Lembar Cetak PDF A3+ / File CSV"
                   data-tooltip-pos="top"
                 >
-                  <Download size={15} />
-                  <span>Unduh</span>
+                  Unduh
                 </button>
-                {activeTab === 'tags' && selectedTagsToAllocate.length > 0 && (
+                {isSumasBatch(activeBatch) && activeTab === 'tags' && selectedTagsToAllocate.length > 0 && (
                   <button 
                     onClick={() => setIsAllocateModalOpen(true)}
-                    className="bg-slate-800 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-slate-900 dark:hover:bg-white px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-colors flex items-center cursor-pointer"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
                   >
                     Alokasikan ke Proyek
                   </button>
@@ -8412,14 +8591,14 @@ export default function App() {
               <button 
                 type="button"
                 onClick={() => { setIsDeleteModalOpen(false); setBatchToDelete(null); }} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
                 type="button"
                 onClick={handleDeleteBatch} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
+                className="flex-1 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
               >
                 Ya, Hapus
               </button>
@@ -8475,15 +8654,17 @@ export default function App() {
             
             <div className="px-5 sm:px-6 py-4 bg-slate-50/90 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex justify-end gap-2.5 flex-shrink-0">
               <button 
+                type="button"
                 onClick={() => setIsSuspendModalOpen(false)} 
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
+                type="button"
                 onClick={handleSuspendBatch}
                 disabled={!suspendForm.reason.trim()}
-                className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
               >
                 Suspend Batch
               </button>
@@ -8539,15 +8720,17 @@ export default function App() {
             
             <div className="px-5 sm:px-6 py-4 bg-slate-50/90 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex justify-end gap-2.5 flex-shrink-0">
               <button 
+                type="button"
                 onClick={() => setIsUnsuspendModalOpen(false)} 
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
+                type="button"
                 onClick={handleUnsuspendBatch}
                 disabled={!unsuspendForm.reason.trim()}
-                className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
               >
                 Pulihkan Batch
               </button>
@@ -8716,10 +8899,11 @@ export default function App() {
             
             <div className="px-5 py-3.5 bg-slate-50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
               <button 
+                type="button"
                 onClick={() => setIsDownloadModalOpen(false)} 
-                className="px-4 py-1.5 text-xs sm:text-sm font-medium text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
-                Batal
+                Tutup
               </button>
             </div>
           </div>
@@ -8872,7 +9056,7 @@ export default function App() {
                     </label>
                     <input 
                       type="text" 
-                      placeholder="Contoh: SUMAS, ASSC, BLIMEY!" 
+                      placeholder="Contoh: Sumas, Somethinc, Avoskin, Skintific" 
                       value={brandForm.name}
                       onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
                       className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:border-[#cd9a6f] focus:ring-2 focus:ring-[#cd9a6f]/20 outline-none font-semibold transition-all" 
@@ -8927,11 +9111,11 @@ export default function App() {
             
             {/* MODAL FOOTER */}
             <div className="px-5 sm:px-6 py-4 bg-slate-50/90 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end flex-shrink-0">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button 
                   type="button"
                   onClick={() => { setIsCreateBrandModalOpen(false); setIsEditBrandModalOpen(false); }} 
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -8939,7 +9123,7 @@ export default function App() {
                   type="button"
                   onClick={isEditBrandModalOpen ? handleUpdateBrand : handleCreateBrand}
                   disabled={!brandForm.name.trim()}
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
                 >
                   {isEditBrandModalOpen ? 'Simpan Perubahan' : 'Buat Brand Sekarang'}
                 </button>
@@ -9415,7 +9599,7 @@ export default function App() {
               <button 
                 type="button"
                 onClick={() => { setIsCreateUserModalOpen(false); setIsEditUserModalOpen(false); setIsResetPasswordMode(false); }} 
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -9429,7 +9613,7 @@ export default function App() {
                   (!isEditUserModalOpen && (!userForm.password.trim() || userForm.password !== userForm.confirmPassword)) ||
                   (isEditUserModalOpen && isResetPasswordMode && (!userForm.password.trim() || userForm.password !== userForm.confirmPassword))
                 }
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
               >
                 {isEditUserModalOpen ? (
                   <span>Simpan Perubahan</span>
@@ -9470,14 +9654,14 @@ export default function App() {
               <button 
                 type="button"
                 onClick={() => { setIsDeleteUserModalOpen(false); setUserToDelete(null); }} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
                 type="button"
                 onClick={handleConfirmDeleteUser} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
+                className="flex-1 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
               >
                 Ya, Hapus
               </button>
@@ -9659,7 +9843,7 @@ export default function App() {
                     setIsDetailUserModalOpen(false);
                     setUserToView(null);
                   }}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/60 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Tutup
                 </button>
@@ -9671,10 +9855,9 @@ export default function App() {
                     setUserToView(null);
                     handleOpenEditUser(u);
                   }}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
                 >
-                  <Edit3 size={13} />
-                  <span>Edit Pengguna</span>
+                  Edit Pengguna
                 </button>
               </div>
             </div>
@@ -9851,11 +10034,11 @@ export default function App() {
             
             {/* MODAL FOOTER */}
             <div className="px-5 sm:px-6 py-4 bg-slate-50/90 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end flex-shrink-0">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button 
                   type="button"
                   onClick={() => setIsAddUserModalOpen(false)} 
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200/80 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -9863,7 +10046,7 @@ export default function App() {
                   type="button"
                   onClick={handleQuickCreateUser}
                   disabled={!userForm.name.trim() || !userForm.email.trim() || !isValidEmail(userForm.email)}
-                  className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#c28e62] hover:bg-[#b07d53] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
                 >
                   <span>Simpan & Pilih Pemilik</span>
                 </button>
@@ -10200,23 +10383,23 @@ export default function App() {
               <span className="text-xs text-slate-400 dark:text-zinc-500">
                 Terdaftar sejak: <span className="font-semibold text-slate-600 dark:text-zinc-300">{brandToView.createdAt}</span>
               </span>
-              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); }}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
                 <button
                   type="button"
                   onClick={() => {
                     setIsDetailBrandModalOpen(false);
                     handleOpenEditBrand(brandToView);
                   }}
-                  className="flex-1 sm:flex-initial px-4 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
                 >
                   Edit Data Brand
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); }}
-                  className="flex-1 sm:flex-initial px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-slate-700 dark:text-zinc-200 rounded-full text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Tutup
                 </button>
               </div>
             </div>
@@ -10258,14 +10441,14 @@ export default function App() {
               <button 
                 type="button"
                 onClick={() => { setIsDeleteBrandModalOpen(false); setBrandToDelete(null); }} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button 
                 type="button"
                 onClick={handleConfirmDeleteBrand} 
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
+                className="flex-1 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
               >
                 Ya, Hapus
               </button>
@@ -10327,10 +10510,15 @@ export default function App() {
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     Batch disuspend (Terkunci)
                   </div>
-                ) : (
+                ) : isSumasBatch(activeBatch) ? (
                   <div className="text-[10px] text-emerald-400 font-medium pt-0.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                     Siap dialokasikan ke proyek
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-emerald-400 font-medium pt-0.5 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Siap scan verifikasi konsumen (Retail)
                   </div>
                 )}
               </div>
@@ -10528,13 +10716,13 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <option value="Material & Konstruksi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard" />
-                      <option value="Material & Konstruksi > Aksesoris & Hardware Cubicle > Nylon Fitting Set Hitam" />
-                      <option value="Material & Konstruksi > Wall Cladding & Plafon > Exterior Architectural Cladding" />
-                      <option value="Pakaian & Fashion > Atasan & T-Shirt > Oversized Boxy Cut Tee" />
-                      <option value="Pakaian & Fashion > Outerwear & Jaket > Heavyweight Fleece Hoodie" />
-                      <option value="Aksesoris & Merchandise > Topi & Headwear > 6-Panel Curved Dad Cap" />
-                      <option value="Aksesoris & Merchandise > Tas & Pouch > Utility Cordura Sling Bag" />
+                      <option value="SUMAS Architectural & Partisi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard" />
+                      <option value="SUMAS Architectural & Partisi > Aksesoris & Hardware SUS 304" />
+                      <option value="Skincare & Dermo-Cosmetics > Serum & Ampoule > Niacinamide & Brightening Serum" />
+                      <option value="Skincare & Dermo-Cosmetics > Moisturizer & Barrier Cream > Ceramide Barrier Cream" />
+                      <option value="Skincare & Dermo-Cosmetics > Sunscreen & UV Defense > Broad Spectrum SPF 50+ PA++++" />
+                      <option value="Skincare & Dermo-Cosmetics > Toner & Essence" />
+                      <option value="Skincare & Dermo-Cosmetics > Facial Cleanser & Micellar" />
                     </>
                   )}
                 </datalist>
@@ -10560,14 +10748,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => { setIsCreateSkuModalOpen(false); setIsEditSkuModalOpen(false); }}
-                className="px-4 py-2 rounded-full text-xs font-semibold text-slate-600 dark:text-zinc-400 hover:bg-slate-200/60 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={isEditSkuModalOpen ? handleUpdateSku : handleCreateSku}
-                className="px-5 py-2 rounded-full text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer flex items-center justify-center"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
               >
                 <span>{isEditSkuModalOpen ? 'Perbarui SKU' : 'Simpan SKU'}</span>
               </button>
@@ -10672,11 +10860,11 @@ export default function App() {
                     
                     {/* BAGIAN ATAS: 2 KOLOM (KIRI GAMBAR 1:1, KANAN INFORMASI UTAMA & 3 KARTU RINGKASAN) */}
                     <div className="p-6">
-                      <div className="flex flex-col sm:flex-row gap-6 sm:items-stretch">
+                      <div className="flex flex-col sm:flex-row gap-6 sm:items-start">
                         
-                        {/* KOLOM KIRI: GAMBAR 1:1 PRODUK */}
-                        <div className="w-full sm:w-44 md:w-48 shrink-0 flex items-center justify-center sm:justify-start sm:self-stretch">
-                          <div className="w-full max-w-[200px] sm:max-w-none h-full min-h-[160px] aspect-square sm:aspect-auto rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 flex items-center justify-center shadow-xs">
+                        {/* KOLOM KIRI: GAMBAR 1:1 PRODUK (STRICT SQUARE 1:1 DENGAN OBJECT-COVER) */}
+                        <div className="w-full sm:w-44 md:w-48 shrink-0 flex items-start justify-center sm:justify-start">
+                          <div className="w-full aspect-square max-w-[200px] sm:max-w-none rounded-2xl overflow-hidden bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/70 flex items-center justify-center shadow-xs">
                             {prod.image ? (
                               <img 
                                 src={prod.image} 
@@ -10945,7 +11133,6 @@ export default function App() {
                   {/* MODAL FOOTER */}
                   <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
-                      <Clock size={14} className="text-[#c28e62] shrink-0" />
                       <span>Tanggal Registrasi:</span>
                       <span className="font-semibold text-slate-800 dark:text-zinc-200">
                         {prod.createdAt ? formatDateTimeDisplay(prod.createdAt) : 'Katalog Master'}
@@ -10955,7 +11142,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => { setIsDetailSkuModalOpen(false); setSkuToView(null); setSkuRelationalData(null); }}
-                        className="px-4 py-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                       >
                         Tutup
                       </button>
@@ -10968,7 +11155,7 @@ export default function App() {
                           setSkuRelationalData(null);
                           handleOpenEditSku(toEdit);
                         }}
-                        className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#c28e62] hover:bg-[#b07d53] text-white transition-colors cursor-pointer"
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
                       >
                         Edit SKU
                       </button>
@@ -11027,14 +11214,14 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => { setIsDeleteSkuModalOpen(false); setSkuToDelete(null); }}
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 rounded-full transition-colors cursor-pointer"
+                className="flex-1 px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDeleteSku}
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-700 rounded-full transition-colors cursor-pointer shadow-xs"
+                className="flex-1 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
               >
                 Ya, Hapus
               </button>
@@ -11077,7 +11264,7 @@ export default function App() {
                   setShowSkuLeaveModal(false);
                   setPendingSkuLeaveNav(null);
                 }}
-                className="flex-1 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="flex-1 px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
               >
                 Lanjut Edit
               </button>
@@ -11094,7 +11281,7 @@ export default function App() {
                     setSkuSubView('list');
                   }
                 }}
-                className="flex-1 py-2.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                className="flex-1 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
               >
                 Tinggalkan
               </button>

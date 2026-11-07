@@ -93,16 +93,26 @@ db.exec(`
     productType TEXT,
     batchId TEXT,
     latestTagId TEXT,
+    pin TEXT,
     latestTime TEXT,
     isB2B INTEGER DEFAULT 0,
     status TEXT DEFAULT 'valid',
     anomalyReason TEXT,
     deviceInfo TEXT,
+    scanHistory TEXT,
     createdAt TEXT
   );
 
   CREATE INDEX IF NOT EXISTS idx_scan_points_status ON scan_points(status);
   CREATE INDEX IF NOT EXISTS idx_scan_points_brand ON scan_points(brand);
+  CREATE INDEX IF NOT EXISTS idx_scan_points_tagId ON scan_points(latestTagId);
+  CREATE INDEX IF NOT EXISTS idx_scan_points_pin ON scan_points(pin);
+`);
+
+try { db.exec("ALTER TABLE scan_points ADD COLUMN pin TEXT"); } catch (_) {}
+try { db.exec("ALTER TABLE scan_points ADD COLUMN scanHistory TEXT"); } catch (_) {}
+
+db.exec(`
 
   CREATE TABLE IF NOT EXISTS scan_activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -267,12 +277,12 @@ try {
   db.prepare("UPDATE products SET skuCode = 'SKU-' || UPPER(id) WHERE skuCode IS NULL OR skuCode = ''").run();
 } catch (_) {}
 
-// Comprehensive Database Seeder (15 complete records per entity)
+// Comprehensive Database Seeder (SUMAS + Skincare Products & Brands)
 try {
+  const oldCat = db.prepare("SELECT id FROM categories WHERE id = 'cat-mat'").get();
   const brandsCountRow = db.prepare('SELECT COUNT(*) as count FROM brands').get() as { count: number };
   const productsCountRow = db.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number };
-  const batchesCountRow = db.prepare('SELECT COUNT(*) as count FROM batches').get() as { count: number };
-  if (brandsCountRow.count < 15 || productsCountRow.count < 15 || batchesCountRow.count < 15) {
+  if (oldCat || brandsCountRow.count < 15 || productsCountRow.count < 15) {
     seedComprehensiveData(db);
   }
 } catch (err) {
@@ -613,33 +623,33 @@ if (scanActivitiesCountRow && scanActivitiesCountRow.count === 0) {
 
   const initialActivities = [
     // 7 Days
-    { rangeType: '7d', label: 'Sen (26/10)', fullDate: '26 Okt 2026', scans: 520, valid: 519, topBrand: 'SUMAS', sortOrder: 1 },
-    { rangeType: '7d', label: 'Sel (27/10)', fullDate: '27 Okt 2026', scans: 680, valid: 679, topBrand: 'ASSC', sortOrder: 2 },
-    { rangeType: '7d', label: 'Rab (28/10)', fullDate: '28 Okt 2026', scans: 610, valid: 608, topBrand: 'BLIMEY!', sortOrder: 3 },
-    { rangeType: '7d', label: 'Kam (29/10)', fullDate: '29 Okt 2026', scans: 790, valid: 788, topBrand: 'SUMAS', sortOrder: 4 },
-    { rangeType: '7d', label: 'Jum (30/10)', fullDate: '30 Okt 2026', scans: 940, valid: 938, topBrand: 'ASSC', sortOrder: 5 },
-    { rangeType: '7d', label: 'Sab (31/10)', fullDate: '31 Okt 2026', scans: 1120, valid: 1118, topBrand: 'ASSC', sortOrder: 6 },
-    { rangeType: '7d', label: 'Min (01/11)', fullDate: '01 Nov 2026', scans: 860, valid: 859, topBrand: 'BLIMEY!', sortOrder: 7 },
+    { rangeType: '7d', label: 'Sen (26/10)', fullDate: '26 Okt 2026', scans: 520, valid: 519, topBrand: 'Sumas', sortOrder: 1 },
+    { rangeType: '7d', label: 'Sel (27/10)', fullDate: '27 Okt 2026', scans: 680, valid: 679, topBrand: 'Somethinc', sortOrder: 2 },
+    { rangeType: '7d', label: 'Rab (28/10)', fullDate: '28 Okt 2026', scans: 610, valid: 608, topBrand: 'Skintific', sortOrder: 3 },
+    { rangeType: '7d', label: 'Kam (29/10)', fullDate: '29 Okt 2026', scans: 790, valid: 788, topBrand: 'Sumas', sortOrder: 4 },
+    { rangeType: '7d', label: 'Jum (30/10)', fullDate: '30 Okt 2026', scans: 940, valid: 938, topBrand: 'Avoskin', sortOrder: 5 },
+    { rangeType: '7d', label: 'Sab (31/10)', fullDate: '31 Okt 2026', scans: 1120, valid: 1118, topBrand: 'Somethinc', sortOrder: 6 },
+    { rangeType: '7d', label: 'Min (01/11)', fullDate: '01 Nov 2026', scans: 860, valid: 859, topBrand: 'Whitelab', sortOrder: 7 },
 
     // 30 Days
-    { rangeType: '30d', label: 'Minggu 1', fullDate: '01 - 07 Okt 2026', scans: 3450, valid: 3442, topBrand: 'SUMAS', sortOrder: 1 },
-    { rangeType: '30d', label: 'Minggu 2', fullDate: '08 - 14 Okt 2026', scans: 4120, valid: 4110, topBrand: 'ASSC', sortOrder: 2 },
-    { rangeType: '30d', label: 'Minggu 3', fullDate: '15 - 21 Okt 2026', scans: 4890, valid: 4881, topBrand: 'SUMAS', sortOrder: 3 },
-    { rangeType: '30d', label: 'Minggu 4', fullDate: '22 - 28 Okt 2026', scans: 5410, valid: 5402, topBrand: 'BLIMEY!', sortOrder: 4 },
-    { rangeType: '30d', label: 'Minggu 5', fullDate: '29 Okt - 01 Nov', scans: 2920, valid: 2915, topBrand: 'ASSC', sortOrder: 5 },
+    { rangeType: '30d', label: 'Minggu 1', fullDate: '01 - 07 Okt 2026', scans: 3450, valid: 3442, topBrand: 'Sumas', sortOrder: 1 },
+    { rangeType: '30d', label: 'Minggu 2', fullDate: '08 - 14 Okt 2026', scans: 4120, valid: 4110, topBrand: 'Somethinc', sortOrder: 2 },
+    { rangeType: '30d', label: 'Minggu 3', fullDate: '15 - 21 Okt 2026', scans: 4890, valid: 4881, topBrand: 'Sumas', sortOrder: 3 },
+    { rangeType: '30d', label: 'Minggu 4', fullDate: '22 - 28 Okt 2026', scans: 5410, valid: 5402, topBrand: 'Skintific', sortOrder: 4 },
+    { rangeType: '30d', label: 'Minggu 5', fullDate: '29 Okt - 01 Nov', scans: 2920, valid: 2915, topBrand: 'Somethinc', sortOrder: 5 },
 
     // 12 Months
-    { rangeType: '12m', label: 'Jan', fullDate: 'Januari 2026', scans: 8900, valid: 8880, topBrand: 'SUMAS', sortOrder: 1 },
-    { rangeType: '12m', label: 'Feb', fullDate: 'Februari 2026', scans: 10400, valid: 10380, topBrand: 'SUMAS', sortOrder: 2 },
-    { rangeType: '12m', label: 'Mar', fullDate: 'Maret 2026', scans: 12100, valid: 12075, topBrand: 'ASSC', sortOrder: 3 },
-    { rangeType: '12m', label: 'Apr', fullDate: 'April 2026', scans: 11800, valid: 11770, topBrand: 'BLIMEY!', sortOrder: 4 },
-    { rangeType: '12m', label: 'Mei', fullDate: 'Mei 2026', scans: 13900, valid: 13865, topBrand: 'SUMAS', sortOrder: 5 },
-    { rangeType: '12m', label: 'Jun', fullDate: 'Juni 2026', scans: 14500, valid: 14470, topBrand: 'ASSC', sortOrder: 6 },
-    { rangeType: '12m', label: 'Jul', fullDate: 'Juli 2026', scans: 15800, valid: 15760, topBrand: 'BLIMEY!', sortOrder: 7 },
-    { rangeType: '12m', label: 'Agt', fullDate: 'Agustus 2026', scans: 17200, valid: 17160, topBrand: 'SUMAS', sortOrder: 8 },
-    { rangeType: '12m', label: 'Sep', fullDate: 'September 2026', scans: 16900, valid: 16860, topBrand: 'ASSC', sortOrder: 9 },
-    { rangeType: '12m', label: 'Okt', fullDate: 'Oktober 2026', scans: 18492, valid: 18450, topBrand: 'SUMAS', sortOrder: 10 },
-    { rangeType: '12m', label: 'Nov', fullDate: 'November 2026', scans: 4820, valid: 4812, topBrand: 'ASSC', sortOrder: 11 }
+    { rangeType: '12m', label: 'Jan', fullDate: 'Januari 2026', scans: 8900, valid: 8880, topBrand: 'Sumas', sortOrder: 1 },
+    { rangeType: '12m', label: 'Feb', fullDate: 'Februari 2026', scans: 10400, valid: 10380, topBrand: 'Sumas', sortOrder: 2 },
+    { rangeType: '12m', label: 'Mar', fullDate: 'Maret 2026', scans: 12100, valid: 12075, topBrand: 'Somethinc', sortOrder: 3 },
+    { rangeType: '12m', label: 'Apr', fullDate: 'April 2026', scans: 11800, valid: 11770, topBrand: 'Avoskin', sortOrder: 4 },
+    { rangeType: '12m', label: 'Mei', fullDate: 'Mei 2026', scans: 13900, valid: 13865, topBrand: 'Sumas', sortOrder: 5 },
+    { rangeType: '12m', label: 'Jun', fullDate: 'Juni 2026', scans: 14500, valid: 14470, topBrand: 'Somethinc', sortOrder: 6 },
+    { rangeType: '12m', label: 'Jul', fullDate: 'Juli 2026', scans: 15800, valid: 15760, topBrand: 'Skintific', sortOrder: 7 },
+    { rangeType: '12m', label: 'Agt', fullDate: 'Agustus 2026', scans: 17200, valid: 17160, topBrand: 'Sumas', sortOrder: 8 },
+    { rangeType: '12m', label: 'Sep', fullDate: 'September 2026', scans: 16900, valid: 16860, topBrand: 'Whitelab', sortOrder: 9 },
+    { rangeType: '12m', label: 'Okt', fullDate: 'Oktober 2026', scans: 18492, valid: 18450, topBrand: 'Sumas', sortOrder: 10 },
+    { rangeType: '12m', label: 'Nov', fullDate: 'November 2026', scans: 4820, valid: 4812, topBrand: 'Somethinc', sortOrder: 11 }
   ];
 
   const insertAllActivities = db.transaction((activities) => {
@@ -836,11 +846,22 @@ try {
 // Get all real scan locations from SQLite
 app.get('/api/scans/locations', (_req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM scan_points ORDER BY totalScans DESC').all() as any[];
-    const result = rows.map((r) => ({
-      ...r,
-      isB2B: Boolean(r.isB2B)
-    }));
+    const rows = db.prepare('SELECT * FROM scan_points ORDER BY id ASC').all() as any[];
+    const result = rows.map((r) => {
+      let history = [];
+      if (r.scanHistory) {
+        try {
+          history = typeof r.scanHistory === 'string' ? JSON.parse(r.scanHistory) : r.scanHistory;
+        } catch (_) {
+          history = [];
+        }
+      }
+      return {
+        ...r,
+        isB2B: Boolean(r.isB2B),
+        scanHistory: history
+      };
+    });
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -1289,11 +1310,23 @@ app.get('/q/:tagNumber', (req, res) => {
   }
 });
 
-// Allocate selected tags to a project in a fast transaction
+// Allocate selected tags to a project in a fast transaction (Khusus Batch Milik SUMAS)
 app.post('/api/batches/:id/allocate', (req, res) => {
   try {
     const { id } = req.params;
     const { tagIds, project, specs, codeType, warranty, prodCode, note } = req.body;
+
+    const batch = db.prepare('SELECT id, brand FROM batches WHERE id = ?').get(id) as { id: string; brand: string } | undefined;
+    if (!batch) {
+      return res.status(404).json({ error: 'Batch tidak ditemukan' });
+    }
+
+    // Algoritma khusus: Hanya batch milik SUMAS yang dapat melakukan alokasi tag untuk proyek
+    if ((batch.brand || '').trim().toLowerCase() !== 'sumas') {
+      return res.status(403).json({ 
+        error: `Batch milik brand "${batch.brand}" tidak diizinkan mengalokasikan proyek. Fitur alokasi proyek khusus didedikasikan untuk batch B2B SUMAS.` 
+      });
+    }
 
     if (!Array.isArray(tagIds) || tagIds.length === 0) {
       return res.status(400).json({ error: 'Tidak ada tag yang dipilih' });
@@ -1329,11 +1362,20 @@ app.post('/api/batches/:id/allocate', (req, res) => {
   }
 });
 
-// Deallocate tags for a project
+// Deallocate tags for a project (Khusus Batch Milik SUMAS)
 app.post('/api/batches/:id/deallocate', (req, res) => {
   try {
     const { id } = req.params;
     const { project } = req.body;
+
+    const batch = db.prepare('SELECT id, brand FROM batches WHERE id = ?').get(id) as { id: string; brand: string } | undefined;
+    if (!batch) {
+      return res.status(404).json({ error: 'Batch tidak ditemukan' });
+    }
+
+    if ((batch.brand || '').trim().toLowerCase() !== 'sumas') {
+      return res.status(403).json({ error: 'Operasi alokasi proyek hanya berlaku untuk batch produk SUMAS.' });
+    }
 
     db.prepare(`
       UPDATE tags
@@ -1355,10 +1397,18 @@ app.post('/api/batches/:id/deallocate', (req, res) => {
   }
 });
 
-// Update project data within batch (from Alokasi Proyek page)
+// Update project data within batch (from Alokasi Proyek page - Khusus SUMAS)
 app.put('/api/batches/:id/projects', (req, res) => {
   try {
     const { id } = req.params;
+    const batch = db.prepare('SELECT id, brand FROM batches WHERE id = ?').get(id) as { id: string; brand: string } | undefined;
+    if (!batch) {
+      return res.status(404).json({ error: 'Batch tidak ditemukan' });
+    }
+    if ((batch.brand || '').trim().toLowerCase() !== 'sumas') {
+      return res.status(403).json({ error: 'Pengeditan data proyek hanya berlaku untuk batch SUMAS.' });
+    }
+
     const { oldProjectName, newProjectName, specs, codeType, warranty, prodCode, note } = req.body;
 
     if (!oldProjectName || !newProjectName) {
