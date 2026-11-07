@@ -1156,56 +1156,6 @@ export default function App() {
     return null;
   };
 
-  // Metrik Live yang diagregasikan langsung dari database & state batches & brands
-  const liveStats = React.useMemo(() => {
-    let totalTags = 0;
-                    const projectMap: { [key: string]: { name: string; count: number; batchId: string; batchObj: any; specs: string } } = {};
-    const brandMap: { [key: string]: { brand: string; batchCount: number; totalQty: number; logo?: string | null } } = {};
-
-    // Inisialisasi peta brand dari master brands
-    brands.forEach(br => {
-      brandMap[br.name] = {
-        brand: br.name,
-        batchCount: 0,
-        totalQty: 0,
-        logo: br.logo
-      };
-    });
-
-    batches.forEach(b => {
-      const qty = Number(b.qty) || 0;
-      totalTags += qty;
-      if (!brandMap[b.brand]) {
-        brandMap[b.brand] = { brand: b.brand, batchCount: 0, totalQty: 0 };
-      }
-      brandMap[b.brand].batchCount += 1;
-      brandMap[b.brand].totalQty += qty;
-
-      const used = typeof b.usedCount === 'number' ? b.usedCount : (b.project ? qty : 0);
-      if (b.project) {
-        const parts = String(b.project).split(',').map((p: string) => p.trim()).filter(Boolean);
-        parts.forEach((proj: string) => {
-          if (!projectMap[proj]) {
-            projectMap[proj] = { name: proj, count: used || qty, batchId: b.batchId, batchObj: b, specs: b.specs || '-' };
-          }
-        });
-      }
-    });
-
-    const projectsList = Object.values(projectMap).sort((a, b) => b.count - a.count);
-
-    return {
-      totalTags,
-      totalBatches: batches.length,
-      activeBatches: batches.filter(b => b.status !== 'Disuspend').length,
-      suspendedBatches: batches.filter(b => b.status === 'Disuspend').length,
-      projectsList,
-      brandList: Object.values(brandMap),
-      totalLogs: auditLogs.length,
-      totalBrands: brands.length,
-      activeBrands: brands.filter(b => b.status === 'Aktif').length,
-    };
-  }, [batches, auditLogs, brands]);
 
   // Fungsi sinkronisasi manual live dengan database SQLite
   const handleManualSync = async () => {
@@ -1395,6 +1345,15 @@ export default function App() {
   const [scanPerPage, setScanPerPage] = useState(10);
   const [selectedScanDetail, setSelectedScanDetail] = useState<any | null>(null);
   const [isScanDetailModalOpen, setIsScanDetailModalOpen] = useState(false);
+  const [expandedScanNumbers, setExpandedScanNumbers] = useState<number[]>([]);
+
+  const handleOpenScanDetail = (item: any) => {
+    setSelectedScanDetail(item);
+    const count = Number(item.totalScans) || 1;
+    // Buka sesi scan paling terbaru secara default
+    setExpandedScanNumbers([count]);
+    setIsScanDetailModalOpen(true);
+  };
   const [isScanMapOpen, setIsScanMapOpen] = useState(false);
   const [hasMapEverOpened, setHasMapEverOpened] = useState(false);
 
@@ -4284,107 +4243,10 @@ export default function App() {
       >
         <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
 
-          {/* 1. BAGIAN 1: 4 KOLOM CARD (KPI STATS) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            {/* CARD 1: TOTAL TAG TERBIT */}
-            <div 
-              onClick={() => setActiveMenu('tag-qr')}
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-[#c28e62]/60 dark:hover:border-[#c28e62]/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Total Tag Terbit</span>
-                <div className="w-10 h-10 rounded-2xl bg-[#c28e62]/10 dark:bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold border border-[#c28e62]/20 group-hover:scale-110 transition-transform">
-                  <QrCode size={20} />
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
-                  {(dashboardStats?.totalTags ?? liveStats.totalTags).toLocaleString('id-ID')}
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
-                  <span className="font-semibold text-[#c28e62]">{batches.length} Batch</span>
-                  <span>•</span>
-                  <span>{liveStats.activeBatches} Batch Aktif</span>
-                </div>
-              </div>
-            </div>
-
-            {/* CARD 2: TOTAL SCAN AKTIVITAS */}
-            <div 
-              onClick={() => setActiveMenu('scan')}
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/60 dark:hover:border-emerald-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Total Aktivitas Scan</span>
-                <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold border border-emerald-200/60 dark:border-emerald-800/40 group-hover:scale-110 transition-transform">
-                  <Scan size={20} />
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
-                  {(dashboardStats?.totalScans ?? 27840).toLocaleString('id-ID')}
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    +{(dashboardStats?.todayScans ?? 625).toLocaleString('id-ID')} Hari ini
-                  </span>
-                  <span>•</span>
-                  <span>{dashboardStats?.validScans ?? 15} Titik Valid</span>
-                </div>
-              </div>
-            </div>
-
-            {/* CARD 3: BRAND & PORTOFOLIO */}
-            <div 
-              onClick={() => setActiveMenu('brand')}
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/60 dark:hover:border-indigo-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Brand Terdaftar</span>
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold border border-indigo-200/60 dark:border-indigo-800/40 group-hover:scale-110 transition-transform">
-                  <Building2 size={20} />
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
-                  {brands.length} <span className="text-base font-normal text-slate-500 dark:text-zinc-400">Merk</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
-                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">{products.length} SKU Katalog</span>
-                  <span>•</span>
-                  <span>{liveStats.activeBrands} Aktif</span>
-                </div>
-              </div>
-            </div>
-
-            {/* CARD 4: SEBARAN WILAYAH SCAN (LEAFLET + OSM) */}
-            <div 
-              onClick={() => setActiveMenu('scan')}
-              className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-3xl p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden group hover:border-amber-500/60 dark:hover:border-amber-500/60 transition-all duration-150 min-w-0 cursor-pointer select-none outline-none shadow-xs"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-slate-500 dark:text-zinc-400">Sebaran Wilayah Scan</span>
-                <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold border border-amber-200/60 dark:border-amber-800/40 group-hover:scale-110 transition-transform">
-                  <Globe size={20} />
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-zinc-50 tracking-tight">
-                  {dashboardStats?.distinctCities ?? 15} <span className="text-base font-normal text-slate-500 dark:text-zinc-400">Kota</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-[11px] text-slate-500 dark:text-zinc-400">
-                  <span className="font-semibold text-amber-600 dark:text-amber-400">{dashboardStats?.totalScanPoints ?? 15} Titik Pantau</span>
-                  <span>•</span>
-                  <span>GPS Real-Time</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. BAGIAN 2: CHART GARIS AKTIVITAS SCAN */}
+          {/* 1. CHART GARIS AKTIVITAS SCAN */}
           <ScanActivityChart />
 
-          {/* 3. BAGIAN 3: MAPS DENGAN POIN-POIN LOKASI SCAN (LEAFLET + OPENSTREETMAP) */}
+          {/* 2. MAPS DENGAN POIN-POIN LOKASI SCAN (LEAFLET + OPENSTREETMAP) */}
           <ScanLocationMap />
 
 
@@ -5919,10 +5781,7 @@ export default function App() {
                             <div className="flex items-center justify-end">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setSelectedScanDetail(item);
-                                  setIsScanDetailModalOpen(true);
-                                }}
+                                onClick={() => handleOpenScanDetail(item)}
                                 data-tooltip="Detail"
                                 data-tooltip-pos="left"
                                 aria-label="Detail"
@@ -6033,182 +5892,248 @@ export default function App() {
 
               {/* Modal Body */}
               <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs">
-                {/* Status Keamanan Banner Sesuai Frekuensi Pemindaian */}
-                {selectedScanDetail.totalScans > 3 ? (
-                  <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl flex items-start gap-3 text-rose-700 dark:text-rose-300">
-                    <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-500" />
-                    <div>
-                      <div className="font-bold text-xs uppercase tracking-wider">
-                        Peringatan Keamanan: Terdeteksi {selectedScanDetail.totalScans}x Pemindaian (&gt;3x Batas Aman)
-                      </div>
-                      <p className="text-xs mt-1 leading-relaxed">
-                        Tag ini telah dipindai sebanyak <strong>{selectedScanDetail.totalScans} kali</strong>. Batas toleransi wajar adalah maksimal 3x pemindaian. Terdeteksi potensi pemalsuan fisik, penyalinan QR Code, atau kode PIN telah disebarkan secara tidak sah.
-                      </p>
-                    </div>
-                  </div>
-                ) : selectedScanDetail.totalScans >= 2 ? (
-                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-2xl flex items-start gap-3 text-amber-700 dark:text-amber-300">
-                    <RotateCcw size={18} className="shrink-0 mt-0.5 text-amber-500" />
-                    <div>
-                      <div className="font-bold text-xs uppercase tracking-wider">
-                        Peringatan: Pemindaian Berulang ({selectedScanDetail.totalScans}x Scan)
-                      </div>
-                      <p className="text-xs mt-1 leading-relaxed">
-                        Tag ini telah dipindai sebanyak <strong>{selectedScanDetail.totalScans} kali</strong>. Pemindaian berulang 2–3x wajar jika dilakukan oleh konsumen atau pihak kontraktor untuk verifikasi berkala.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl flex items-start gap-3 text-emerald-700 dark:text-emerald-300">
-                    <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-emerald-500" />
-                    <div>
-                      <div className="font-bold text-xs uppercase tracking-wider">
-                        Status Valid: Pemindaian Pertama Sah (1x Scan)
-                      </div>
-                      <p className="text-xs mt-1 leading-relaxed">
-                        Tag otentik asli terverifikasi untuk pertama kalinya. Unit produk telah terdaftar sah dan garansi resmi aktif.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Ringkasan Informasi Tag & Produk (Grid 4 Kolom) */}
+                {/* 1. RINGKASAN METRIK CEPAT (4 KARTU BERSIH TANPA TEKS BERLEBIHAN) */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
-                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Total Pemindaian</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 font-mono mt-0.5 block">
-                      {selectedScanDetail.totalScans} Kali
+                  {/* Status Keaslian */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      Status Keaslian
                     </span>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
-                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Status Saat Ini</span>
-                    <span className={`text-xs font-bold mt-0.5 inline-block ${
-                      selectedScanDetail.totalScans > 3 ? 'text-rose-600 dark:text-rose-400' : selectedScanDetail.totalScans >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
-                    }`}>
-                      {selectedScanDetail.totalScans > 3 ? 'Berbahaya (>3x)' : selectedScanDetail.totalScans >= 2 ? 'Peringatan (2-3x)' : 'Valid (1x Sah)'}
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
-                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Brand &amp; Produk</span>
-                    <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 truncate mt-0.5 block" title={selectedScanDetail.productType}>
-                      {selectedScanDetail.brand} • {selectedScanDetail.productType}
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
-                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 block">Batch Produksi</span>
-                    <span className="text-xs font-mono font-bold text-[#c28e62] truncate mt-0.5 block">
-                      {selectedScanDetail.batchId || '-'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* TIMELINE RIWAYAT LENGKAP SEMUA SCAN (#1, #2, #3, ...) */}
-                <div className="pt-2">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Clock size={15} className="text-[#c28e62]" />
-                      <h4 className="font-bold text-slate-900 dark:text-zinc-100 text-xs sm:text-sm">
-                        Riwayat Lengkap Sesi Pemindaian ({getScanHistoryList(selectedScanDetail).length} Sesi Terdeteksi)
-                      </h4>
+                    <div className="mt-1">
+                      {selectedScanDetail.totalScans > 3 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                          <span>Berbahaya</span>
+                        </span>
+                      ) : selectedScanDetail.totalScans >= 2 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                          <span>Peringatan</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          <span>Valid</span>
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[11px] text-slate-400 dark:text-zinc-500">
-                      Kronologis per-sesi scan
-                    </span>
                   </div>
 
-                  <div className="space-y-3 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-slate-200 dark:before:bg-zinc-800">
-                    {getScanHistoryList(selectedScanDetail).map((historyItem: any, idx: number) => {
-                      const isFirst = historyItem.scanNumber === 1;
-                      const isDanger = historyItem.scanNumber > 3 || historyItem.status === 'suspicious';
-                      const isWarn = !isDanger && (historyItem.scanNumber >= 2 || historyItem.status === 'repeated');
+                  {/* Total Frekuensi Pemindaian */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      Frekuensi Scan
+                    </span>
+                    <div className="mt-1 font-bold text-sm text-slate-800 dark:text-zinc-100 font-mono">
+                      {selectedScanDetail.totalScans}x Scan
+                    </div>
+                  </div>
 
-                      return (
-                        <div 
-                          key={idx} 
-                          className="relative pl-10 group"
-                        >
-                          {/* Timeline node icon */}
-                          <div className={`absolute left-1.5 top-3 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-xs z-10 ${
-                            isDanger 
-                              ? 'bg-rose-500 ring-4 ring-rose-100 dark:ring-rose-950/60' 
-                              : isWarn 
-                                ? 'bg-amber-500 ring-4 ring-amber-100 dark:ring-amber-950/60' 
-                                : 'bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-950/60'
-                          }`}>
-                            {historyItem.scanNumber}
-                          </div>
+                  {/* Brand */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      Brand
+                    </span>
+                    <div className="mt-1 font-bold text-xs text-[#c28e62] uppercase tracking-wider truncate">
+                      {selectedScanDetail.brand}
+                    </div>
+                  </div>
 
-                          {/* Timeline Card */}
-                          <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80 hover:border-[#c28e62]/50 transition-colors">
-                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-200/60 dark:border-zinc-700/60">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-sm">
-                                  Pemindaian Ke-{historyItem.scanNumber}
-                                </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                  isDanger 
-                                    ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/60' 
-                                    : isWarn 
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-900/60' 
-                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900/60'
-                                }`}>
-                                  {isFirst ? '✓ Scan Pertama Sah' : isDanger ? '⚠️ Anomali (>3x Scan)' : '↺ Scan Berulang'}
-                                </span>
-                              </div>
-                              <span className="font-mono text-slate-500 dark:text-zinc-400 text-xs">
-                                {historyItem.scannedAt}
-                              </span>
-                            </div>
-
-                            {/* Details Grid: Lokasi & Jaringan */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                              {/* Lokasi */}
-                              <div className="flex items-start gap-2">
-                                <MapPin size={14} className="text-[#c28e62] shrink-0 mt-0.5" />
-                                <div>
-                                  <div className="font-semibold text-slate-800 dark:text-zinc-200">
-                                    {historyItem.city}, {historyItem.province}
-                                  </div>
-                                  <div className="text-[11px] text-slate-500 dark:text-zinc-400">
-                                    {historyItem.venue}
-                                  </div>
-                                  <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 mt-0.5">
-                                    GPS: {Number(historyItem.lat).toFixed(4)}, {Number(historyItem.lng).toFixed(4)}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* IP & Device */}
-                              <div className="flex items-start gap-2">
-                                <Globe size={14} className="text-[#c28e62] shrink-0 mt-0.5" />
-                                <div>
-                                  <div className="font-mono font-semibold text-slate-800 dark:text-zinc-200">
-                                    IP: {historyItem.ipAddress}
-                                  </div>
-                                  <div className="text-[11px] text-slate-500 dark:text-zinc-400">
-                                    ISP: {historyItem.isp || 'Provider Seluler'}
-                                  </div>
-                                  <div className="text-[11px] text-slate-600 dark:text-zinc-300 mt-0.5 flex items-center gap-1">
-                                    <span>Perangkat:</span>
-                                    <span className="font-medium text-slate-800 dark:text-zinc-200">{historyItem.device}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Catatan Sesi */}
-                            {historyItem.statusNote && (
-                              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-zinc-800 text-[11px] text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
-                                <span className="text-slate-400">Status Sesi:</span>
-                                <span className="font-medium text-slate-700 dark:text-zinc-300">{historyItem.statusNote}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  {/* Batch Produksi */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      Batch Produksi
+                    </span>
+                    <div className="mt-1 font-mono font-bold text-xs text-slate-700 dark:text-zinc-300 truncate" title={selectedScanDetail.batchId}>
+                      {selectedScanDetail.batchId || '-'}
+                    </div>
                   </div>
                 </div>
+
+                {/* 2. NAMA PRODUK SKU RINGKAS */}
+                <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block">
+                      Nama Produk SKU
+                    </span>
+                    <div className="font-bold text-slate-900 dark:text-zinc-100 text-xs sm:text-sm mt-0.5 truncate" title={selectedScanDetail.productType}>
+                      {selectedScanDetail.productType}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. RIWAYAT LENGKAP SEMUA SESI SCAN (URUTAN TERBARU DI ATAS DENGAN ACCORDION) */}
+                {(() => {
+                  const historyList = getScanHistoryList(selectedScanDetail);
+                  // Urutan riwayat scan dari atas terbaru lalu paling lama di bawah
+                  const sortedHistory = [...historyList].sort((a, b) => b.scanNumber - a.scanNumber);
+
+                  const toggleAccordion = (num: number) => {
+                    setExpandedScanNumbers(prev => 
+                      prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
+                    );
+                  };
+
+                  const allNumbers = sortedHistory.map((h: any) => h.scanNumber);
+                  const isAllExpanded = allNumbers.length > 0 && allNumbers.every((n: number) => expandedScanNumbers.includes(n));
+
+                  const toggleAll = () => {
+                    if (isAllExpanded) {
+                      setExpandedScanNumbers([]);
+                    } else {
+                      setExpandedScanNumbers(allNumbers);
+                    }
+                  };
+
+                  return (
+                    <div className="pt-1 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Clock size={15} className="text-[#c28e62]" />
+                          <h4 className="font-bold text-slate-900 dark:text-zinc-100 text-xs sm:text-sm">
+                            Riwayat Sesi Pemindaian ({sortedHistory.length})
+                          </h4>
+                          <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-normal hidden sm:inline">
+                            • Urut terbaru ke terlama
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={toggleAll}
+                          className="text-[11px] font-semibold text-[#c28e62] hover:underline cursor-pointer select-none"
+                        >
+                          {isAllExpanded ? 'Tutup Semua' : 'Buka Semua'}
+                        </button>
+                      </div>
+
+                      {/* DAFTAR ACCORDION RIWAYAT SCAN */}
+                      <div className="space-y-2">
+                        {sortedHistory.map((historyItem: any) => {
+                          const isExpanded = expandedScanNumbers.includes(historyItem.scanNumber);
+                          const isFirst = historyItem.scanNumber === 1;
+                          const isLatest = historyItem.scanNumber === selectedScanDetail.totalScans;
+                          const isDanger = historyItem.scanNumber > 3 || historyItem.status === 'suspicious';
+                          const isWarn = !isDanger && (historyItem.scanNumber >= 2 || historyItem.status === 'repeated');
+
+                          return (
+                            <div 
+                              key={historyItem.scanNumber}
+                              className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                                isExpanded 
+                                  ? 'bg-white dark:bg-zinc-800 border-[#c28e62]/40 shadow-xs' 
+                                  : 'bg-slate-50/70 dark:bg-zinc-800/40 border-slate-200/80 dark:border-zinc-700/80 hover:border-slate-300 dark:hover:border-zinc-700'
+                              }`}
+                            >
+                              {/* HEADER ACCORDION (BISA DI-KLIK UNTUK EXPAND/COLLAPSE) */}
+                              <button
+                                type="button"
+                                onClick={() => toggleAccordion(historyItem.scanNumber)}
+                                className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                                  {/* Badge Nomor Scan */}
+                                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${
+                                    isDanger 
+                                      ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60' 
+                                      : isWarn 
+                                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60' 
+                                        : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60'
+                                  }`}>
+                                    Scan #{historyItem.scanNumber} {isLatest && selectedScanDetail.totalScans > 1 ? '(Terbaru)' : isFirst ? '(Pertama)' : ''}
+                                  </span>
+
+                                  {/* Status Dot */}
+                                  <span className="flex items-center gap-1.5 text-xs font-semibold">
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${
+                                      isDanger ? 'bg-rose-500' : isWarn ? 'bg-amber-500' : 'bg-emerald-500'
+                                    }`}></span>
+                                    <span className={isDanger ? 'text-rose-700 dark:text-rose-400' : isWarn ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}>
+                                      {isDanger ? 'Berbahaya' : isWarn ? 'Peringatan' : 'Valid'}
+                                    </span>
+                                  </span>
+
+                                  {/* Waktu Scan */}
+                                  <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
+                                    {historyItem.scannedAt}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2.5 shrink-0">
+                                  <span className="text-xs text-slate-500 dark:text-zinc-400 hidden sm:inline font-medium">
+                                    {historyItem.city}
+                                  </span>
+                                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors">
+                                    <ChevronDown 
+                                      size={16} 
+                                      className={`transition-transform duration-200 ${isExpanded ? 'rotate-180 text-[#c28e62]' : ''}`} 
+                                    />
+                                  </div>
+                                </div>
+                              </button>
+
+                              {/* KONTEN EXPANDED ACCORDION */}
+                              {isExpanded && (
+                                <div className="px-4 pb-4 pt-1 border-t border-slate-100 dark:border-zinc-700/60 space-y-2.5 animate-in fade-in duration-200">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                                    {/* Lokasi & Koordinat */}
+                                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/60 flex items-start gap-2.5">
+                                      <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0 mt-0.5">
+                                        <MapPin size={14} />
+                                      </div>
+                                      <div className="min-w-0 flex-1 text-xs">
+                                        <div className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider">
+                                          Lokasi Pemindaian
+                                        </div>
+                                        <div className="font-bold text-slate-800 dark:text-zinc-200 mt-0.5">
+                                          {historyItem.city}, {historyItem.province}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                                          {historyItem.venue}
+                                        </div>
+                                        <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 mt-1">
+                                          GPS: {Number(historyItem.lat).toFixed(4)}, {Number(historyItem.lng).toFixed(4)}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Jaringan & Perangkat */}
+                                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/60 flex items-start gap-2.5">
+                                      <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
+                                        <Globe size={14} />
+                                      </div>
+                                      <div className="min-w-0 flex-1 text-xs">
+                                        <div className="text-[10px] uppercase font-bold text-slate-400 dark:text-zinc-500 tracking-wider">
+                                          Jaringan &amp; Perangkat
+                                        </div>
+                                        <div className="font-mono font-bold text-slate-800 dark:text-zinc-200 mt-0.5">
+                                          IP: {historyItem.ipAddress}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                                          ISP: {historyItem.isp || 'Provider Seluler'}
+                                        </div>
+                                        <div className="text-[11px] text-slate-600 dark:text-zinc-300 mt-1 truncate" title={historyItem.device}>
+                                          {historyItem.device}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Catatan Status Sesi */}
+                                  {historyItem.statusNote && (
+                                    <div className="px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700/60 text-xs flex items-center justify-between gap-2">
+                                      <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-medium">Status Sesi:</span>
+                                      <span className="font-semibold text-slate-700 dark:text-zinc-300 text-right">{historyItem.statusNote}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Modal Footer */}
