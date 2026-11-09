@@ -8,8 +8,7 @@
     {
       "binding": "DB",
       "database_name": "sumas-db",
-      "database_id": "YOUR_D1_DATABASE_ID_OR_PAGES_BINDING",
-      "migrations_dir": "./d1"
+      "database_id": "748f1a1c-1ca2-4bd4-8433-3966447eab86"
     }
   ]
 }
