@@ -1,4 +1,4 @@
-import { ScanPoint } from '../components/ScanLocationMap';
+import type { ScanPoint } from '../types/telemetry.ts';
 
 export const initialScanPoints: ScanPoint[] = [
   {

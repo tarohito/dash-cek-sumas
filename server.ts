@@ -11,7 +11,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+const portArgIndex = process.argv.indexOf('--port');
+const portFromArg = portArgIndex !== -1 ? parseInt(process.argv[portArgIndex + 1], 10) : NaN;
+const PORT = !isNaN(portFromArg) ? portFromArg : (Number(process.env.PORT) || 3000);
+
+const hostArgIndex = process.argv.indexOf('--host');
+const hostFromArg = hostArgIndex !== -1 ? process.argv[hostArgIndex + 1] : undefined;
+const HOST = hostFromArg && hostFromArg !== 'true' ? hostFromArg : '0.0.0.0';
 
 app.use(express.json({ limit: '50mb' }));
 
@@ -2464,8 +2470,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on port ${PORT}`);
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`Server listening on http://${HOST}:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use.`);
+    } else {
+      console.error('Server listen error:', err);
+    }
   });
 }
 

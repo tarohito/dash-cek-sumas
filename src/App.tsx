@@ -202,6 +202,46 @@ export const isSumasBatch = (batch?: { brand?: string } | null): boolean => {
   return b2bBrandsRegistry.has(normalized) || normalized === 'sumas';
 };
 
+// ==========================================
+// BADGE MODEL BISNIS (B2B VS RETAIL) - FULL ROUNDED TANPA ICON
+// ==========================================
+export const BusinessTypeBadge: React.FC<{ 
+  type?: string | null; 
+  brandName?: string | null;
+  size?: 'sm' | 'md';
+  className?: string;
+}> = ({ 
+  type, 
+  brandName,
+  size = 'sm',
+  className = ''
+}) => {
+  const isB2B = type === 'B2B' || 
+    (brandName ? brandName.trim().toLowerCase() === 'sumas' || b2bBrandsRegistry.has(brandName.trim().toLowerCase()) : false);
+
+  if (size === 'md') {
+    return isB2B ? (
+      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950 border border-slate-900 dark:border-zinc-100 select-none ${className}`}>
+        B2B
+      </span>
+    ) : (
+      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-200 border border-slate-300 dark:border-zinc-700 select-none ${className}`}>
+        Retail
+      </span>
+    );
+  }
+
+  return isB2B ? (
+    <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950 border border-slate-900 dark:border-zinc-100 select-none shadow-2xs ${className}`}>
+      B2B
+    </span>
+  ) : (
+    <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-slate-100 text-slate-700 dark:bg-zinc-800/90 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 select-none ${className}`}>
+      Retail
+    </span>
+  );
+};
+
 const NewBadge: React.FC<{ 
   date?: string | null; 
   id?: string | null; 
@@ -1507,22 +1547,60 @@ export default function App() {
 
   const [userToDelete, setUserToDelete] = useState<UserItem | null>(null);
   const [userToView, setUserToView] = useState<UserItem | null>(null);
+  const [isUserBrandsExpanded, setIsUserBrandsExpanded] = useState(false);
+  const [isUserProductsExpanded, setIsUserProductsExpanded] = useState(false);
 
   const [openUserDropdownId, setOpenUserDropdownId] = useState<string | null>(null);
   const [userDropdownPos, setUserDropdownPos] = useState({ top: 0, left: 0 });
   const [userDropdownDirection, setUserDropdownDirection] = useState<'up' | 'down'>('down');
 
-  // Hak akses multi-tenant: Super Admin (Developer / Bos), Klien B2B (Sumas), Klien Retail Non-B2B (ASSC / Somethinc)
-  const [currentRole, setCurrentRole] = useState<'Super Admin' | 'Brand B2B (Sumas)' | 'Brand Retail (Non-B2B)'>('Super Admin');
-  const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
+  // Tag detail modal state:
   const [selectedTagForDetail, setSelectedTagForDetail] = useState<any | null>(null);
   const [tagDetailQrDataUrl, setTagDetailQrDataUrl] = useState<string>('');
   const [isCopiedTagUrl, setIsCopiedTagUrl] = useState(false);
   const [isCopiedTagPin, setIsCopiedTagPin] = useState(false);
 
-  const isSuperAdmin = currentRole === 'Super Admin' || (currentRole as string) === 'Administrator';
-  const isBrandB2B = currentRole === 'Brand B2B (Sumas)';
-  const isBrandRetail = currentRole === 'Brand Retail (Non-B2B)';
+  // Akun aktif yang sedang login (default: Administrator)
+  const currentUser = React.useMemo(() => {
+    const foundAdmin = users.find(u => u.role === 'Administrator');
+    return foundAdmin || users[0] || {
+      id: 'u1',
+      name: 'Kalingga Jeandy',
+      username: 'kalingga.jeandy',
+      email: 'kalinggajeandy3@gmail.com',
+      role: 'Administrator',
+      status: 'Aktif',
+      avatar: '/assets/avatars/user_kalingga.svg'
+    };
+  }, [users]);
+
+  const currentRole = currentUser?.role || 'Administrator';
+  const isSuperAdmin = !currentUser || currentUser.role === 'Administrator' || currentUser.role === 'Super Admin';
+
+  // Brand yang dikelola jika user adalah akun pemilik brand
+  const managedBrand = React.useMemo(() => {
+    if (isSuperAdmin) return null;
+    return brands.find(b => 
+      b.ownerId === currentUser?.id || 
+      (b.ownerName && currentUser?.name && b.ownerName.toLowerCase() === currentUser.name.toLowerCase())
+    ) || brands[0] || null;
+  }, [brands, isSuperAdmin, currentUser]);
+
+  const activeBrandName = managedBrand?.name || '';
+  const isCurrentBrandB2B = React.useMemo(() => {
+    if (isSuperAdmin) return true;
+    return managedBrand?.businessType === 'B2B' || managedBrand?.name?.toLowerCase() === 'sumas' || b2bBrandsRegistry.has((managedBrand?.name || '').toLowerCase());
+  }, [isSuperAdmin, managedBrand]);
+
+  const isBrandB2B = !isSuperAdmin && isCurrentBrandB2B;
+  const isBrandRetail = !isSuperAdmin && !isCurrentBrandB2B;
+
+  // Auto-redirect jika Pemilik Brand mendarat pada menu khusus Super Admin (brand, category, users, settings)
+  useEffect(() => {
+    if (!isSuperAdmin && ['brand', 'category', 'users', 'settings'].includes(activeMenu)) {
+      setActiveMenu('dashboard');
+    }
+  }, [isSuperAdmin, activeMenu]);
 
   const defaultUserForm = {
     id: '',
@@ -2439,6 +2517,8 @@ export default function App() {
 
   const handleOpenDetailUser = (user: UserItem) => {
     setUserToView(user);
+    setIsUserBrandsExpanded(false);
+    setIsUserProductsExpanded(false);
     setIsDetailUserModalOpen(true);
   };
 
@@ -2996,7 +3076,7 @@ export default function App() {
   };
 
   const toggleTagSelection = (tagId: string) => {
-    if (!isSumasBatch(activeBatch)) return;
+    if (!isSumasBatch(activeBatch) || isBrandRetail) return;
     setSelectedTagsToAllocate(prev =>
       prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
     );
@@ -3060,7 +3140,7 @@ export default function App() {
   };
 
   const handleQuickSelectAvailable = (count: number) => {
-    if (!isSumasBatch(activeBatch)) return;
+    if (!isSumasBatch(activeBatch) || isBrandRetail) return;
     const availableTagIds = currentTags
       .filter(t => t.status === 'Tersedia')
       .map(t => t.id);
@@ -3073,7 +3153,7 @@ export default function App() {
   };
 
   const handleSaveAllocation = async () => {
-    if (!isSumasBatch(activeBatch)) return;
+    if (!isSumasBatch(activeBatch) || isBrandRetail) return;
     if (!allocationForm.project.trim() || !allocationForm.specs.trim() || !activeBatch) return;
     if (selectedTagsToAllocate.length === 0) return;
 
@@ -3743,6 +3823,12 @@ export default function App() {
   const filteredAndSortedBatches = React.useMemo(() => {
     let list = [...batches];
 
+    // PEMILIK BRAND HANYA BISA MELIHAT BATCH BRAND YANG DIKELOLA
+    if (!isSuperAdmin && activeBrandName) {
+      const ownerBrandNorm = activeBrandName.toLowerCase();
+      list = list.filter(b => (b.brand || '').toLowerCase() === ownerBrandNorm);
+    }
+
     // Filter pencarian: Batch ID, SKU, Brand, Proyek
     const q = batchSearch.toLowerCase().trim();
     if (q) {
@@ -3805,7 +3891,7 @@ export default function App() {
     });
 
     return list;
-  }, [batches, batchSearch, batchFilterStatus, batchSortBy]);
+  }, [batches, batchSearch, batchFilterStatus, batchSortBy, isSuperAdmin, activeBrandName]);
 
   const currentBatches = React.useMemo(() => {
     const start = (currentPage - 1) * batchPerPage;
@@ -3818,6 +3904,11 @@ export default function App() {
   const filteredBrands = React.useMemo(() => {
     const q = brandSearch.toLowerCase().trim();
     const matched = brands.filter(b => {
+      // PEMILIK BRAND HANYA BISA MELIHAT BRAND YANG DIKELOLA
+      if (!isSuperAdmin && activeBrandName) {
+        if (b.name.toLowerCase() !== activeBrandName.toLowerCase()) return false;
+      }
+
       const matchSearch = !q || 
         b.name.toLowerCase().includes(q) ||
         b.ownerName.toLowerCase().includes(q) ||
@@ -3853,7 +3944,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [brands, brandSearch, brandFilterStatus, brandSortBy]);
+  }, [brands, brandSearch, brandFilterStatus, brandSortBy, isSuperAdmin, activeBrandName]);
 
   const totalBrandPages = Math.ceil(filteredBrands.length / brandPerPage) || 1;
   const currentBrands = React.useMemo(() => {
@@ -3865,44 +3956,6 @@ export default function App() {
     return Array.from(new Set(brands.map(b => b.category))).filter(Boolean);
   }, [brands]);
 
-  // Akun aktif yang sedang login / digunakan saat ini sesuai Role Multi-Tenant
-  const currentUser = React.useMemo(() => {
-    if (isSuperAdmin) {
-      const found = users.find(u => u.role === 'Administrator');
-      return found || {
-        id: 'u-superadmin',
-        name: 'Developer (Super Admin)',
-        username: 'superadmin',
-        email: 'developer@platform.cek.sumas.id',
-        role: 'Super Admin',
-        status: 'Aktif',
-        avatar: ''
-      };
-    }
-    if (isBrandB2B) {
-      const found = users.find(u => u.name.toLowerCase().includes('budi') || (u.email && u.email.includes('sumas')));
-      return found || {
-        id: 'u-budi',
-        name: 'Budi Santoso (PIC Sumas)',
-        username: 'budi.sumas',
-        email: 'budi.s@sumas.id',
-        role: 'Brand B2B (Sumas)',
-        status: 'Aktif',
-        avatar: '/assets/avatars/user_budi.svg'
-      };
-    }
-    // isBrandRetail
-    const found = users.find(u => u.name.toLowerCase().includes('siti') || u.name.toLowerCase().includes('rina'));
-    return found || {
-      id: 'u-retail',
-      name: 'Siti Rahma (PIC Retail)',
-      username: 'siti.retail',
-      email: 'siti.r@retailbrand.id',
-      role: 'Brand Retail (Non-B2B)',
-      status: 'Aktif',
-      avatar: '/assets/avatars/user_siti.svg'
-    };
-  }, [users, isSuperAdmin, isBrandB2B]);
 
   // Memoized calculations for Users Table (Top level to adhere to React Hook rules)
   const filteredUsers = React.useMemo(() => {
@@ -3963,6 +4016,12 @@ export default function App() {
   const filteredProducts = React.useMemo(() => {
     const q = skuSearch.toLowerCase().trim();
     const matched = products.filter(p => {
+      // PEMILIK BRAND HANYA BISA MELIHAT DATA PRODUK BRAND YANG DIKELOLA
+      if (!isSuperAdmin && activeBrandName) {
+        const ownerBrandNorm = activeBrandName.toLowerCase();
+        if ((p.brandName || '').toLowerCase() !== ownerBrandNorm) return false;
+      }
+
       const matchSearch = !q ||
         (p.sku && p.sku.toLowerCase().includes(q)) ||
         (p.brandName && p.brandName.toLowerCase().includes(q)) ||
@@ -4002,7 +4061,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [products, skuSearch, skuFilterBrand, skuSortBy]);
+  }, [products, skuSearch, skuFilterBrand, skuSortBy, isSuperAdmin, activeBrandName]);
 
   const totalSkuPages = Math.ceil(filteredProducts.length / skuPerPage) || 1;
   const currentProducts = React.useMemo(() => {
@@ -4180,42 +4239,86 @@ export default function App() {
             </div>
           </div>
 
-          {/* SIDEBAR NAVIGATION ITEMS (EQUAL WIDTH & EQUAL FONT SIZE FOR ALL ITEMS) */}
+          {/* SIDEBAR NAVIGATION ITEMS (SCOPED PER ROLE) */}
           <div className={`${isSidebarMinimized && !isMobile ? 'px-2 flex flex-col items-center' : 'px-3.5'} py-4 space-y-1.5`}>
             <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
 
-            {/* MASTER DATA SECTION */}
-            {(!isSidebarMinimized || isMobile) && (
-              <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">
-                  Master Data
-                </span>
-                <span className="w-8 h-px bg-slate-200 dark:bg-zinc-700/60"></span>
-              </div>
-            )}
-            
-            <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
-              <NavItem id="brand" icon={Building2} label="Brand / Merk" />
-              <NavItem id="category" icon={Layers} label="Kategori Produk" />
-              <NavItem id="sku" icon={Box} label="SKU Produk" />
-              <NavItem id="tag-qr" icon={QrCode} label="Tag / QRCode" />
-            </div>
+            {isSuperAdmin ? (
+              <>
+                {/* MASTER DATA SECTION (SUPER ADMIN) */}
+                {(!isSidebarMinimized || isMobile) && (
+                  <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">
+                      Master Data
+                    </span>
+                    <span className="w-8 h-px bg-slate-200 dark:bg-zinc-700/60"></span>
+                  </div>
+                )}
+                
+                <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
+                  <NavItem id="brand" icon={Building2} label="Brand / Merk" />
+                  <NavItem id="category" icon={Layers} label="Kategori Produk" />
+                  <NavItem id="sku" icon={Box} label="SKU Produk" />
+                  <NavItem id="tag-qr" icon={QrCode} label="Tag / QRCode" />
+                </div>
 
-            {/* SISTEM & OPERASIONAL SECTION */}
-            {(!isSidebarMinimized || isMobile) && (
-              <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">
-                  Sistem & Log
-                </span>
-                <span className="w-8 h-px bg-slate-200 dark:bg-zinc-700/60"></span>
-              </div>
-            )}
+                {/* SISTEM & OPERASIONAL SECTION (SUPER ADMIN) */}
+                {(!isSidebarMinimized || isMobile) && (
+                  <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">
+                      Sistem & Log
+                    </span>
+                    <span className="w-8 h-px bg-slate-200 dark:bg-zinc-700/60"></span>
+                  </div>
+                )}
 
-            <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
-              <NavItem id="scan" icon={Scan} label="Aktivitas Scan" />
-              <NavItem id="users" icon={Users} label="Akun Pengguna" />
-              <NavItem id="settings" icon={Settings} label="Pengaturan" />
-            </div>
+                <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
+                  <NavItem id="scan" icon={Scan} label="Aktivitas Scan" />
+                  <NavItem id="users" icon={Users} label="Akun Pengguna" />
+                  <NavItem id="settings" icon={Settings} label="Pengaturan" />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* BRAND OWNER SCOPE SECTION */}
+                {(!isSidebarMinimized || isMobile) && (
+                  <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#c28e62] tracking-wider uppercase truncate">
+                      Brand: {activeBrandName}
+                    </span>
+                    <span className="w-6 h-px bg-[#cd9a6f]/40"></span>
+                  </div>
+                )}
+
+                <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
+                  <NavItem id="sku" icon={Box} label={`Katalog SKU (${activeBrandName})`} />
+                  <NavItem id="tag-qr" icon={QrCode} label={`Batch Tag (${activeBrandName})`} />
+                  <NavItem id="scan" icon={Scan} label={`Aktivitas Scan (${activeBrandName})`} />
+                </div>
+
+                {/* INFORMATIONAL NOTICE: READ-ONLY & SCOPE RULE */}
+                {(!isSidebarMinimized || isMobile) && (
+                  <div className="mt-5 p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/60 text-[11px] space-y-1 text-slate-500 dark:text-zinc-400">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-zinc-300">
+                      <Lock size={12} className="text-[#c28e62]" />
+                      <span>Hak Akses Terisolasi</span>
+                    </div>
+                    <p className="leading-snug">
+                      Data terbatas pada brand <strong>{activeBrandName}</strong>.
+                      {isCurrentBrandB2B ? (
+                        <span className="block mt-1 text-blue-600 dark:text-blue-400 font-medium">
+                          🏗️ Brand B2B: Alokasi proyek fisik aktif.
+                        </span>
+                      ) : (
+                        <span className="block mt-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                          🛍️ Brand Retail: Distribusi langsung ke konsumen akhir.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -4238,7 +4341,7 @@ export default function App() {
               </div>
             )}
             {(!isSidebarMinimized || isMobile) && (
-              <div className="flex-1 overflow-hidden cursor-pointer" onClick={() => setIsRoleMenuOpen(prev => !prev)}>
+              <div className="flex-1 overflow-hidden">
                 <p className="text-sm font-bold text-slate-700 dark:text-zinc-200 truncate">
                   {currentUser ? currentUser.name : 'Super Admin'}
                 </p>
@@ -4250,26 +4353,9 @@ export default function App() {
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                         : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                   }`}>
-                    {isSuperAdmin ? 'Super Admin' : isBrandB2B ? 'B2B Sumas' : 'Retail'}
+                    {currentUser?.role || (isSuperAdmin ? 'Super Admin' : 'Brand Owner')}
                   </span>
                 </div>
-              </div>
-            )}
-            {(!isSidebarMinimized || isMobile) && (
-              <div className="relative">
-                <button 
-                  type="button"
-                  onClick={() => setIsRoleMenuOpen(prev => !prev)}
-                  className={`p-1.5 rounded-full transition-colors cursor-pointer ${
-                    isRoleMenuOpen 
-                      ? 'bg-[#c28e62] text-white' 
-                      : 'text-slate-400 dark:text-zinc-500 hover:text-[#c28e62] dark:hover:text-[#c28e62] hover:bg-slate-100 dark:hover:bg-zinc-800'
-                  }`}
-                  data-tooltip="Ganti Hak Akses / Peran"
-                  data-tooltip-pos="top"
-                >
-                  <RotateCcw size={15} />
-                </button>
               </div>
             )}
           </div>
@@ -4351,15 +4437,44 @@ export default function App() {
   const ActiveIcon = activeDetails.icon;
 
   const renderDashboardContent = () => {
-    const totalTagsCount = dashboardStats?.totalTags ?? 0;
-    const totalBatchesCount = dashboardStats?.totalBatches ?? batches.length;
-    const totalScansCount = dashboardStats?.totalScans ?? scanStats?.totalScans ?? 0;
-    const todayScansCount = dashboardStats?.todayScans ?? scanStats?.todayScans ?? 0;
-    const distinctCitiesCount = dashboardStats?.distinctCities ?? 0;
-    const totalLocationsCount = dashboardStats?.totalScanPoints ?? scanStats?.totalLocations ?? 0;
-    const validCount = scanStats?.valid ?? dashboardStats?.validScans ?? 0;
-    const repeatedCount = scanStats?.repeated ?? 0;
-    const suspiciousCount = scanStats?.suspicious ?? 0;
+    const brandBatches = isSuperAdmin ? batches : batches.filter(b => (b.brand || '').toLowerCase() === (activeBrandName || '').toLowerCase());
+    const brandPoints = isSuperAdmin ? scanPoints : scanPoints.filter(p => (p.brand || '').toLowerCase() === (activeBrandName || '').toLowerCase());
+
+    const totalTagsCount = isSuperAdmin 
+      ? (dashboardStats?.totalTags ?? 0)
+      : brandBatches.reduce((acc, curr) => acc + (Number(curr.actualTagCount || curr.qty) || 0), 0);
+
+    const totalBatchesCount = isSuperAdmin 
+      ? (dashboardStats?.totalBatches ?? batches.length)
+      : brandBatches.length;
+
+    const totalScansCount = isSuperAdmin 
+      ? (dashboardStats?.totalScans ?? scanStats?.totalScans ?? 0)
+      : brandPoints.reduce((acc, curr) => acc + (Number(curr.totalScans) || 1), 0);
+
+    const todayScansCount = isSuperAdmin 
+      ? (dashboardStats?.todayScans ?? scanStats?.todayScans ?? 0)
+      : brandPoints.reduce((acc, curr) => acc + (Number(curr.todayScans) || 0), 0);
+
+    const distinctCitiesCount = isSuperAdmin 
+      ? (dashboardStats?.distinctCities ?? 0)
+      : new Set(brandPoints.map(p => p.city)).size;
+
+    const totalLocationsCount = isSuperAdmin 
+      ? (dashboardStats?.totalScanPoints ?? scanStats?.totalLocations ?? 0)
+      : brandPoints.length;
+
+    const validCount = isSuperAdmin 
+      ? (scanStats?.valid ?? dashboardStats?.validScans ?? 0)
+      : brandPoints.filter(p => p.status === 'valid').length;
+
+    const repeatedCount = isSuperAdmin 
+      ? (scanStats?.repeated ?? 0)
+      : brandPoints.filter(p => p.status === 'repeated').length;
+
+    const suspiciousCount = isSuperAdmin 
+      ? (scanStats?.suspicious ?? 0)
+      : brandPoints.filter(p => p.status === 'suspicious').length;
 
     return (
       <div 
@@ -4466,7 +4581,7 @@ export default function App() {
           <ScanActivityChart />
 
           {/* 2. MAPS DENGAN POIN-POIN LOKASI SCAN (LEAFLET + OPENSTREETMAP) */}
-          <ScanLocationMap />
+          <ScanLocationMap points={brandPoints} />
 
 
 
@@ -4653,13 +4768,9 @@ export default function App() {
                               </button>
                               <NewBadge date={brand.createdAt} id={brand.id} />
                             </div>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 ${
-                              brand.businessType === 'B2B' || brand.name.toLowerCase() === 'sumas'
-                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800'
-                                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800'
-                            }`}>
-                              {brand.businessType === 'B2B' || brand.name.toLowerCase() === 'sumas' ? 'B2B (Proyek)' : 'Retail (B2C)'}
-                            </span>
+                            <div className="mt-1">
+                              <BusinessTypeBadge type={brand.businessType} brandName={brand.name} size="sm" />
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -5264,13 +5375,20 @@ export default function App() {
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={handleOpenCreateSku}
-              className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
-            >
-              Tambah SKU Produk
-            </button>
+            {isSuperAdmin ? (
+              <button
+                type="button"
+                onClick={handleOpenCreateSku}
+                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
+              >
+                Tambah SKU Produk
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 text-xs font-medium">
+                <Eye size={14} className="text-[#c28e62]" />
+                <span>Mode Lihat Saja: Katalog {activeBrandName}</span>
+              </div>
+            )}
           </div>
 
           {/* SKU TABLE & CONTROLS (TERPADU DALAM SATU CARD SEPERTI TABEL SCAN) */}
@@ -5573,7 +5691,7 @@ export default function App() {
   // ==========================================
   const renderScanContent = () => {
     // Dropdown opsi Brand dari scanPoints & master brands
-    const scanBrandOptions = [
+    const scanBrandOptions = isSuperAdmin ? [
       { value: 'all', label: 'Semua Brand' },
       ...Array.from(
         new Set([
@@ -5583,11 +5701,18 @@ export default function App() {
       )
         .sort()
         .map((b) => ({ value: b, label: b }))
+    ] : [
+      { value: activeBrandName, label: activeBrandName }
     ];
 
     // Filter dan sort log scan telemetri
     const q = scanSearch.trim().toLowerCase();
-    const filteredPoints = scanPoints.filter((item) => {
+    const sourcePoints = isSuperAdmin ? scanPoints : scanPoints.filter(p => (p.brand || '').toLowerCase() === (activeBrandName || '').toLowerCase());
+    const filteredPoints = sourcePoints.filter((item) => {
+      // PEMILIK BRAND HANYA BISA MELIHAT AKTIVITAS SCAN BRAND YANG DIKELOLA
+      if (!isSuperAdmin && activeBrandName) {
+        if ((item.brand || '').toLowerCase() !== activeBrandName.toLowerCase()) return false;
+      }
       if (scanStatusFilter !== 'all' && item.status !== scanStatusFilter) return false;
       if (scanBrandFilter !== 'all' && item.brand?.toLowerCase() !== scanBrandFilter.toLowerCase()) return false;
       if (q) {
@@ -5786,7 +5911,7 @@ export default function App() {
               <div className="pt-0.5 pb-1">
                 {hasMapEverOpened && (
                   <ScanLocationMap
-                    points={scanPoints}
+                    points={sourcePoints}
                     isLoading={isScanLoading}
                     onClose={() => setIsScanMapOpen(false)}
                   />
@@ -6618,8 +6743,8 @@ export default function App() {
                         { value: 'oldest', label: 'Terlama (Tanggal Dibuat)' },
                         { value: 'batchId-asc', label: 'Batch ID (A - Z)' },
                         { value: 'batchId-desc', label: 'Batch ID (Z - A)' },
-                        { value: 'sku-asc', label: 'Produk SKU (A - Z)' },
-                        { value: 'sku-desc', label: 'Produk SKU (Z - A)' },
+                        { value: 'sku-asc', label: 'Nama Produk (A - Z)' },
+                        { value: 'sku-desc', label: 'Nama Produk (Z - A)' },
                         { value: 'brand-asc', label: 'Brand / Merk (A - Z)' },
                         { value: 'qty-desc', label: 'Jumlah Tag (Terbanyak)' },
                         { value: 'qty-asc', label: 'Jumlah Tag (Tersedikit)' }
@@ -6680,7 +6805,7 @@ export default function App() {
                   <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                     <tr>
                       <th className="px-5 py-3.5">Batch ID &amp; Info</th>
-                      <th className="px-5 py-3.5">Produk SKU</th>
+                      <th className="px-5 py-3.5">Produk &amp; Brand</th>
                       <th className="px-5 py-3.5">Jumlah Tag</th>
                       <th className="px-5 py-3.5">Status</th>
                       <th className="px-5 py-3.5 text-right">Aksi</th>
@@ -7953,6 +8078,17 @@ export default function App() {
                     <span>Alokasi Proyek ({activeBatchProjects.length})</span>
                   </button>
                 )}
+                {isBrandRetail && (
+                  <span 
+                    className="pb-3 px-1 border-b-2 border-transparent text-slate-400 dark:text-zinc-600 whitespace-nowrap flex items-center gap-1.5 cursor-default select-none text-xs"
+                    data-tooltip="Alokasi proyek fisik dinonaktifkan untuk Brand Retail (produk diedarkan langsung ke konsumen)"
+                    data-tooltip-pos="bottom"
+                  >
+                    <Building2 size={14} className="opacity-40" />
+                    <span className="line-through opacity-60">Alokasi Proyek</span>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700">Khusus B2B</span>
+                  </span>
+                )}
                 <button 
                   onClick={() => { setActiveTab('history'); setHoveredTagInfo(null); }}
                   className={`pb-3 px-1 border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${activeTab === 'history' ? 'border-[#c28e62] text-[#c28e62] font-bold' : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200'}`}
@@ -7978,19 +8114,22 @@ export default function App() {
                     <div className="flex-1 min-w-[200px] max-w-full">
                       <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Brand &amp; SKU</span>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap sm:flex-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const foundBrand = brands.find(b => b.name.toLowerCase() === (activeBatch?.brand || '').toLowerCase());
-                            if (foundBrand) {
-                              closeDetailModal();
-                              handleOpenDetailBrand(foundBrand);
-                            }
-                          }}
-                          className="font-bold text-[#c28e62] hover:underline cursor-pointer shrink-0 text-left whitespace-nowrap"
-                        >
-                          {activeBatch?.brand}
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const foundBrand = brands.find(b => b.name.toLowerCase() === (activeBatch?.brand || '').toLowerCase());
+                              if (foundBrand) {
+                                closeDetailModal();
+                                handleOpenDetailBrand(foundBrand);
+                              }
+                            }}
+                            className="font-bold text-[#c28e62] hover:underline cursor-pointer shrink-0 text-left whitespace-nowrap"
+                          >
+                            {activeBatch?.brand}
+                          </button>
+                          <BusinessTypeBadge brandName={activeBatch?.brand} size="sm" />
+                        </div>
                         <span className="text-slate-300 dark:text-zinc-600 font-bold shrink-0">•</span>
                         <button
                           type="button"
@@ -8599,40 +8738,44 @@ export default function App() {
               <Download size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Unduh
             </button>
 
-            <button 
-              onClick={() => {
-                const b = activeDropdownBatch;
-                setOpenDropdownId(null);
-                openEditUrlModal(b);
-              }}
-              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-            >
-              <Globe size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit URL Dinamis
-            </button>
-            {activeDropdownBatch.status !== 'Disuspend' ? (
-              <button 
-                onClick={() => openSuspendModal(activeDropdownBatch)}
-                className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-              >
-                <Ban size={16} className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors" /> Suspend Batch
-              </button>
-            ) : (
-              <button 
-                onClick={() => openUnsuspendModal(activeDropdownBatch)}
-                className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-              >
-                <RotateCcw size={16} className="text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors" /> Pulihkan Batch
-              </button>
-            )}
+            {isSuperAdmin && (
+              <>
+                <button 
+                  onClick={() => {
+                    const b = activeDropdownBatch;
+                    setOpenDropdownId(null);
+                    openEditUrlModal(b);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+                >
+                  <Globe size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit URL Dinamis
+                </button>
+                {activeDropdownBatch.status !== 'Disuspend' ? (
+                  <button 
+                    onClick={() => openSuspendModal(activeDropdownBatch)}
+                    className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+                  >
+                    <Ban size={16} className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors" /> Suspend Batch
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => openUnsuspendModal(activeDropdownBatch)}
+                    className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+                  >
+                    <RotateCcw size={16} className="text-emerald-500 dark:text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors" /> Pulihkan Batch
+                  </button>
+                )}
 
-            <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
-            
-            <button 
-              onClick={() => confirmDelete(activeDropdownBatch.id)}
-              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-            >
-              <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus Batch
-            </button>
+                <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
+                
+                <button 
+                  onClick={() => confirmDelete(activeDropdownBatch.id)}
+                  className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+                >
+                  <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus Batch
+                </button>
+              </>
+            )}
           </div>
         </>,
         document.body
@@ -9299,38 +9442,58 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setBrandForm({ ...brandForm, businessType: 'B2B' })}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
+                    className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
                       brandForm.businessType === 'B2B'
-                        ? 'bg-[#c28e62]/10 border-[#c28e62] dark:border-[#c28e62] ring-1 ring-[#c28e62]'
-                        : 'bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f]'
+                        ? 'bg-[#fcf7f3] dark:bg-[#c28e62]/10 border-[#c28e62] dark:border-[#cd9a6f] shadow-2xs'
+                        : 'bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-600'
                     }`}
                   >
-                    <span className={`text-xs sm:text-sm font-bold ${
-                      brandForm.businessType === 'B2B' ? 'text-[#c28e62]' : 'text-slate-800 dark:text-zinc-100'
-                    }`}>
-                      B2B (Proyek)
-                    </span>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
-                      Bisa alokasi tag ke proyek
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <Building2 size={16} className={brandForm.businessType === 'B2B' ? 'text-[#c28e62] dark:text-[#cd9a6f]' : 'text-slate-400 dark:text-zinc-500'} />
+                        <span className={`text-xs sm:text-sm font-bold ${brandForm.businessType === 'B2B' ? 'text-slate-900 dark:text-zinc-100' : 'text-slate-700 dark:text-zinc-300'}`}>
+                          B2B
+                        </span>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                        brandForm.businessType === 'B2B'
+                          ? 'border-[#c28e62] bg-[#c28e62] text-white'
+                          : 'border-slate-300 dark:border-zinc-600 bg-transparent'
+                      }`}>
+                        {brandForm.businessType === 'B2B' && <Check size={10} className="stroke-[3]" />}
+                      </div>
+                    </div>
+                    <span className={`text-[11px] mt-2 leading-relaxed ${brandForm.businessType === 'B2B' ? 'text-slate-600 dark:text-zinc-400 font-medium' : 'text-slate-400 dark:text-zinc-500'}`}>
+                      Alokasi tag ke proyek fisik
                     </span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setBrandForm({ ...brandForm, businessType: 'Retail' })}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-center ${
+                    className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
                       brandForm.businessType === 'Retail'
-                        ? 'bg-[#c28e62]/10 border-[#c28e62] dark:border-[#c28e62] ring-1 ring-[#c28e62]'
-                        : 'bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 hover:border-[#cd9a6f]'
+                        ? 'bg-[#fcf7f3] dark:bg-[#c28e62]/10 border-[#c28e62] dark:border-[#cd9a6f] shadow-2xs'
+                        : 'bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-600'
                     }`}
                   >
-                    <span className={`text-xs sm:text-sm font-bold ${
-                      brandForm.businessType === 'Retail' ? 'text-[#c28e62]' : 'text-slate-800 dark:text-zinc-100'
-                    }`}>
-                      Retail (B2C)
-                    </span>
-                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
-                      Katalog & verifikasi produk
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag size={16} className={brandForm.businessType === 'Retail' ? 'text-[#c28e62] dark:text-[#cd9a6f]' : 'text-slate-400 dark:text-zinc-500'} />
+                        <span className={`text-xs sm:text-sm font-bold ${brandForm.businessType === 'Retail' ? 'text-slate-900 dark:text-zinc-100' : 'text-slate-700 dark:text-zinc-300'}`}>
+                          Retail
+                        </span>
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                        brandForm.businessType === 'Retail'
+                          ? 'border-[#c28e62] bg-[#c28e62] text-white'
+                          : 'border-slate-300 dark:border-zinc-600 bg-transparent'
+                      }`}>
+                        {brandForm.businessType === 'Retail' && <Check size={10} className="stroke-[3]" />}
+                      </div>
+                    </div>
+                    <span className={`text-[11px] mt-2 leading-relaxed ${brandForm.businessType === 'Retail' ? 'text-slate-600 dark:text-zinc-400 font-medium' : 'text-slate-400 dark:text-zinc-500'}`}>
+                      Katalog &amp; verifikasi konsumen
                     </span>
                   </button>
                 </div>
@@ -9893,175 +10056,484 @@ export default function App() {
       {/* MODAL DETAIL AKUN PENGGUNA */}
       {isDetailUserModalOpen && userToView && (
         <div 
-          onClick={(e) => { if (e.target === e.currentTarget) { setIsDetailUserModalOpen(false); setUserToView(null); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setIsDetailUserModalOpen(false); setUserToView(null); setIsUserBrandsExpanded(false); setIsUserProductsExpanded(false); } }}
           className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 w-full max-w-xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            {/* USER HEADER */}
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-zinc-800 flex items-start justify-between gap-4 bg-white dark:bg-zinc-900 flex-shrink-0">
-              <div className="flex items-center gap-4">
-                {/* AVATAR */}
-                <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-0.5 flex items-center justify-center shrink-0 overflow-hidden">
-                  {userToView.avatar ? (
-                    <img 
-                      src={userToView.avatar} 
-                      alt={userToView.name} 
-                      onError={(e) => {
-                        const el = e.currentTarget;
-                        el.onerror = null;
-                        el.src = getInitialsAvatar(userToView.name);
-                      }}
-                      className="w-full h-full object-cover rounded-xl" 
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-xl bg-[#c28e62] text-white flex items-center justify-center font-bold text-lg">
-                      {userToView.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 w-full max-w-3xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] shadow-2xl">
+            {/* HEADER MODAL: CUKUP ICON DAN JUDUL MODAL TANPA SUBTITLE */}
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-zinc-800/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#c28e62]/10 dark:bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold border border-[#c28e62]/20 shadow-xs">
+                  <Users size={20} />
                 </div>
-
-                {/* IDENTIFIERS */}
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-zinc-100">
-                      {userToView.name}
-                    </h3>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
-                      userToView.status === 'Aktif'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                        : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                    }`}>
-                      {userToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
-                      <span>{userToView.status || 'Aktif'}</span>
-                    </span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
-                      userToView.role === 'Administrator'
-                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
-                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700'
-                    }`}>
-                      <UserCheck size={11} />
-                      <span>{userToView.role}</span>
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
-                    ID Pengguna: {userToView.id} {userToView.username ? `• @${userToView.username}` : ''}
-                  </p>
-                </div>
+                <h3 className="font-bold text-slate-900 dark:text-zinc-50 text-base sm:text-lg leading-tight">
+                  Detail Akun Pengguna
+                </h3>
               </div>
-
-              {/* CLOSE BUTTON */}
               <button 
-                onClick={() => { setIsDetailUserModalOpen(false); setUserToView(null); }} 
+                type="button"
+                onClick={() => { setIsDetailUserModalOpen(false); setUserToView(null); setIsUserBrandsExpanded(false); setIsUserProductsExpanded(false); }} 
                 data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
-                className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-2 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* DETAIL MODAL BODY */}
-            <div className="p-6 space-y-5 overflow-y-auto flex-1">
-              {/* KONTAK & AKUN */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                  <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                    <Mail size={13} className="text-[#c28e62]" />
-                    <span>Email Akun</span>
-                  </div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 truncate font-mono">
-                    {userToView.email}
-                  </div>
-                </div>
-
-                <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                  <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                    <Phone size={13} className="text-emerald-500" />
-                    <span>Nomor Telepon</span>
-                  </div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 font-mono">
-                    {userToView.phone || '-'}
-                  </div>
-                </div>
-              </div>
-
-              {/* BRAND YANG DIKELOLA */}
+            {/* DETAIL MODAL BODY (SCROLLABLE) */}
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-zinc-800/80 text-sm">
               {(() => {
-                const userBrands = brands.filter(b => b.ownerId === userToView.id);
+                const isTargetSuperAdmin = userToView.role === 'Administrator';
+                const userBrands = isTargetSuperAdmin
+                  ? brands
+                  : brands.filter(b => b.ownerId === userToView.id || (b.ownerName && b.ownerName.toLowerCase() === userToView.name.toLowerCase()));
+                const userBrandNames = userBrands.map(b => b.name.toLowerCase());
+                const userProducts = products.filter(p => 
+                  (p.brandId && userBrands.some(b => b.id === p.brandId)) ||
+                  (p.brandName && userBrandNames.includes(p.brandName.toLowerCase()))
+                );
+                const userBatches = batches.filter(b => 
+                  b.brand && userBrandNames.includes(b.brand.toLowerCase())
+                );
+                const activeBatches = userBatches.filter(b => b.status === 'Aktif').length;
+
                 return (
-                  <div>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        <span>Brand yang Dikelola ({userBrands.length})</span>
+                  <>
+                    {/* BAGIAN ATAS: 2 KOLOM (KIRI AVATAR 1:1, KANAN INFORMASI UTAMA PENGGUNA) */}
+                    <div className="p-6">
+                      <div className="flex flex-col sm:flex-row gap-6 sm:items-stretch">
+                        {/* KOLOM KIRI: AVATAR PENGGUNA 1:1 (ASPECT-SQUARE) */}
+                        <div className="w-full sm:w-44 md:w-48 shrink-0 flex items-center sm:items-start justify-center sm:justify-start">
+                          <div className="w-full sm:w-44 sm:h-44 md:w-48 md:h-48 aspect-square max-w-[200px] sm:max-w-none rounded-2xl overflow-hidden bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/80 p-2 sm:p-2.5 flex items-center justify-center shadow-xs">
+                            {userToView.avatar ? (
+                              <img 
+                                src={userToView.avatar} 
+                                alt={userToView.name} 
+                                onError={(e) => {
+                                  const el = e.currentTarget;
+                                  el.onerror = null;
+                                  el.src = getInitialsAvatar(userToView.name);
+                                }}
+                                className="w-full h-full object-cover rounded-xl" 
+                              />
+                            ) : (
+                              <div className="w-full h-full rounded-xl bg-[#c28e62] text-white flex items-center justify-center font-bold text-3xl">
+                                {userToView.name.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* KOLOM KANAN: INFORMASI UTAMA PENGGUNA */}
+                        <div className="flex-1 min-w-0 w-full flex flex-col justify-between sm:self-stretch">
+                          <div>
+                            {/* NAMA PENGGUNA, STATUS, & ROLE */}
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight leading-snug">
+                                {userToView.name}
+                              </h2>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                                userToView.status === 'Aktif'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                                  : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                              }`}>
+                                {userToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
+                                <span>{userToView.status || 'Aktif'}</span>
+                              </span>
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                                userToView.role === 'Administrator'
+                                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                                  : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                              }`}>
+                                <UserCheck size={13} />
+                                <span>{userToView.role}</span>
+                              </span>
+                            </div>
+
+                            {/* ID PENGGUNA BADGE */}
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-zinc-800/70 rounded-xl border border-slate-200/80 dark:border-zinc-700/70 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
+                              <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">ID Pengguna</span>
+                              <span className="text-slate-300 dark:text-zinc-600 font-sans">•</span>
+                              <span>{userToView.id}</span>
+                            </div>
+                          </div>
+
+                          {/* 3 KARTU RINGKASAN METRIK RELASIONAL (TINGGI DITAMBAHKAN & POSISI DINAIKKAN SEDIKIT) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 sm:mt-auto sm:mb-2.5">
+                            <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
+                              <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                                <Building2 size={15} className="text-[#c28e62]" />
+                                <span className="font-medium">Brand Dikelola</span>
+                              </div>
+                              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+                                {userBrands.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">Brand</span>
+                              </div>
+                            </div>
+
+                            <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
+                              <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                                <Box size={15} className="text-indigo-500" />
+                                <span className="font-medium">Katalog SKU</span>
+                              </div>
+                              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+                                {userProducts.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">SKU</span>
+                              </div>
+                            </div>
+
+                            <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
+                              <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                                <QrCode size={15} className="text-emerald-500" />
+                                <span className="font-medium">Batch Produksi</span>
+                              </div>
+                              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+                                {userBatches.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">Batch ({activeBatches} Aktif)</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {userBrands.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {userBrands.map(b => (
-                          <div
-                            key={b.id}
-                            onClick={() => {
-                              setIsDetailUserModalOpen(false);
-                              setUserToView(null);
-                              handleOpenDetailBrand(b);
-                            }}
-                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-1 flex items-center justify-center shrink-0">
-                                {b.logo ? (
-                                  <img 
-                                    src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
-                                    alt={b.name} 
-                                    onError={(e) => {
-                                      const el = e.currentTarget;
-                                      el.onerror = null;
-                                      el.src = getBrandInitialsLogo(b.name);
-                                    }}
-                                    className="w-full h-full object-contain" 
-                                  />
-                                ) : (
-                                  <span className="font-bold text-[10px] text-[#c28e62]">
-                                    {b.name.slice(0, 2).toUpperCase()}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
-                                  {b.name}
-                                </div>
-                                <div className="text-[11px] text-slate-400 truncate">
-                                  {b.category}
-                                </div>
-                              </div>
+                    {/* BAGIAN BAWAH: 1 KOLOM PENUH UNTUK SELURUH INFORMASI LAINNYA */}
+                    <div className="p-6 space-y-5">
+                      {/* SEKSI: KONTAK & INFORMASI AKUN */}
+                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                          Kontak &amp; Informasi Akun
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-200/70 dark:border-zinc-700/70">
+                            <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                              <Mail size={13} className="text-[#c28e62]" />
+                              <span>Email Akun</span>
                             </div>
-                            <span className="text-[10px] text-[#c28e62] opacity-0 group-hover:opacity-100 transition-opacity font-semibold shrink-0 ml-1">
-                              Detail →
-                            </span>
+                            <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 truncate font-mono">
+                              {userToView.email}
+                            </div>
                           </div>
-                        ))}
+
+                          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-200/70 dark:border-zinc-700/70">
+                            <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                              <Phone size={13} className="text-emerald-500" />
+                              <span>Nomor Telepon</span>
+                            </div>
+                            <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 font-mono">
+                              {userToView.phone || '-'}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
-                        Pengguna ini belum ditugaskan sebagai PIC dari brand manapun.
+
+                      {/* SEKSI: BRAND YANG DIKELOLA */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span>Brand yang Dikelola ({userBrands.length})</span>
+                          </div>
+                          {userBrands.length > 4 && (
+                            <button
+                              type="button"
+                              onClick={() => setIsUserBrandsExpanded(!isUserBrandsExpanded)}
+                              className="text-xs font-semibold text-[#c28e62] hover:text-[#b07d53] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <span>{isUserBrandsExpanded ? 'Ciutkan' : `Buka Semua (${userBrands.length})`}</span>
+                              {isUserBrandsExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            </button>
+                          )}
+                        </div>
+
+                        {userBrands.length > 0 ? (
+                          <>
+                            {/* 2 BARIS PERTAMA (4 BRAND PADA GRID 2 KOLOM) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {userBrands.slice(0, 4).map(b => (
+                                <div
+                                  key={b.id}
+                                  onClick={() => {
+                                    setIsDetailUserModalOpen(false);
+                                    setUserToView(null);
+                                    setIsUserBrandsExpanded(false);
+                                    handleOpenDetailBrand(b);
+                                  }}
+                                  className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-1.5 flex items-center justify-center shrink-0">
+                                      {b.logo ? (
+                                        <img 
+                                          src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
+                                          alt={b.name} 
+                                          onError={(e) => {
+                                            const el = e.currentTarget;
+                                            el.onerror = null;
+                                            el.src = getBrandInitialsLogo(b.name);
+                                          }}
+                                          className="w-full h-full object-contain" 
+                                        />
+                                      ) : (
+                                        <span className="font-bold text-xs text-[#c28e62]">
+                                          {b.name.slice(0, 2).toUpperCase()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
+                                        {b.name}
+                                      </div>
+                                      <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                                        {b.category || 'Brand Mitra'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                                    Lihat →
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* ACCORDION SMOOTH UNTUK SISA BRAND (MINIMIZE ACCORDION) */}
+                            {userBrands.length > 4 && (
+                              <>
+                                <div
+                                  className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 transition-all duration-300 ease-in-out overflow-hidden ${
+                                    isUserBrandsExpanded
+                                      ? 'max-h-[2000px] opacity-100 mt-2.5'
+                                      : 'max-h-0 opacity-0 mt-0 pointer-events-none'
+                                  }`}
+                                >
+                                  {userBrands.slice(4).map(b => (
+                                    <div
+                                      key={b.id}
+                                      onClick={() => {
+                                        setIsDetailUserModalOpen(false);
+                                        setUserToView(null);
+                                        setIsUserBrandsExpanded(false);
+                                        handleOpenDetailBrand(b);
+                                      }}
+                                      className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-1.5 flex items-center justify-center shrink-0">
+                                          {b.logo ? (
+                                            <img 
+                                              src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
+                                              alt={b.name} 
+                                              onError={(e) => {
+                                                const el = e.currentTarget;
+                                                el.onerror = null;
+                                                el.src = getBrandInitialsLogo(b.name);
+                                              }}
+                                              className="w-full h-full object-contain" 
+                                            />
+                                          ) : (
+                                            <span className="font-bold text-xs text-[#c28e62]">
+                                              {b.name.slice(0, 2).toUpperCase()}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
+                                            {b.name}
+                                          </div>
+                                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                                            {b.category || 'Brand Mitra'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                                        Lihat →
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setIsUserBrandsExpanded(!isUserBrandsExpanded)}
+                                  className="w-full mt-2.5 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/80 hover:bg-slate-50 dark:hover:bg-zinc-700/80 text-xs font-semibold text-slate-700 dark:text-zinc-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-[#c28e62]/40"
+                                >
+                                  {isUserBrandsExpanded ? (
+                                    <>
+                                      <span>Sembunyikan ({userBrands.length - 4} Brand)</span>
+                                      <ChevronUp size={14} className="text-[#c28e62]" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>Lihat Semua Brand (+{userBrands.length - 4} lainnya)</span>
+                                      <ChevronDown size={14} className="text-[#c28e62]" />
+                                    </>
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
+                            Pengguna ini belum ditugaskan sebagai PIC dari brand manapun.
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+
+
+                      {/* SEKSI: KATALOG PRODUK TERKAIT */}
+                      {userProducts.length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                              <span>Katalog Produk Terkait ({userProducts.length})</span>
+                            </div>
+                            {userProducts.length > 4 && (
+                              <button
+                                type="button"
+                                onClick={() => setIsUserProductsExpanded(!isUserProductsExpanded)}
+                                className="text-xs font-semibold text-[#c28e62] hover:text-[#b07d53] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <span>{isUserProductsExpanded ? 'Ciutkan' : `Buka Semua (${userProducts.length})`}</span>
+                                {isUserProductsExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* 2 BARIS PERTAMA (4 PRODUK PADA GRID 2 KOLOM) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {userProducts.slice(0, 4).map((p) => (
+                              <div 
+                                key={p.id}
+                                onClick={() => {
+                                  setIsDetailUserModalOpen(false);
+                                  setUserToView(null);
+                                  setIsUserBrandsExpanded(false);
+                                  setIsUserProductsExpanded(false);
+                                  handleOpenDetailSku(p);
+                                }}
+                                className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  {p.image ? (
+                                    <img
+                                      src={p.image}
+                                      alt={p.sku}
+                                      className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
+                                      <Box size={16} />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div 
+                                      className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
+                                      title={p.sku}
+                                    >
+                                      {p.sku}
+                                    </div>
+                                    <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                                      {p.brandName}
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                                  Lihat →
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* ACCORDION SMOOTH UNTUK SISA PRODUK (MINIMIZE ACCORDION) */}
+                          {userProducts.length > 4 && (
+                            <>
+                              <div
+                                className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 transition-all duration-300 ease-in-out overflow-hidden ${
+                                  isUserProductsExpanded
+                                    ? 'max-h-[3000px] opacity-100 mt-2.5'
+                                    : 'max-h-0 opacity-0 mt-0 pointer-events-none'
+                                }`}
+                              >
+                                {userProducts.slice(4).map((p) => (
+                                  <div 
+                                    key={p.id}
+                                    onClick={() => {
+                                      setIsDetailUserModalOpen(false);
+                                      setUserToView(null);
+                                      setIsUserBrandsExpanded(false);
+                                      setIsUserProductsExpanded(false);
+                                      handleOpenDetailSku(p);
+                                    }}
+                                    className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      {p.image ? (
+                                        <img
+                                          src={p.image}
+                                          alt={p.sku}
+                                          className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
+                                          <Box size={16} />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <div 
+                                          className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
+                                          title={p.sku}
+                                        >
+                                          {p.sku}
+                                        </div>
+                                        <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                                          {p.brandName}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                                      Lihat →
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => setIsUserProductsExpanded(!isUserProductsExpanded)}
+                                className="w-full mt-2.5 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/80 hover:bg-slate-50 dark:hover:bg-zinc-700/80 text-xs font-semibold text-slate-700 dark:text-zinc-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-[#c28e62]/40"
+                              >
+                                {isUserProductsExpanded ? (
+                                  <>
+                                    <span>Sembunyikan ({userProducts.length - 4} Produk)</span>
+                                    <ChevronUp size={14} className="text-[#c28e62]" />
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>Lihat Semua Produk (+{userProducts.length - 4} lainnya)</span>
+                                    <ChevronDown size={14} className="text-[#c28e62]" />
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                    </div>
+                  </>
                 );
               })()}
             </div>
 
             {/* MODAL FOOTER */}
-            <div className="px-6 py-3.5 bg-slate-50/50 dark:bg-zinc-800/50 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
-              <span className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
-                Registrasi: {userToView.createdAt ? formatDateTimeDisplay(userToView.createdAt) : '-'}
+            <div className="px-6 py-4 bg-slate-50 dark:bg-zinc-800/80 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+              <span className="text-xs text-slate-400 dark:text-zinc-500">
+                Terdaftar sejak: <span className="font-semibold text-slate-600 dark:text-zinc-300">{userToView.createdAt ? formatDateTimeDisplay(userToView.createdAt) : '-'}</span>
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button
                   type="button"
                   onClick={() => {
                     setIsDetailUserModalOpen(false);
                     setUserToView(null);
+                    setIsUserBrandsExpanded(false);
+                    setIsUserProductsExpanded(false);
                   }}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
@@ -10073,11 +10545,13 @@ export default function App() {
                     const u = userToView;
                     setIsDetailUserModalOpen(false);
                     setUserToView(null);
+                    setIsUserBrandsExpanded(false);
+                    setIsUserProductsExpanded(false);
                     handleOpenEditUser(u);
                   }}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
                 >
-                  Edit Pengguna
+                  Edit Data Pengguna
                 </button>
               </div>
             </div>
@@ -10282,65 +10756,29 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) { setIsDetailBrandModalOpen(false); setBrandToView(null); } }}
           className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 w-full max-w-2xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            {/* CLEAN BRAND HEADER */}
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-zinc-800 flex items-start justify-between gap-4 bg-white dark:bg-zinc-900 flex-shrink-0">
-              <div className="flex items-center gap-4">
-                {/* BRAND LOGO */}
-                <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-2 flex items-center justify-center shrink-0">
-                  {brandToView.logo ? (
-                    <img 
-                      src={brandToView.name.toLowerCase() === 'sumas' && (!brandToView.logo || brandToView.logo.includes('541888946425') || brandToView.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : brandToView.logo} 
-                      alt={brandToView.name} 
-                      onError={(e) => {
-                        const el = e.currentTarget;
-                        el.onerror = null;
-                        el.src = getBrandInitialsLogo(brandToView.name);
-                      }}
-                      className="w-full h-full object-contain" 
-                    />
-                  ) : (
-                    <span className="font-bold text-lg text-[#c28e62]">
-                      {brandToView.name.slice(0, 2).toUpperCase()}
-                    </span>
-                  )}
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 w-full max-w-3xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] shadow-2xl">
+            {/* HEADER MODAL: CUKUP ICON DAN JUDUL MODAL TANPA SUBTITLE */}
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-zinc-800/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#c28e62]/10 dark:bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold border border-[#c28e62]/20 shadow-xs">
+                  <Building2 size={20} />
                 </div>
-
-                {/* BRAND IDENTIFIERS */}
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-zinc-100">
-                      {brandToView.name}
-                    </h3>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
-                      brandToView.status === 'Aktif'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                        : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                    }`}>
-                      {brandToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
-                      <span>{brandToView.status}</span>
-                    </span>
-
-                  </div>
-                  <p className="text-xs text-slate-400 dark:text-zinc-500 font-mono">
-                    ID Brand: {brandToView.id}
-                  </p>
-                </div>
+                <h3 className="font-bold text-slate-900 dark:text-zinc-50 text-base sm:text-lg leading-tight">
+                  Detail Brand
+                </h3>
               </div>
-
-              {/* CLOSE BUTTON */}
               <button 
+                type="button"
                 onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); }} 
                 data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
-                className="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-2 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* DETAIL MODAL BODY */}
-            <div className="p-6 space-y-5 overflow-y-auto flex-1">
-              {/* METRIC STRIP (RELASI DATABASE: PRODUCTS & BATCHES) */}
+            {/* DETAIL MODAL BODY (SCROLLABLE) */}
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-100 dark:divide-zinc-800/80 text-sm">
               {(() => {
                 const brandProducts = products.filter(p => (p.brandId && p.brandId === brandToView.id) || (p.brandName && p.brandName.toLowerCase() === brandToView.name.toLowerCase()));
                 const brandBatches = batches.filter(b => (b.brand || '').toLowerCase() === brandToView.name.toLowerCase());
@@ -10348,330 +10786,343 @@ export default function App() {
                 const activeBatches = brandBatches.filter(b => b.status === 'Aktif').length;
 
                 return (
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                      <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                        <Box size={14} className="text-[#c28e62]" />
-                        <span>Katalog Produk</span>
-                      </div>
-                      <div className="text-lg font-bold text-slate-800 dark:text-zinc-100">
-                        {brandProducts.length} <span className="text-xs font-normal text-slate-400">SKU Terdaftar</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                      <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                        <QrCode size={14} className="text-indigo-500" />
-                        <span>Batch Produksi</span>
-                      </div>
-                      <div className="text-lg font-bold text-slate-800 dark:text-zinc-100">
-                        {brandBatches.length} <span className="text-xs font-normal text-slate-400">Batch ({activeBatches} Aktif)</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                      <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                        <Tag size={14} className="text-emerald-500" />
-                        <span>Total Tag Fisik</span>
-                      </div>
-                      <div className="text-lg font-bold text-slate-800 dark:text-zinc-100">
-                        {totalTags.toLocaleString()} <span className="text-xs font-normal text-slate-400">Tag Diterbitkan</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* SEKSI 1: PIC / PEMILIK AKUN TERHUBUNG (RELASI TABEL USERS) */}
-              {(() => {
-                const hasOwner = Boolean(brandToView.ownerId && brandToView.ownerName !== 'Belum Ditentukan');
-                const linkedUser = hasOwner ? users.find(u => u.id === brandToView.ownerId) : null;
-                const ownerDisplayName = linkedUser ? linkedUser.name : brandToView.ownerName;
-                const ownerDisplayRole = linkedUser ? linkedUser.role : (brandToView.ownerRole || 'PIC Brand');
-                const ownerDisplayEmail = linkedUser ? linkedUser.email : (brandToView.ownerEmail || '-');
-                const ownerDisplayStatus = linkedUser?.status || 'Aktif';
-                const ownerAvatar = linkedUser?.avatar;
-
-                if (!hasOwner) {
-                  return (
-                    <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                      <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                          <UserX size={13} />
-                          <span>Akun Pengguna</span>
-                        </span>
-                        <span className="text-[10px] font-medium bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-zinc-700">
-                          Belum Ditetapkan
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                        <div>
-                          <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-100">
-                            Akun Pengguna Belum Ditetapkan
-                          </div>
-                          <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                            Brand ini saat ini belum memiliki akun pengelola yang terhubung. Anda dapat menetapkan akun kapan saja melalui formulir edit brand.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsDetailBrandModalOpen(false);
-                            handleOpenEditBrand(brandToView);
-                          }}
-                          className="px-3.5 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow shrink-0 cursor-pointer flex items-center justify-center gap-1.5 self-start sm:self-auto"
-                        >
-                          <UserCheck size={14} />
-                          <span>Tetapkan Akun Pengguna</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
-                      <span>Akun Pengguna Terhubung</span>
-                      <span className="font-mono text-[10px] text-slate-400">ID: {brandToView.ownerId}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        {ownerAvatar ? (
-                          <img 
-                            src={ownerAvatar} 
-                            alt={ownerDisplayName} 
-                            onError={(e) => {
-                              const el = e.currentTarget;
-                              el.onerror = null;
-                              el.src = getInitialsAvatar(ownerDisplayName);
-                            }}
-                            className="w-11 h-11 rounded-full object-cover border-2 border-white dark:border-zinc-700 shrink-0" 
-                          />
-                        ) : (
-                          <div className="w-11 h-11 rounded-full bg-[#c28e62] text-white flex items-center justify-center font-bold text-sm shrink-0">
-                            {ownerDisplayName ? ownerDisplayName.charAt(0).toUpperCase() : 'U'}
-                          </div>
-                        )}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            {linkedUser ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsDetailBrandModalOpen(false);
-                                  handleOpenDetailUser(linkedUser);
+                  <>
+                    {/* BAGIAN ATAS: 2 KOLOM (KIRI LOGO BRAND 1:1, KANAN INFORMASI UTAMA BRAND) */}
+                    <div className="p-6">
+                      <div className="flex flex-col sm:flex-row gap-6 sm:items-stretch">
+                        {/* KOLOM KIRI: LOGO/GAMBAR BRAND 1:1 (ASPECT-SQUARE) */}
+                        <div className="w-full sm:w-44 md:w-48 shrink-0 flex items-center sm:items-start justify-center sm:justify-start">
+                          <div className="w-full sm:w-44 sm:h-44 md:w-48 md:h-48 aspect-square max-w-[200px] sm:max-w-none rounded-2xl overflow-hidden bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/80 p-3.5 sm:p-4 flex items-center justify-center shadow-xs">
+                            {brandToView.logo ? (
+                              <img 
+                                src={brandToView.name.toLowerCase() === 'sumas' && (!brandToView.logo || brandToView.logo.includes('541888946425') || brandToView.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : brandToView.logo} 
+                                alt={brandToView.name} 
+                                onError={(e) => {
+                                  const el = e.currentTarget;
+                                  el.onerror = null;
+                                  el.src = getBrandInitialsLogo(brandToView.name);
                                 }}
-                                className="font-bold text-slate-800 dark:text-zinc-100 text-sm hover:text-[#c28e62] hover:underline cursor-pointer text-left inline-flex items-center gap-1"
-                              >
-                                <span>{ownerDisplayName}</span>
-                                <ArrowUpRight size={13} className="text-[#c28e62]" />
-                              </button>
+                                className="w-full h-full object-contain" 
+                              />
                             ) : (
-                              <span className="font-bold text-slate-800 dark:text-zinc-100 text-sm">
-                                {ownerDisplayName}
-                              </span>
+                              <div className="w-full h-full rounded-xl bg-slate-100 dark:bg-zinc-700 flex items-center justify-center font-bold text-3xl text-[#c28e62]">
+                                {brandToView.name.slice(0, 2).toUpperCase()}
+                              </div>
                             )}
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300">
-                              {ownerDisplayRole}
-                            </span>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                              {ownerDisplayStatus}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                            <span className="flex items-center gap-1.5">
-                              <Mail size={12} className="text-slate-400" />
-                              <span>{ownerDisplayEmail}</span>
-                            </span>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
 
-              {/* SEKSI: MODEL BISNIS & HAK AKSES */}
-              <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>Model Bisnis & Hak Fitur</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    brandToView.businessType === 'B2B' || brandToView.name.toLowerCase() === 'sumas'
-                      ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
-                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                  }`}>
-                    {brandToView.businessType === 'B2B' || brandToView.name.toLowerCase() === 'sumas' ? 'B2B (Proyek)' : 'Retail (B2C)'}
-                  </span>
-                </div>
+                        {/* KOLOM KANAN: INFORMASI UTAMA BRAND */}
+                        <div className="flex-1 min-w-0 w-full flex flex-col justify-between sm:self-stretch">
+                          <div>
+                            {/* NAMA BRAND, STATUS, & MODEL BISNIS */}
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight leading-snug">
+                                {brandToView.name}
+                              </h2>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                                brandToView.status === 'Aktif'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                                  : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                              }`}>
+                                {brandToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
+                                <span>{brandToView.status}</span>
+                              </span>
+                              <BusinessTypeBadge type={brandToView.businessType} brandName={brandToView.name} size="sm" />
+                            </div>
 
-                <div className="flex items-start gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                    brandToView.businessType === 'B2B' || brandToView.name.toLowerCase() === 'sumas'
-                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300'
-                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
-                  }`}>
-                    {brandToView.businessType === 'B2B' || brandToView.name.toLowerCase() === 'sumas' ? (
-                      <Building2 size={18} />
-                    ) : (
-                      <ShoppingBag size={18} />
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-100">
-                      {brandToView.businessType === 'B2B' || brandToView.name.toLowerCase() === 'sumas'
-                        ? 'B2B (Proyek / Instalasi Material)'
-                        : 'Retail (Produk Konsumen / B2C)'}
-                    </div>
-                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
-                      {brandToView.businessType === 'B2B' || brandToView.name.toLowerCase() === 'sumas'
-                        ? 'Akun pemilik brand ini memiliki wewenang khusus untuk mengalokasikan tag fisik ke proyek/kontraktor spesifik.'
-                        : 'Akun pemilik brand ini hanya memiliki wewenang melihat daftar batch, katalog produk SKU, dan statistik verifikasi keaslian.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                            {/* ID BRAND BADGE */}
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-zinc-800/70 rounded-xl border border-slate-200/80 dark:border-zinc-700/70 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
+                              <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">ID Brand</span>
+                              <span className="text-slate-300 dark:text-zinc-600 font-sans">•</span>
+                              <span>{brandToView.id}</span>
+                            </div>
+                          </div>
 
-              {/* SEKSI 2: DESKRIPSI & PROFIL BISNIS */}
-              {brandToView.description && (
-                <div>
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Deskripsi & Profil Brand
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-300 leading-relaxed bg-slate-50 dark:bg-zinc-800/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-800">
-                    {brandToView.description}
-                  </p>
-                </div>
-              )}
-
-              {/* SEKSI 3: KATALOG PRODUK & SKU (RELASI TABEL PRODUCTS) */}
-              {(() => {
-                const brandProducts = products.filter(p => (p.brandId && p.brandId === brandToView.id) || (p.brandName && p.brandName.toLowerCase() === brandToView.name.toLowerCase()));
-
-                return (
-                  <div>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        <span>Katalog Produk Terdaftar ({brandProducts.length})</span>
-                      </div>
-                    </div>
-
-                    {brandProducts.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {brandProducts.map((p) => (
-                          <div 
-                            key={p.id}
-                            onClick={() => handleOpenDetailSku(p)}
-                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
-                          >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              {p.image ? (
-                                <img
-                                  src={p.image}
-                                  alt={p.sku}
-                                  className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
-                                  <Box size={16} />
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <div 
-                                  className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
-                                  title={p.sku}
-                                >
-                                  {p.sku}
-                                </div>
+                          {/* 3 KARTU RINGKASAN METRIK RELASIONAL (POSISI DINAIKKAN SEDIKIT) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 sm:mt-auto sm:mb-2.5">
+                            <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
+                              <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                                <Box size={15} className="text-[#c28e62]" />
+                                <span className="font-medium">Katalog Produk</span>
+                              </div>
+                              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+                                {brandProducts.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">SKU</span>
                               </div>
                             </div>
-                            <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                              Lihat →
-                            </span>
+
+                            <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
+                              <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                                <QrCode size={15} className="text-indigo-500" />
+                                <span className="font-medium">Batch Produksi</span>
+                              </div>
+                              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+                                {brandBatches.length} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">Batch ({activeBatches} Aktif)</span>
+                              </div>
+                            </div>
+
+                            <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
+                              <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                                <Tag size={15} className="text-emerald-500" />
+                                <span className="font-medium">Tag Fisik</span>
+                              </div>
+                              <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
+                                {totalTags.toLocaleString()} <span className="text-xs font-normal text-slate-400 dark:text-zinc-500">Tag</span>
+                              </div>
+                            </div>
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    ) : (
-                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
-                        Belum ada SKU produk yang terhubung untuk merk ini.
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* SEKSI 4: RIWAYAT BATCH PRODUKSI (RELASI TABEL BATCHES) */}
-              {(() => {
-                const brandBatches = batches.filter(b => (b.brand || '').toLowerCase() === brandToView.name.toLowerCase());
-
-                return (
-                  <div>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        <span>Riwayat Batch Produksi ({brandBatches.length})</span>
-                      </div>
-                      {brandBatches.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsDetailBrandModalOpen(false);
-                            setActiveMenu('tag-qr');
-                          }}
-                          className="text-[11px] text-[#c28e62] hover:underline font-semibold cursor-pointer"
-                        >
-                          Buka di Menu Tag / QR Code →
-                        </button>
-                      )}
                     </div>
 
-                    {brandBatches.length > 0 ? (
-                      <div className="space-y-2">
-                        {brandBatches.map(b => (
-                          <div 
-                            key={b.id} 
-                            className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs"
-                          >
-                            <div>
-                              <div className="font-mono font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                    {/* BAGIAN BAWAH: 1 KOLOM PENUH UNTUK SELURUH INFORMASI LAINNYA */}
+                    <div className="p-6 space-y-5">
+
+                      {/* SEKSI: PIC / PEMILIK AKUN TERHUBUNG */}
+                      {(() => {
+                        const hasOwner = Boolean(brandToView.ownerId && brandToView.ownerName !== 'Belum Ditentukan');
+                        const linkedUser = hasOwner ? users.find(u => u.id === brandToView.ownerId) : null;
+                        const ownerDisplayName = linkedUser ? linkedUser.name : brandToView.ownerName;
+                        const ownerDisplayRole = linkedUser ? linkedUser.role : (brandToView.ownerRole || 'PIC Brand');
+                        const ownerDisplayEmail = linkedUser ? linkedUser.email : (brandToView.ownerEmail || '-');
+                        const ownerDisplayStatus = linkedUser?.status || 'Aktif';
+                        const ownerAvatar = linkedUser?.avatar;
+
+                        if (!hasOwner) {
+                          return (
+                            <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                              <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <UserX size={13} />
+                                  <span>Akun Pengguna</span>
+                                </span>
+                                <span className="text-[10px] font-medium bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-zinc-700">
+                                  Belum Ditetapkan
+                                </span>
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                                <div>
+                                  <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-100">
+                                    Akun Pengguna Belum Ditetapkan
+                                  </div>
+                                  <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                                    Brand ini saat ini belum memiliki akun pengelola yang terhubung. Anda dapat menetapkan akun kapan saja melalui formulir edit brand.
+                                  </p>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setIsDetailBrandModalOpen(false);
-                                    openDetailModal(b);
+                                    handleOpenEditBrand(brandToView);
                                   }}
-                                  className="hover:text-[#c28e62] hover:underline cursor-pointer text-left"
+                                  className="px-3.5 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow shrink-0 cursor-pointer flex items-center justify-center gap-1.5 self-start sm:self-auto"
                                 >
-                                  {b.batchId}
+                                  <UserCheck size={14} />
+                                  <span>Tetapkan Akun Pengguna</span>
                                 </button>
-                                {b.project && (
-                                  <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                                    {b.project}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-slate-400 mt-0.5">
-                                SKU: {b.sku} • {b.qty?.toLocaleString()} Tag • {b.date}
                               </div>
                             </div>
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium inline-flex items-center gap-1 shrink-0 ${
-                              b.status === 'Disuspend'
-                                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
-                                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                            }`}>
-                              {b.status === 'Disuspend' ? <Ban size={10} /> : <CheckCircle2 size={10} />}
-                              <span>{b.status}</span>
-                            </span>
+                          );
+                        }
+
+                        return (
+                          <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+                              <span>Akun Pengguna Terhubung</span>
+                              <span className="font-mono text-[10px] text-slate-400">ID: {brandToView.ownerId}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                {ownerAvatar ? (
+                                  <img 
+                                    src={ownerAvatar} 
+                                    alt={ownerDisplayName} 
+                                    onError={(e) => {
+                                      const el = e.currentTarget;
+                                      el.onerror = null;
+                                      el.src = getInitialsAvatar(ownerDisplayName);
+                                    }}
+                                    className="w-11 h-11 rounded-full object-cover border-2 border-white dark:border-zinc-700 shrink-0" 
+                                  />
+                                ) : (
+                                  <div className="w-11 h-11 rounded-full bg-[#c28e62] text-white flex items-center justify-center font-bold text-sm shrink-0">
+                                    {ownerDisplayName ? ownerDisplayName.charAt(0).toUpperCase() : 'U'}
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    {linkedUser ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setIsDetailBrandModalOpen(false);
+                                          handleOpenDetailUser(linkedUser);
+                                        }}
+                                        className="font-bold text-slate-800 dark:text-zinc-100 text-sm hover:text-[#c28e62] hover:underline cursor-pointer text-left inline-flex items-center gap-1"
+                                      >
+                                        <span>{ownerDisplayName}</span>
+                                        <ArrowUpRight size={13} className="text-[#c28e62]" />
+                                      </button>
+                                    ) : (
+                                      <span className="font-bold text-slate-800 dark:text-zinc-100 text-sm">
+                                        {ownerDisplayName}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300">
+                                      {ownerDisplayRole}
+                                    </span>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                      {ownerDisplayStatus}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                                    <span className="flex items-center gap-1.5">
+                                      <Mail size={12} className="text-slate-400" />
+                                      <span>{ownerDisplayEmail}</span>
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        ))}
+                        );
+                      })()}
+
+                      {/* SEKSI: DESKRIPSI & PROFIL BISNIS */}
+                      {brandToView.description && (
+                        <div>
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            Deskripsi &amp; Profil Brand
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-300 leading-relaxed bg-slate-50 dark:bg-zinc-800/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-800">
+                            {brandToView.description}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* SEKSI: KATALOG PRODUK & SKU */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span>Katalog Produk Terdaftar ({brandProducts.length})</span>
+                          </div>
+                        </div>
+
+                        {brandProducts.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {brandProducts.map((p) => (
+                              <div 
+                                key={p.id}
+                                onClick={() => {
+                                  setIsDetailBrandModalOpen(false);
+                                  handleOpenDetailSku(p);
+                                }}
+                                className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  {p.image ? (
+                                    <img
+                                      src={p.image}
+                                      alt={p.sku}
+                                      className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
+                                      <Box size={16} />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div 
+                                      className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
+                                      title={p.sku}
+                                    >
+                                      {p.sku}
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                                  Lihat →
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
+                            Belum ada SKU produk yang terhubung untuk merk ini.
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
-                        Belum ada batch produksi yang digenerate untuk merk ini.
+
+                      {/* SEKSI: RIWAYAT BATCH PRODUKSI */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span>Riwayat Batch Produksi ({brandBatches.length})</span>
+                          </div>
+                          {brandBatches.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsDetailBrandModalOpen(false);
+                                setActiveMenu('tag-qr');
+                              }}
+                              className="text-[11px] text-[#c28e62] hover:underline font-semibold cursor-pointer"
+                            >
+                              Buka di Menu Tag / QR Code →
+                            </button>
+                          )}
+                        </div>
+
+                        {brandBatches.length > 0 ? (
+                          <div className="space-y-2">
+                            {brandBatches.map(b => (
+                              <div 
+                                key={b.id} 
+                                className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs"
+                              >
+                                <div>
+                                  <div className="font-mono font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setIsDetailBrandModalOpen(false);
+                                        openDetailModal(b);
+                                      }}
+                                      className="hover:text-[#c28e62] hover:underline cursor-pointer text-left"
+                                    >
+                                      {b.batchId}
+                                    </button>
+                                    {b.project && (
+                                      <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                        {b.project}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 mt-0.5">
+                                    SKU: {b.sku} • {b.qty?.toLocaleString()} Tag • {b.date}
+                                  </div>
+                                </div>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium inline-flex items-center gap-1 shrink-0 ${
+                                  b.status === 'Disuspend'
+                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                }`}>
+                                  {b.status === 'Disuspend' ? <Ban size={10} /> : <CheckCircle2 size={10} />}
+                                  <span>{b.status}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
+                            Belum ada batch produksi yang digenerate untuk merk ini.
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  </>
                 );
               })()}
             </div>
@@ -10859,23 +11310,27 @@ export default function App() {
               <Eye size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Detail SKU Produk
             </button>
             
-            <button 
-              type="button"
-              onClick={() => { setOpenSkuDropdownId(null); handleOpenEditSku(activeDropdownSku); }}
-              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-            >
-              <Edit3 size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit Data SKU
-            </button>
+            {isSuperAdmin && (
+              <>
+                <button 
+                  type="button"
+                  onClick={() => { setOpenSkuDropdownId(null); handleOpenEditSku(activeDropdownSku); }}
+                  className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-[#fcf7f3] dark:hover:bg-zinc-700 hover:text-[#c28e62] dark:hover:text-[#c28e62] rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+                >
+                  <Edit3 size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Edit Data SKU
+                </button>
 
-            <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
-            
-            <button 
-              type="button"
-              onClick={() => { setOpenSkuDropdownId(null); handleOpenDeleteSku(activeDropdownSku); }}
-              className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
-            >
-              <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus SKU
-            </button>
+                <div className="h-px bg-slate-100 dark:bg-zinc-700 my-1.5 mx-2"></div>
+                
+                <button 
+                  type="button"
+                  onClick={() => { setOpenSkuDropdownId(null); handleOpenDeleteSku(activeDropdownSku); }}
+                  className="w-full text-left px-4 py-2.5 text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors flex items-center gap-2 group my-0.5 cursor-pointer"
+                >
+                  <Trash2 size={16} className="text-red-400 dark:text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" /> Hapus SKU
+                </button>
+              </>
+            )}
           </div>
         </>,
         document.body
@@ -11654,116 +12109,6 @@ export default function App() {
         </div>,
         document.body
       )}
-      {/* MULTI-TENANT ROLE SWITCHER PORTAL */}
-      {isRoleMenuOpen && createPortal(
-        <>
-          <div 
-            className="fixed inset-0 z-[999990] bg-black/20 backdrop-blur-2xs" 
-            onClick={() => setIsRoleMenuOpen(false)} 
-          />
-          <div 
-            className="fixed z-[999991] bottom-20 left-4 sm:left-6 w-84 bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
-          >
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-zinc-800 px-2">
-              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">Pilih Hak Akses & Peran Pengguna</span>
-              <button 
-                onClick={() => setIsRoleMenuOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 p-1 rounded-full cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="space-y-1.5">
-              {/* Option 1: Super Admin */}
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentRole('Super Admin');
-                  setIsRoleMenuOpen(false);
-                  triggerAlert('Hak Akses Diperbarui', 'Beralih ke Super Admin (Developer / Bos): Akses penuh platform, wewenang penerbitan batch baru untuk semua brand.', 'info');
-                }}
-                className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
-                  currentRole === 'Super Admin'
-                    ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800'
-                    : 'bg-white dark:bg-zinc-800/50 border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
-                    <span>👑 Super Admin</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
-                      Developer / Bos
-                    </span>
-                  </span>
-                  {currentRole === 'Super Admin' && <Check size={14} className="text-purple-600 dark:text-purple-400 font-bold" />}
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 leading-snug">
-                  Wewenang penuh platform: Menerbitkan batch baru untuk semua brand, alokasi proyek, kelola pengguna & master data.
-                </p>
-              </button>
-
-              {/* Option 2: Brand B2B (Sumas) */}
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentRole('Brand B2B (Sumas)');
-                  setIsRoleMenuOpen(false);
-                  triggerAlert('Hak Akses Diperbarui', 'Beralih ke Klien B2B (Sumas): Hanya melihat batch Sumas & memiliki wewenang Alokasi Tag ke Proyek.', 'info');
-                }}
-                className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
-                  currentRole === 'Brand B2B (Sumas)'
-                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800'
-                    : 'bg-white dark:bg-zinc-800/50 border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
-                    <span>🏗️ Klien B2B</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
-                      Sumas
-                    </span>
-                  </span>
-                  {currentRole === 'Brand B2B (Sumas)' && <Check size={14} className="text-blue-600 dark:text-blue-400 font-bold" />}
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 leading-snug">
-                  Tidak bisa tambah batch baru. <strong>Bisa alokasi tag fisik ke proyek B2B</strong> (RS Kediri, IKN, dll.) dan unduh stiker cetak.
-                </p>
-              </button>
-
-              {/* Option 3: Brand Retail (Non-B2B) */}
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentRole('Brand Retail (Non-B2B)');
-                  setIsRoleMenuOpen(false);
-                  triggerAlert('Hak Akses Diperbarui', 'Beralih ke Klien Retail (ASSC / Somethinc): Hanya melihat batch & detail tag untuk verifikasi konsumen.', 'info');
-                }}
-                className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer ${
-                  currentRole === 'Brand Retail (Non-B2B)'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800'
-                    : 'bg-white dark:bg-zinc-800/50 border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">
-                    <span>🛍️ Klien Retail</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
-                      Non-B2B (ASSC / Somethinc)
-                    </span>
-                  </span>
-                  {currentRole === 'Brand Retail (Non-B2B)' && <Check size={14} className="text-emerald-600 dark:text-emerald-400 font-bold" />}
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 leading-snug">
-                  Tidak bisa tambah batch baru. Tidak bisa alokasi proyek. <strong>Hanya bisa melihat detail spesifik setiap tag</strong> dan status keaslian.
-                </p>
-              </button>
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
-
       {/* DETAIL TAG FISIK MODAL (KHUSUS UNTUK MEMERIKSA SPESIFIKASI DAN KODE QR TAG NON-B2B MAUPUN B2B) */}
       {selectedTagForDetail && createPortal(
         <div 
@@ -11852,9 +12197,12 @@ export default function App() {
 
               {/* Info Grid */}
               <div className="space-y-2 text-xs">
-                <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
+                <div className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-zinc-800">
                   <span className="text-slate-400 dark:text-zinc-500">Merek / Brand</span>
-                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeBatch?.brand || '-'}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeBatch?.brand || '-'}</span>
+                    <BusinessTypeBadge brandName={activeBatch?.brand} size="sm" />
+                  </div>
                 </div>
                 <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
                   <span className="text-slate-400 dark:text-zinc-500">SKU Produk</span>
