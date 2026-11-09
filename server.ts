@@ -106,11 +106,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_scan_points_status ON scan_points(status);
   CREATE INDEX IF NOT EXISTS idx_scan_points_brand ON scan_points(brand);
   CREATE INDEX IF NOT EXISTS idx_scan_points_tagId ON scan_points(latestTagId);
-  CREATE INDEX IF NOT EXISTS idx_scan_points_pin ON scan_points(pin);
 `);
 
 try { db.exec("ALTER TABLE scan_points ADD COLUMN pin TEXT"); } catch (_) {}
 try { db.exec("ALTER TABLE scan_points ADD COLUMN scanHistory TEXT"); } catch (_) {}
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_scan_points_pin ON scan_points(pin)"); } catch (_) {}
 
 db.exec(`
 

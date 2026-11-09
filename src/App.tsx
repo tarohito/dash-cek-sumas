@@ -4236,12 +4236,116 @@ export default function App() {
   const ActiveIcon = activeDetails.icon;
 
   const renderDashboardContent = () => {
+    const totalTagsCount = dashboardStats?.totalTags ?? 0;
+    const totalBatchesCount = dashboardStats?.totalBatches ?? batches.length;
+    const totalScansCount = dashboardStats?.totalScans ?? scanStats?.totalScans ?? 0;
+    const todayScansCount = dashboardStats?.todayScans ?? scanStats?.todayScans ?? 0;
+    const distinctCitiesCount = dashboardStats?.distinctCities ?? 0;
+    const totalLocationsCount = dashboardStats?.totalScanPoints ?? scanStats?.totalLocations ?? 0;
+    const validCount = scanStats?.valid ?? dashboardStats?.validScans ?? 0;
+    const repeatedCount = scanStats?.repeated ?? 0;
+    const suspiciousCount = scanStats?.suspicious ?? 0;
+
     return (
       <div 
         className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300"
         onScroll={() => { if(openDropdownId) setOpenDropdownId(null); }}
       >
         <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
+
+          {/* 4 CARD RANGKUMAN DATA PENTING */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5">
+            {/* Card 1: Total Tag QR */}
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-all hover:border-slate-300 dark:hover:border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+                  <QrCode size={20} />
+                </div>
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#c28e62]/10 text-[#c28e62] border border-[#c28e62]/20">
+                  Tag Aktif
+                </span>
+              </div>
+              <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">Total Tag QR</p>
+              <h3 className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-zinc-100 tracking-tight mt-1">
+                {totalTagsCount.toLocaleString('id-ID')}
+              </h3>
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                <Layers size={13} className="text-[#c28e62]" />
+                <span className="font-semibold text-slate-700 dark:text-zinc-300">{totalBatchesCount}</span>
+                <span>Batch Produksi</span>
+              </div>
+            </div>
+
+            {/* Card 2: Total Pemindaian */}
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-all hover:border-slate-300 dark:hover:border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Scan size={20} />
+                </div>
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40">
+                  Konsumen
+                </span>
+              </div>
+              <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">Total Pemindaian</p>
+              <h3 className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-zinc-100 tracking-tight mt-1">
+                {totalScansCount.toLocaleString('id-ID')}
+              </h3>
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center gap-1.5 text-xs">
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <TrendingUp size={13} />
+                  +{todayScansCount.toLocaleString('id-ID')}
+                </span>
+                <span className="text-slate-400 dark:text-zinc-500">pemindaian hari ini</span>
+              </div>
+            </div>
+
+            {/* Card 3: Sebaran Wilayah */}
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-all hover:border-slate-300 dark:hover:border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <MapPin size={20} />
+                </div>
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-900/40">
+                  Nasional
+                </span>
+              </div>
+              <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">Sebaran Wilayah</p>
+              <h3 className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-zinc-100 tracking-tight mt-1">
+                {distinctCitiesCount} <span className="text-base sm:text-lg font-semibold text-slate-500 dark:text-zinc-400">Kota</span>
+              </h3>
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
+                <span className="font-semibold text-slate-700 dark:text-zinc-300">{totalLocationsCount}</span>
+                <span>titik lokasi pemantauan</span>
+              </div>
+            </div>
+
+            {/* Card 4: Status Keaslian Tag */}
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-xs transition-all hover:border-slate-300 dark:hover:border-zinc-700">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck size={20} />
+                </div>
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40">
+                  Otentikasi
+                </span>
+              </div>
+              <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">Status Keaslian Tag</p>
+              <h3 className="text-2xl sm:text-3xl font-bold font-mono text-emerald-600 dark:text-emerald-400 tracking-tight mt-1">
+                {validCount} <span className="text-base sm:text-lg font-semibold text-slate-600 dark:text-zinc-300">Asli</span>
+              </h3>
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center gap-2 text-xs">
+                <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  {repeatedCount} Waspada
+                </span>
+                <span className="text-slate-300 dark:text-zinc-700">•</span>
+                <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                  {suspiciousCount} Palsu
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* 1. CHART GARIS AKTIVITAS SCAN */}
           <ScanActivityChart />
@@ -5453,8 +5557,8 @@ export default function App() {
           statusNote: isFirst 
             ? 'Scan Pertama Sah (Aktivasi Keaslian Asli)' 
             : isExcess 
-              ? `Berbahaya: Scan ke-${i} melebihi batas aman 3x` 
-              : `Scan Berulang ke-${i}`
+              ? `Palsu: Scan ke-${i} melebihi batas aman 3x` 
+              : `Waspada: Scan berulang ke-${i}`
         });
       }
       return list;
@@ -5594,9 +5698,9 @@ export default function App() {
                     buttonClassName="w-full bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full px-3.5 py-2 text-xs text-slate-700 dark:text-zinc-200 cursor-pointer flex justify-between items-center gap-2 transition-colors select-none"
                     options={[
                       { value: 'all', label: 'Semua Status' },
-                      { value: 'valid', label: 'Valid' },
-                      { value: 'repeated', label: 'Peringatan' },
-                      { value: 'suspicious', label: 'Berbahaya' },
+                      { value: 'valid', label: 'Asli' },
+                      { value: 'repeated', label: 'Waspada' },
+                      { value: 'suspicious', label: 'Palsu' },
                     ]}
                   />
                 </div>
@@ -5743,30 +5847,30 @@ export default function App() {
                               <div>
                                 {isSuspicious ? (
                                   <span
-                                    data-tooltip={`Berbahaya: Terdeteksi ${item.totalScans}x scan (melebihi batas aman 3x)`}
+                                    data-tooltip={`Palsu: Terdeteksi ${item.totalScans}x scan (melebihi batas aman 3x)`}
                                     data-tooltip-pos="top"
                                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/40 cursor-help"
                                   >
                                     <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-ping"></span>
-                                    <span>Berbahaya</span>
+                                    <span>Palsu</span>
                                   </span>
                                 ) : isRepeated ? (
                                   <span
-                                    data-tooltip={`Peringatan: Pemindaian berulang sebanyak ${item.totalScans}x`}
+                                    data-tooltip={`Waspada: Pemindaian berulang sebanyak ${item.totalScans}x`}
                                     data-tooltip-pos="top"
                                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40 cursor-help"
                                   >
                                     <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                                    <span>Peringatan</span>
+                                    <span>Waspada</span>
                                   </span>
                                 ) : (
                                   <span
-                                    data-tooltip="Valid: Pemindaian pertama sah (Otentikasi 1x)"
+                                    data-tooltip="Asli: Pemindaian pertama sah (Otentikasi 1x)"
                                     data-tooltip-pos="top"
                                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 cursor-help"
                                   >
                                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                                    <span>Valid</span>
+                                    <span>Asli</span>
                                   </span>
                                 )}
                               </div>
@@ -5903,17 +6007,17 @@ export default function App() {
                       {selectedScanDetail.totalScans > 3 ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
-                          <span>Berbahaya</span>
+                          <span>Palsu</span>
                         </span>
                       ) : selectedScanDetail.totalScans >= 2 ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                          <span>Peringatan</span>
+                          <span>Waspada</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                          <span>Valid</span>
+                          <span>Asli</span>
                         </span>
                       )}
                     </div>
@@ -6048,7 +6152,7 @@ export default function App() {
                                       isDanger ? 'bg-rose-500' : isWarn ? 'bg-amber-500' : 'bg-emerald-500'
                                     }`}></span>
                                     <span className={isDanger ? 'text-rose-700 dark:text-rose-400' : isWarn ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}>
-                                      {isDanger ? 'Berbahaya' : isWarn ? 'Peringatan' : 'Valid'}
+                                      {isDanger ? 'Palsu' : isWarn ? 'Waspada' : 'Asli'}
                                     </span>
                                   </span>
 

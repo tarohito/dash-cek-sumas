@@ -99,7 +99,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Samsung Galaxy S24',
         browser: 'Chrome Mobile 124',
         status: 'repeated',
-        statusNote: 'Peringatan: Pemindaian ke-3 di lokasi berbeda'
+        statusNote: 'Waspada: Pemindaian ke-3 di lokasi berbeda'
       }
     ]
   },
@@ -165,7 +165,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Vivo V29',
         browser: 'Chrome Mobile 123',
         status: 'repeated',
-        statusNote: 'Peringatan: Pemindaian ke-3'
+        statusNote: 'Waspada: Pemindaian ke-3'
       },
       {
         scanNumber: 4,
@@ -180,7 +180,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Xiaomi 13T',
         browser: 'Mi Browser v14',
         status: 'suspicious',
-        statusNote: 'Berbahaya: Scan ke-4 melebihi batas toleransi 3x'
+        statusNote: 'Palsu: Scan ke-4 melebihi batas toleransi 3x'
       },
       {
         scanNumber: 5,
@@ -195,7 +195,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Xiaomi 13T',
         browser: 'Mi Browser v14',
         status: 'suspicious',
-        statusNote: 'Berbahaya: Scan ke-5 potensi kloning / duplikasi tag'
+        statusNote: 'Palsu: Scan ke-5 potensi kloning / duplikasi tag'
       }
     ]
   },
@@ -384,7 +384,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Vivo V29 5G',
         browser: 'Chrome Mobile 121',
         status: 'repeated',
-        statusNote: 'Peringatan: Pemindaian ke-3'
+        statusNote: 'Waspada: Pemindaian ke-3'
       },
       {
         scanNumber: 4,
@@ -399,7 +399,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Samsung Galaxy A54',
         browser: 'Chrome Mobile 124',
         status: 'suspicious',
-        statusNote: 'Berbahaya: Scan ke-4 melebihi batas aman (>3x)'
+        statusNote: 'Palsu: Scan ke-4 melebihi batas aman (>3x)'
       }
     ]
   },
@@ -552,7 +552,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Xiaomi Note 10',
         browser: 'Mi Browser',
         status: 'repeated',
-        statusNote: 'Peringatan: Pemindaian ke-3'
+        statusNote: 'Waspada: Pemindaian ke-3'
       },
       {
         scanNumber: 4,
@@ -567,7 +567,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Realme 11 Pro',
         browser: 'Chrome Mobile',
         status: 'suspicious',
-        statusNote: 'Berbahaya: Scan ke-4 melebihi batas aman'
+        statusNote: 'Palsu: Scan ke-4 melebihi batas aman'
       },
       {
         scanNumber: 5,
@@ -582,7 +582,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Unknown Device',
         browser: 'Automated Bot',
         status: 'suspicious',
-        statusNote: 'Berbahaya: Scan ke-5 (Proxy IP terdeteksi)'
+        statusNote: 'Palsu: Scan ke-5 (Proxy IP terdeteksi)'
       },
       {
         scanNumber: 6,
@@ -597,7 +597,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Unknown Device',
         browser: 'Automated Bot',
         status: 'suspicious',
-        statusNote: 'Berbahaya: Scan ke-6 (Potensi serangan duplikasi tag)'
+        statusNote: 'Palsu: Scan ke-6 (Potensi serangan duplikasi tag)'
       }
     ]
   },
@@ -735,7 +735,7 @@ export const initialScanPoints: ScanPoint[] = [
         device: 'Samsung Galaxy A54',
         browser: 'Chrome Mobile 122',
         status: 'repeated',
-        statusNote: 'Peringatan: Pemindaian ke-3'
+        statusNote: 'Waspada: Pemindaian ke-3'
       }
     ]
   },

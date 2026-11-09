@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dash-cek-sumas",
+  "compatibility_date": "2026-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": "./dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sumas-db",
+      "database_id": "YOUR_D1_DATABASE_ID_OR_PAGES_BINDING",
+      "migrations_dir": "./d1"
+    }
+  ]
+}

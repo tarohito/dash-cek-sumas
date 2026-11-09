@@ -128,9 +128,9 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
   // Helper teks status (1 kata)
   const getStatusLabel = (status: ScanSecurityStatus) => {
     switch (status) {
-      case 'valid': return '✓ Valid';
-      case 'repeated': return '↺ Peringatan';
-      case 'suspicious': return '⚠️ Berbahaya';
+      case 'valid': return '✓ Asli';
+      case 'repeated': return '↺ Waspada';
+      case 'suspicious': return '⚠️ Palsu';
     }
   };
 
@@ -371,7 +371,7 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
             <button
               type="button"
               onClick={() => setStatusFilter('valid')}
-              data-tooltip="Valid: Otentikasi normal dan pemindaian sah pertama kali"
+              data-tooltip="Asli: Otentikasi normal dan pemindaian sah pertama kali"
               data-tooltip-pos="top"
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 statusFilter === 'valid'
@@ -380,13 +380,13 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Valid ({stats.valid})</span>
+              <span>Asli ({stats.valid})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setStatusFilter('repeated')}
-              data-tooltip="Peringatan: Pemindaian berulang 2-3x untuk verifikasi berkala"
+              data-tooltip="Waspada: Pemindaian berulang 2-3x untuk verifikasi berkala"
               data-tooltip-pos="top"
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 statusFilter === 'repeated'
@@ -395,13 +395,13 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              <span>Peringatan ({stats.repeated})</span>
+              <span>Waspada ({stats.repeated})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setStatusFilter('suspicious')}
-              data-tooltip="Berbahaya: Terdeteksi anomali pemindaian lebih dari 3x"
+              data-tooltip="Palsu: Terdeteksi anomali pemindaian lebih dari 3x"
               data-tooltip-pos="top"
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                 statusFilter === 'suspicious'
@@ -410,7 +410,7 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
-              <span>Berbahaya ({stats.suspicious})</span>
+              <span>Palsu ({stats.suspicious})</span>
             </button>
           </div>
 
@@ -466,7 +466,7 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-800"></span>
-                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Valid</span>
+                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Asli</span>
                   </div>
                   <span className="font-mono text-[11px] text-slate-400">{stats.valid} titik</span>
                 </div>
@@ -474,7 +474,7 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-white dark:border-zinc-800"></span>
-                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Peringatan</span>
+                    <span className="text-slate-700 dark:text-zinc-300 font-medium">Waspada</span>
                   </div>
                   <span className="font-mono text-[11px] text-slate-400">{stats.repeated} titik</span>
                 </div>
@@ -482,7 +482,7 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-white dark:border-zinc-800 ring-2 ring-red-500/30"></span>
-                    <span className="text-red-600 dark:text-red-400 font-semibold">Berbahaya</span>
+                    <span className="text-red-600 dark:text-red-400 font-semibold">Palsu</span>
                   </div>
                   <span className="font-mono text-[11px] text-red-500 font-semibold">{stats.suspicious} titik</span>
                 </div>
