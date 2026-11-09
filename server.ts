@@ -160,6 +160,7 @@ db.exec(`
     ownerRole TEXT,
     description TEXT,
     category TEXT,
+    businessType TEXT DEFAULT 'Retail',
     status TEXT NOT NULL,
     createdAt TEXT NOT NULL
   );
@@ -275,6 +276,12 @@ try {
 } catch (_) {}
 try {
   db.prepare("UPDATE products SET skuCode = 'SKU-' || UPPER(id) WHERE skuCode IS NULL OR skuCode = ''").run();
+} catch (_) {}
+try {
+  db.prepare("ALTER TABLE brands ADD COLUMN businessType TEXT DEFAULT 'Retail'").run();
+} catch (_) {}
+try {
+  db.prepare("UPDATE brands SET businessType = 'B2B' WHERE LOWER(name) = 'sumas'").run();
 } catch (_) {}
 
 // Comprehensive Database Seeder (SUMAS + Skincare Products & Brands)
@@ -1755,42 +1762,52 @@ app.get('/api/brands', (_req, res) => {
 app.post('/api/brands', (req, res) => {
   try {
     const b = req.body;
-    let ownerName = b.ownerName || '';
+    let ownerName = b.ownerName || 'Belum Ditentukan';
     let ownerEmail = b.ownerEmail || null;
     let ownerRole = b.ownerRole || null;
+    const finalOwnerId = b.ownerId && typeof b.ownerId === 'string' && b.ownerId.trim() !== '' ? b.ownerId.trim() : '';
 
-    if (b.ownerId) {
-      const u = db.prepare('SELECT * FROM users WHERE id = ?').get(b.ownerId) as any;
+    if (finalOwnerId) {
+      const u = db.prepare('SELECT * FROM users WHERE id = ?').get(finalOwnerId) as any;
       if (u) {
         ownerName = u.name;
         ownerEmail = u.email;
         ownerRole = u.role;
       }
+    } else {
+      ownerName = 'Belum Ditentukan';
+      ownerEmail = null;
+      ownerRole = null;
     }
 
+    const businessType = b.businessType === 'B2B' ? 'B2B' : (b.name?.toLowerCase() === 'sumas' ? 'B2B' : 'Retail');
+
     const stmt = db.prepare(`
-      INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, businessType, status, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       b.id,
       b.name,
       b.logo || null,
-      b.ownerId,
+      finalOwnerId,
       ownerName,
       ownerEmail,
       ownerRole,
       b.description || '',
       b.category || 'Umum',
+      businessType,
       b.status || 'Aktif',
       b.createdAt || new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
     );
 
     res.json({
       ...b,
+      ownerId: finalOwnerId,
       ownerName,
       ownerEmail,
-      ownerRole
+      ownerRole,
+      businessType
     });
   } catch (error) {
     res.status(500).json({ error: String(error) });
@@ -1807,7 +1824,8 @@ app.put('/api/brands/:id', (req, res) => {
       return res.status(404).json({ error: 'Brand tidak ditemukan' });
     }
 
-    const targetOwnerId = b.ownerId !== undefined ? b.ownerId : existing.ownerId;
+    const rawOwnerId = b.ownerId !== undefined ? b.ownerId : existing.ownerId;
+    const targetOwnerId = rawOwnerId && typeof rawOwnerId === 'string' && rawOwnerId.trim() !== '' ? rawOwnerId.trim() : '';
     let ownerName = b.ownerName !== undefined ? b.ownerName : existing.ownerName;
     let ownerEmail = b.ownerEmail !== undefined ? b.ownerEmail : existing.ownerEmail;
     let ownerRole = b.ownerRole !== undefined ? b.ownerRole : existing.ownerRole;
@@ -1819,6 +1837,10 @@ app.put('/api/brands/:id', (req, res) => {
         ownerEmail = u.email;
         ownerRole = u.role;
       }
+    } else {
+      ownerName = 'Belum Ditentukan';
+      ownerEmail = null;
+      ownerRole = null;
     }
 
     const updated = {
@@ -1830,12 +1852,13 @@ app.put('/api/brands/:id', (req, res) => {
       ownerRole,
       description: b.description !== undefined ? b.description : existing.description,
       category: b.category !== undefined ? b.category : existing.category,
+      businessType: b.businessType !== undefined ? b.businessType : (existing.businessType || (existing.name?.toLowerCase() === 'sumas' ? 'B2B' : 'Retail')),
       status: b.status !== undefined ? b.status : existing.status,
     };
 
     db.prepare(`
       UPDATE brands 
-      SET name = ?, logo = ?, ownerId = ?, ownerName = ?, ownerEmail = ?, ownerRole = ?, description = ?, category = ?, status = ?
+      SET name = ?, logo = ?, ownerId = ?, ownerName = ?, ownerEmail = ?, ownerRole = ?, description = ?, category = ?, businessType = ?, status = ?
       WHERE id = ?
     `).run(
       updated.name,
@@ -1846,6 +1869,7 @@ app.put('/api/brands/:id', (req, res) => {
       updated.ownerRole,
       updated.description,
       updated.category,
+      updated.businessType,
       updated.status,
       id
     );
