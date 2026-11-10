@@ -290,13 +290,21 @@ try {
   db.prepare("UPDATE brands SET businessType = 'B2B' WHERE LOWER(name) = 'sumas'").run();
 } catch (_) {}
 
-// Comprehensive Database Seeder (SUMAS + Skincare Products & Brands)
+// Migration: Pastikan data batch & tag Retail murni tanpa proyek, dan brand/batch Sumas teridentifikasi B2B
 try {
+  const dirtyRetailRow = db.prepare("SELECT COUNT(*) as count FROM batches WHERE isB2B = 0 AND project IS NOT NULL").get() as { count: number };
   const oldCat = db.prepare("SELECT id FROM categories WHERE id = 'cat-mat'").get();
   const brandsCountRow = db.prepare('SELECT COUNT(*) as count FROM brands').get() as { count: number };
   const productsCountRow = db.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number };
-  if (oldCat || brandsCountRow.count < 15 || productsCountRow.count < 15) {
+  
+  if (oldCat || brandsCountRow.count < 15 || productsCountRow.count < 15 || (dirtyRetailRow && dirtyRetailRow.count > 0)) {
     seedComprehensiveData(db);
+  } else {
+    db.prepare("UPDATE batches SET project = NULL WHERE isB2B = 0 OR LOWER(brand) != 'sumas'").run();
+    db.prepare("UPDATE tags SET project = NULL, allocatedAt = NULL WHERE batchId IN (SELECT id FROM batches WHERE isB2B = 0 OR LOWER(brand) != 'sumas')").run();
+    db.prepare("UPDATE batches SET isB2B = 1 WHERE LOWER(brand) = 'sumas'").run();
+    db.prepare("UPDATE products SET isB2B = 1 WHERE LOWER(brandName) = 'sumas'").run();
+    db.prepare("UPDATE brands SET businessType = 'B2B' WHERE LOWER(name) = 'sumas'").run();
   }
 } catch (err) {
   console.error('Seeding check notice:', err);
@@ -1130,12 +1138,14 @@ app.get('/api/batches/:id/summary', (req, res) => {
       GROUP BY project
     `).all(id);
 
+    const isB2B = Boolean(batch.isB2B) || (batch.brand || '').trim().toLowerCase() === 'sumas';
+
     res.json({
-      batch: { ...batch, isB2B: Boolean(batch.isB2B) },
+      batch: { ...batch, isB2B },
       totalTags: tagStats?.total || batch.qty,
       availableCount: tagStats?.available || 0,
       usedCount: tagStats?.used || 0,
-      projects: projectAllocations
+      projects: isB2B ? projectAllocations : []
     });
   } catch (error) {
     res.status(500).json({ error: String(error) });

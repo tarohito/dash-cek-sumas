@@ -510,22 +510,22 @@ Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: V
     insertProduct.run(p);
   }
 
-  // 5. OVERHAUL BATCHES (15 Batches: SUMAS B2B with isB2B: 1, Skincare Retail with isB2B: 0)
+  // 5. OVERHAUL BATCHES (15 Batches: SUMAS B2B with isB2B: 1 & real project allocations; Skincare Retail with isB2B: 0 & project: null)
   const batches = [
     { id: 'b1', batchId: 'SUMAS-BATCH-0001-10', date: '28 Okt 2026, 09:15', project: 'RS Kediri', sku: 'Pintu Cubicle Toilet', brand: 'Sumas', qty: 50, specs: 'Phenolic Board 12mm Standard', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b2', batchId: 'BATCH-SMT-082', date: '29 Okt 2026, 11:27', project: 'Distribusi Retail Nasional', sku: '5% Niacinamide + Moisture Sabi Beet Serum', brand: 'Somethinc', qty: 250, specs: 'Niacinamide 5% + Sabi Beet 20ml', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b3', batchId: 'BATCH-AVO-041', date: '30 Okt 2026, 14:20', project: 'Sociolla & Beauty Store Drop', sku: 'Miraculous Retinol Toner 100ml', brand: 'Avoskin', qty: 150, specs: 'Actosome Retinol 1% 100ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b2', batchId: 'BATCH-SMT-082', date: '29 Okt 2026, 11:27', project: null, sku: '5% Niacinamide + Moisture Sabi Beet Serum', brand: 'Somethinc', qty: 250, specs: 'Niacinamide 5% + Sabi Beet 20ml', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b3', batchId: 'BATCH-AVO-041', date: '30 Okt 2026, 14:20', project: null, sku: 'Miraculous Retinol Toner 100ml', brand: 'Avoskin', qty: 150, specs: 'Actosome Retinol 1% 100ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
     { id: 'b4', batchId: 'SUMAS-BATCH-0002-25', date: '31 Okt 2026, 10:00', project: 'IKN Gedung Kemenko', sku: 'Phenolic Board 12mm Standard', brand: 'Sumas', qty: 120, specs: 'High Density Solid Phenolic Resin', pinLength: 8, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b5', batchId: 'BATCH-SKT-104', date: '01 Nov 2026, 13:45', project: 'Official Store & Watsons Network', sku: '5X Ceramide Barrier Moisture Gel 30g', brand: 'Skintific', qty: 300, specs: '5X Ceramide + Centella Gel 30g', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b6', batchId: 'BATCH-WHL-058', date: '02 Nov 2026, 09:30', project: 'Guardian & Apotek Modern', sku: 'Brightening Face Serum Niacinamide 10%', brand: 'Whitelab', qty: 200, specs: 'Niacinamide 10% + HyaluComplex 20ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b5', batchId: 'BATCH-SKT-104', date: '01 Nov 2026, 13:45', project: null, sku: '5X Ceramide Barrier Moisture Gel 30g', brand: 'Skintific', qty: 300, specs: '5X Ceramide + Centella Gel 30g', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b6', batchId: 'BATCH-WHL-058', date: '02 Nov 2026, 09:30', project: null, sku: 'Brightening Face Serum Niacinamide 10%', brand: 'Whitelab', qty: 200, specs: 'Niacinamide 10% + HyaluComplex 20ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
     { id: 'b7', batchId: 'SUMAS-BATCH-0003-40', date: '02 Nov 2026, 11:15', project: 'Bandara Juanda T2 Surabaya', sku: 'Cubicle Hardware Set Stainless 304', brand: 'Sumas', qty: 200, specs: 'Stainless Steel SUS 304 Luxury', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b8', batchId: 'BATCH-ORG-012', date: '03 Nov 2026, 08:45', project: 'TikTok Shop & Shopee Mall Batch', sku: 'Hyalucera Moisturizer Gel 50ml', brand: 'The Originote', qty: 400, specs: 'Hyaluron + Ceramide Gel 50ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b9', batchId: 'BATCH-WRD-008', date: '03 Nov 2026, 14:00', project: 'Departemen Store & Wardah Beauty House', sku: 'UV Shield Essential Sunscreen Gel SPF 50', brand: 'Wardah', qty: 350, specs: 'Broad Spectrum SPF 50 PA++++ 40ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b10', batchId: 'BATCH-AZR-033', date: '04 Nov 2026, 10:10', project: 'Modern Trade & Supermarket Drop', sku: 'Hydrasoothe Sunscreen Gel SPF 45 PA++++', brand: 'Azarine', qty: 280, specs: 'Hydrasoothe Water Gel SPF 45 50ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b11', batchId: 'BATCH-TTS-019', date: '04 Nov 2026, 15:30', project: 'Clean Beauty Retail Partner', sku: 'Bakuchiol Anti-Aging Miracle Serum 20ml', brand: 'True to Skin', qty: 120, specs: 'Bakuchiol 1% + Probiotics 20ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b12', batchId: 'BATCH-STP-005', date: '05 Nov 2026, 09:20', project: 'Sephora Indonesia & Official Launch', sku: 'Herbitus Skin Tonic 100ml', brand: 'Studio Tropik', qty: 90, specs: 'Centella Asiatica + Mugwort 100ml', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b13', batchId: 'BATCH-DMB-014', date: '05 Nov 2026, 13:50', project: 'Flagship Store & E-Commerce Batch', sku: 'Skin Barrier Water Cream 30g', brand: 'Dear Me Beauty', qty: 180, specs: 'Water Burst Barrier Cream 30g', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
-    { id: 'b14', batchId: 'BATCH-NPR-022', date: '06 Nov 2026, 11:00', project: 'Retail Chain & Dermo Store', sku: 'Centella Asiatica Face Wash 100ml', brand: 'NPURE', qty: 160, specs: 'Gentle Cleanser Centella Leaf 100ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b8', batchId: 'BATCH-ORG-012', date: '03 Nov 2026, 08:45', project: null, sku: 'Hyalucera Moisturizer Gel 50ml', brand: 'The Originote', qty: 400, specs: 'Hyaluron + Ceramide Gel 50ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b9', batchId: 'BATCH-WRD-008', date: '03 Nov 2026, 14:00', project: null, sku: 'UV Shield Essential Sunscreen Gel SPF 50', brand: 'Wardah', qty: 350, specs: 'Broad Spectrum SPF 50 PA++++ 40ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b10', batchId: 'BATCH-AZR-033', date: '04 Nov 2026, 10:10', project: null, sku: 'Hydrasoothe Sunscreen Gel SPF 45 PA++++', brand: 'Azarine', qty: 280, specs: 'Hydrasoothe Water Gel SPF 45 50ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b11', batchId: 'BATCH-TTS-019', date: '04 Nov 2026, 15:30', project: null, sku: 'Bakuchiol Anti-Aging Miracle Serum 20ml', brand: 'True to Skin', qty: 120, specs: 'Bakuchiol 1% + Probiotics 20ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b12', batchId: 'BATCH-STP-005', date: '05 Nov 2026, 09:20', project: null, sku: 'Herbitus Skin Tonic 100ml', brand: 'Studio Tropik', qty: 90, specs: 'Centella Asiatica + Mugwort 100ml', pinLength: 8, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b13', batchId: 'BATCH-DMB-014', date: '05 Nov 2026, 13:50', project: null, sku: 'Skin Barrier Water Cream 30g', brand: 'Dear Me Beauty', qty: 180, specs: 'Water Burst Barrier Cream 30g', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
+    { id: 'b14', batchId: 'BATCH-NPR-022', date: '06 Nov 2026, 11:00', project: null, sku: 'Centella Asiatica Face Wash 100ml', brand: 'NPURE', qty: 160, specs: 'Gentle Cleanser Centella Leaf 100ml', pinLength: 6, status: 'Aktif', isB2B: 0, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 },
     { id: 'b15', batchId: 'SUMAS-BATCH-0004-50', date: '06 Nov 2026, 16:15', project: 'PIK 2 Central Market', sku: 'Pintu Cubicle Toilet', brand: 'Sumas', qty: 150, specs: 'Phenolic Board 12mm Standard', pinLength: 6, status: 'Aktif', isB2B: 1, redirectUrl: 'https://cek.sumas.id/', qrType: 'dynamic', requirePin: 1, enableGps: 1 }
   ];
 
@@ -551,7 +551,7 @@ Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: V
 
   const insertAllTagsTx = db.transaction(() => {
     for (const b of batches) {
-      const isSumas = b.brand.toLowerCase() === 'sumas';
+      const isSumasB2B = b.isB2B === 1 || b.brand.toLowerCase() === 'sumas';
       const brandPrefix = b.brand.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
       for (let i = 1; i <= 15; i++) {
         let tagNumber = '';
@@ -565,9 +565,9 @@ Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: V
         let pin = '';
         for (let p = 0; p < b.pinLength; p++) pin += pinDigits.charAt(Math.floor(Math.random() * pinDigits.length));
 
-        // For SUMAS batches, some tags are allocated to B2B projects.
-        // For retail skincare brands, tags are consumer verification items (Tersedia / Siap Verifikasi).
-        const isAllocated = isSumas ? i <= 8 : false;
+        // For SUMAS B2B batches, tags are allocated to B2B projects (first 8 tags allocated, remainder available).
+        // For Retail batches, tags are consumer packaging verification tags (Tersedia / Siap Verifikasi) with NO project allocation.
+        const isAllocated = isSumasB2B ? i <= 8 : false;
 
         insertTag.run({
           id: `tag-${b.id}-${tagNumber}`,
@@ -575,13 +575,15 @@ Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: V
           tagNumber,
           pin,
           status: isAllocated ? 'Telah Digunakan' : 'Tersedia',
-          project: isAllocated ? b.project : (isSumas ? 'Alokasi Cadangan Gudang' : 'Stok Retail Siap Verifikasi'),
+          project: isAllocated ? b.project : null,
           specs: b.specs || 'Standard Factory Spec',
-          codeType: `${brandPrefix}-${b.isB2B ? 'B2B' : 'SKN'}-2026`,
-          warranty: b.isB2B ? '5 Tahun Garansi Resmi' : 'Garansi Keaslian BPOM Resmi',
+          codeType: `${brandPrefix}-${isSumasB2B ? 'B2B' : 'RET'}-2026`,
+          warranty: isSumasB2B ? '5 Tahun Garansi Resmi' : 'Garansi Keaslian BPOM Resmi',
           prodCode: `PRD-${brandPrefix}-${String(i).padStart(3, '0')}`,
-          note: isAllocated ? `Pemasangan & verifikasi area ${b.project}` : (isSumas ? 'Unit QC Passed siap distribusi' : 'Kemasan tersegel siap scan keaslian oleh konsumen'),
-          allocatedAt: isAllocated ? b.date : '06 Nov 2026, 17:00'
+          note: isAllocated
+            ? `Pemasangan & verifikasi area proyek ${b.project}`
+            : (isSumasB2B ? 'Unit partisi QC passed siap alokasi proyek' : 'Kemasan produk tersegel siap scan keaslian oleh konsumen'),
+          allocatedAt: isAllocated ? b.date : null
         });
       }
     }

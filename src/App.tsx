@@ -196,11 +196,16 @@ export const registerB2BBrand = (brandName: string, isB2B: boolean) => {
   }
 };
 
-export const isSumasBatch = (batch?: { brand?: string } | null): boolean => {
-  if (!batch?.brand) return false;
+export const isB2BBatch = (batch?: { brand?: string; isB2B?: number | boolean } | null): boolean => {
+  if (!batch) return false;
+  if (batch.isB2B === 1 || batch.isB2B === true) return true;
+  if (batch.isB2B === 0 || batch.isB2B === false) return false;
+  if (!batch.brand) return false;
   const normalized = batch.brand.trim().toLowerCase();
   return b2bBrandsRegistry.has(normalized) || normalized === 'sumas';
 };
+
+export const isSumasBatch = isB2BBatch;
 
 // ==========================================
 // BADGE MODEL BISNIS (B2B VS RETAIL) - FULL ROUNDED TANPA ICON
@@ -208,35 +213,31 @@ export const isSumasBatch = (batch?: { brand?: string } | null): boolean => {
 export const BusinessTypeBadge: React.FC<{ 
   type?: string | null; 
   brandName?: string | null;
+  isB2B?: boolean | number | null;
   size?: 'sm' | 'md';
   className?: string;
 }> = ({ 
   type, 
   brandName,
+  isB2B: isB2BProp,
   size = 'sm',
   className = ''
 }) => {
-  const isB2B = type === 'B2B' || 
-    (brandName ? brandName.trim().toLowerCase() === 'sumas' || b2bBrandsRegistry.has(brandName.trim().toLowerCase()) : false);
+  const isB2B = isB2BProp !== undefined && isB2BProp !== null
+    ? Boolean(isB2BProp)
+    : (type === 'B2B' || 
+      (brandName ? brandName.trim().toLowerCase() === 'sumas' || b2bBrandsRegistry.has(brandName.trim().toLowerCase()) : false));
 
-  if (size === 'md') {
-    return isB2B ? (
-      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950 border border-slate-900 dark:border-zinc-100 select-none ${className}`}>
-        B2B
-      </span>
-    ) : (
-      <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-200 border border-slate-300 dark:border-zinc-700 select-none ${className}`}>
-        Retail
-      </span>
-    );
-  }
+  const sizeClasses = size === 'md' 
+    ? 'px-3.5 py-1 text-xs' 
+    : 'px-3 py-1 text-xs';
 
   return isB2B ? (
-    <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-950 border border-slate-900 dark:border-zinc-100 select-none shadow-2xs ${className}`}>
+    <span className={`inline-flex items-center justify-center rounded-full font-bold tracking-wider uppercase bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/70 select-none shadow-2xs ${sizeClasses} ${className}`}>
       B2B
     </span>
   ) : (
-    <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-slate-100 text-slate-700 dark:bg-zinc-800/90 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 select-none ${className}`}>
+    <span className={`inline-flex items-center justify-center rounded-full font-bold tracking-wider uppercase bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/70 select-none shadow-2xs ${sizeClasses} ${className}`}>
       Retail
     </span>
   );
@@ -865,6 +866,7 @@ export default function App() {
     category: string;
     description?: string;
     image?: string;
+    isB2B?: number | boolean;
     createdAt?: string;
   }
 
@@ -1555,11 +1557,6 @@ export default function App() {
   const [userDropdownPos, setUserDropdownPos] = useState({ top: 0, left: 0 });
   const [userDropdownDirection, setUserDropdownDirection] = useState<'up' | 'down'>('down');
 
-  // Tag detail modal state:
-  const [selectedTagForDetail, setSelectedTagForDetail] = useState<any | null>(null);
-  const [tagDetailQrDataUrl, setTagDetailQrDataUrl] = useState<string>('');
-  const [isCopiedTagUrl, setIsCopiedTagUrl] = useState(false);
-  const [isCopiedTagPin, setIsCopiedTagPin] = useState(false);
 
   // Akun aktif yang sedang login (default: Administrator)
   const currentUser = React.useMemo(() => {
@@ -2028,28 +2025,6 @@ export default function App() {
     };
   }, [hoveredTagInfo]);
 
-  // Generate QR Code data URL saat selectedTagForDetail aktif
-  useEffect(() => {
-    if (!selectedTagForDetail) {
-      setTagDetailQrDataUrl('');
-      setIsCopiedTagUrl(false);
-      setIsCopiedTagPin(false);
-      return;
-    }
-    const targetUrl = (activeBatch?.redirectUrl && activeBatch.redirectUrl.trim()) 
-      ? activeBatch.redirectUrl.trim() 
-      : `https://cek.sumas.id/q/${selectedTagForDetail.tagNumber}`;
-    
-    QRCode.toDataURL(targetUrl, {
-      width: 240,
-      margin: 1,
-      color: { dark: '#0f172a', light: '#ffffff' }
-    }).then(url => {
-      setTagDetailQrDataUrl(url);
-    }).catch(err => {
-      console.error('Failed to generate QR preview:', err);
-    });
-  }, [selectedTagForDetail, activeBatch]);
 
   // Global dismiss untuk seluruh dropdown menu Aksi:
   // Menutup dropdown segera saat pengguna mulai scroll / wheel atau sentuh layar,
@@ -3078,7 +3053,7 @@ export default function App() {
   };
 
   const toggleTagSelection = (tagId: string) => {
-    if (!isSumasBatch(activeBatch) || isBrandRetail) return;
+    if (!isB2BBatch(activeBatch)) return;
     setSelectedTagsToAllocate(prev =>
       prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
     );
@@ -3142,7 +3117,7 @@ export default function App() {
   };
 
   const handleQuickSelectAvailable = (count: number) => {
-    if (!isSumasBatch(activeBatch) || isBrandRetail) return;
+    if (!isB2BBatch(activeBatch)) return;
     const availableTagIds = currentTags
       .filter(t => t.status === 'Tersedia')
       .map(t => t.id);
@@ -3155,7 +3130,7 @@ export default function App() {
   };
 
   const handleSaveAllocation = async () => {
-    if (!isSumasBatch(activeBatch) || isBrandRetail) return;
+    if (!isB2BBatch(activeBatch)) return;
     if (!allocationForm.project.trim() || !allocationForm.specs.trim() || !activeBatch) return;
     if (selectedTagsToAllocate.length === 0) return;
 
@@ -3270,15 +3245,17 @@ export default function App() {
     if (!selectedSku || !formQty) return; 
 
     const matchedProduct = products.find(p => p.id === selectedSku || p.sku === selectedSku);
-        const brandName = matchedProduct ? matchedProduct.brandName : 'UMUM';
+    const brandName = matchedProduct ? matchedProduct.brandName : 'UMUM';
+    const isBrandB2B = isB2BBatch({ brand: brandName, isB2B: matchedProduct?.isB2B });
     const skuName = matchedProduct ? matchedProduct.sku : selectedSku;
     const newId = `b${Date.now()}`;
     const randCode = Math.floor(1000 + Math.random() * 9000); 
+    const brandPrefix = brandName.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase() || 'BATCH';
     
-    // Batch murni untuk stok, data proyek di-set null/kosong.
+    // Batch baru terdaftar sesuai identitas B2B atau Retail (project selalu null saat inisiasi)
     const newBatch = {
       id: newId,
-      batchId: `${brandName}-BATCH-${randCode}-${formQty}`,
+      batchId: `${brandPrefix}-BATCH-${randCode}-${formQty}`,
       date: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
       createdAt: new Date().toISOString(),
       project: null, 
@@ -3288,6 +3265,7 @@ export default function App() {
       specs: '-', 
       pinLength: Number(selectedPinLength),
       status: 'Aktif', // Status batch aktif normal
+      isB2B: isBrandB2B ? 1 : 0,
       redirectUrl: (formRedirectUrl && formRedirectUrl.trim()) || 'https://cek.sumas.id/',
       qrType: formQrType || 'dynamic',
       requirePin: Boolean(formRequirePin),
@@ -3606,7 +3584,7 @@ export default function App() {
   const openDetailModal = async (batch: any, initialTab = 'tags') => {
     setHoveredTagInfo(null);
     setActiveBatch(batch);
-    const targetTab = (!isSumasBatch(batch) && initialTab === 'projects') ? 'tags' : initialTab;
+    const targetTab = (!isB2BBatch(batch) && initialTab === 'projects') ? 'tags' : initialTab;
     setActiveTab(targetTab);
     setTagSearch('');
     setSelectedTagsToAllocate([]);
@@ -3628,6 +3606,7 @@ export default function App() {
   const filteredTags = currentTags;
 
   const activeBatchProjects = React.useMemo(() => {
+    if (!isB2BBatch(activeBatch)) return [];
     if (Array.isArray(batchProjectsList) && batchProjectsList.length > 0) {
       return batchProjectsList;
     }
@@ -4719,12 +4698,13 @@ export default function App() {
 
             {/* BRAND TABLE DISPLAY */}
             <div className="overflow-x-auto scrollbar-thin">
-                <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[700px]">
+                <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap min-w-[780px]">
                 <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider text-[11px] select-none">
                   <tr>
                     <th className="px-5 py-3.5">Brand / Merk</th>
                     <th className="px-5 py-3.5">Akun Pengguna</th>
                     <th className="px-5 py-3.5">SKU Produk</th>
+                    <th className="px-5 py-3.5">Jenis Bisnis</th>
                     <th className="px-5 py-3.5">Status</th>
                     <th className="px-5 py-3.5 text-right">Aksi</th>
                   </tr>
@@ -4769,9 +4749,9 @@ export default function App() {
                               </button>
                               <NewBadge date={brand.createdAt} id={brand.id} />
                             </div>
-                            <div className="mt-1">
-                              <BusinessTypeBadge type={brand.businessType} brandName={brand.name} size="sm" />
-                            </div>
+                            <span className="text-[11px] text-slate-400 dark:text-zinc-500 mt-0.5 truncate">
+                              ID: {brand.id}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -4792,7 +4772,7 @@ export default function App() {
                                   -
                                 </div>
                                 <div>
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 text-[11px] font-semibold border border-slate-200 dark:border-zinc-700">
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 text-xs font-semibold border border-slate-200 dark:border-zinc-700">
                                     Belum Ditetapkan
                                   </span>
                                   <div className="text-[10px] text-slate-400 dark:text-zinc-500 pl-0.5 mt-0.5">
@@ -4860,7 +4840,12 @@ export default function App() {
                         })()}
                       </td>
 
-                      {/* KOLOM 4: STATUS OPERASIONAL (KONSISTEN: AKTIF / NONAKTIF) */}
+                      {/* KOLOM 4: JENIS BISNIS (B2B / RETAIL) */}
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <BusinessTypeBadge type={brand.businessType} brandName={brand.name} size="sm" />
+                      </td>
+
+                      {/* KOLOM 5: STATUS OPERASIONAL (KONSISTEN: AKTIF / NONAKTIF) */}
                       <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
@@ -4883,7 +4868,7 @@ export default function App() {
                         </button>
                       </td>
 
-                      {/* KOLOM 5: AKSI (BUTTON 3-DOTS PERSIS SEPERTI DI HALAMAN TAG/QRCODE) */}
+                      {/* KOLOM 6: AKSI (BUTTON 3-DOTS PERSIS SEPERTI DI HALAMAN TAG/QRCODE) */}
                       <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className={`relative inline-block transition-opacity duration-150 ${
                           openBrandDropdownId === brand.id 
@@ -4909,7 +4894,7 @@ export default function App() {
 
                     {currentBrands.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 dark:text-zinc-500 text-xs sm:text-sm">
+                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400 dark:text-zinc-500 text-xs sm:text-sm">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Building2 size={28} className="text-slate-300 dark:text-zinc-600" />
                             <p className="font-semibold text-slate-700 dark:text-zinc-300">
@@ -5540,7 +5525,7 @@ export default function App() {
                             </div>
                           </td>
 
-                          {/* KOLOM 2: BRAND / MERK (MODEL BADGE SEPERTI DI TABEL PENGGUNA) */}
+                          {/* KOLOM 2: BRAND / MERK */}
                           <td className="px-5 py-3.5 whitespace-nowrap">
                             <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700">
                               <span>{prod.brandName}</span>
@@ -6274,17 +6259,17 @@ export default function App() {
                     </span>
                     <div className="mt-1">
                       {selectedScanDetail.totalScans > 3 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
                           <span>Palsu</span>
                         </span>
                       ) : selectedScanDetail.totalScans >= 2 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                           <span>Waspada</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                           <span>Asli</span>
                         </span>
@@ -6832,12 +6817,12 @@ export default function App() {
                           <div className="text-[11px] sm:text-xs text-slate-400 dark:text-zinc-500 mt-0.5">{batch.date}</div>
                           <div className="mt-1.5 flex items-center">
                             {batch.qrType === 'static' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700 select-none">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700 select-none">
                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                                 QR Statis
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800/60 select-none">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800/60 select-none">
                                 <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
                                 QR Dinamis
                               </span>
@@ -6868,7 +6853,7 @@ export default function App() {
                             </button>
                           </div>
                           {(() => {
-                            if (!isSumasBatch(batch)) return null;
+                            if (!isB2BBatch(batch)) return null;
                             const distinctProjects = batch.tags 
                               ? Array.from(new Set(batch.tags.filter((t: any) => t.project).map((t: any) => t.project)))
                               : (batch.project ? batch.project.split(',').map((p: string) => p.trim()) : []);
@@ -6897,6 +6882,7 @@ export default function App() {
                             const remaining = typeof batch.availableCount === 'number'
                               ? batch.availableCount
                               : Math.max(0, qtyNum - used);
+                            const isB2B = isB2BBatch(batch);
                             return (
                               <div
                                 onClick={() => openDetailModal(batch, 'tags')}
@@ -6921,7 +6907,9 @@ export default function App() {
                                           ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50'
                                           : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
                                     }`}>
-                                      {used === 0 ? `${qtyNum} Siap Pakai` : `${used} Terpakai • ${remaining} Sisa`}
+                                      {isB2B
+                                        ? (used === 0 ? `${qtyNum} Siap Alokasi` : `${used} Teralokasi • ${remaining} Sisa`)
+                                        : (used === 0 ? `${qtyNum} Siap Edar` : `${used} Terverifikasi • ${remaining} Sisa`)}
                                     </span>
                                 </div>
                               </div>
@@ -8069,7 +8057,7 @@ export default function App() {
                   <QrCode size={15} />
                   <span>Daftar Tag ({(tagsTotalCount || activeBatch?.actualTagCount || activeBatch?.qty || currentTags.length).toLocaleString('id-ID')})</span>
                 </button>
-                {isSumasBatch(activeBatch) && !isBrandRetail && (
+                {isB2BBatch(activeBatch) && (
                   <button 
                     onClick={() => { setActiveTab('projects'); setHoveredTagInfo(null); }}
                     className={`pb-3 px-1 border-b-2 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${activeTab === 'projects' ? 'border-[#c28e62] text-[#c28e62] font-bold' : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200'}`}
@@ -8077,17 +8065,6 @@ export default function App() {
                     <Building2 size={15} />
                     <span>Alokasi Proyek ({activeBatchProjects.length})</span>
                   </button>
-                )}
-                {isBrandRetail && (
-                  <span 
-                    className="pb-3 px-1 border-b-2 border-transparent text-slate-400 dark:text-zinc-600 whitespace-nowrap flex items-center gap-1.5 cursor-default select-none text-xs"
-                    data-tooltip="Alokasi proyek fisik dinonaktifkan untuk Brand Retail (produk diedarkan langsung ke konsumen)"
-                    data-tooltip-pos="bottom"
-                  >
-                    <Building2 size={14} className="opacity-40" />
-                    <span className="line-through opacity-60">Alokasi Proyek</span>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700">Khusus B2B</span>
-                  </span>
                 )}
                 <button 
                   onClick={() => { setActiveTab('history'); setHoveredTagInfo(null); }}
@@ -8102,18 +8079,19 @@ export default function App() {
             <div className="p-4 sm:p-5 pb-6 sm:pb-8 flex-1 flex flex-col min-h-0 bg-white dark:bg-zinc-900 overflow-y-auto">
               {/* STATS BREADCRUMB / SUMMARY */}
               {(() => {
+                const isB2B = isB2BBatch(activeBatch);
                 return (
-                  <div className="bg-slate-50 dark:bg-zinc-800 p-3 sm:p-3.5 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-4 lg:gap-6 flex-shrink-0 text-xs sm:text-sm">
+                  <div className="bg-slate-50 dark:bg-zinc-800 p-3.5 sm:p-4 rounded-2xl border border-slate-100 dark:border-zinc-700 mb-3 flex flex-wrap items-center gap-x-6 sm:gap-x-8 lg:gap-x-10 gap-y-3.5 flex-shrink-0 text-xs sm:text-sm">
                     {/* BATCH ID */}
-                    <div className="shrink-0 min-w-[130px]">
+                    <div className="shrink-0 w-auto">
                       <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Batch ID</span>
-                      <span className="font-bold text-slate-800 dark:text-zinc-100 block font-mono mt-0.5">{activeBatch?.batchId}</span>
+                      <span className="font-bold text-slate-800 dark:text-zinc-100 block font-mono mt-0.5 whitespace-nowrap">{activeBatch?.batchId}</span>
                     </div>
 
-                    {/* BRAND & SKU (MENDAPATKAN RUANG LEBAR AGAR TIDAK TERPOTONG) */}
-                    <div className="flex-1 min-w-[200px] max-w-full">
+                    {/* BRAND & SKU */}
+                    <div className="shrink-0 w-auto">
                       <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Brand &amp; SKU</span>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-1.5 mt-0.5 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => {
@@ -8123,7 +8101,7 @@ export default function App() {
                               handleOpenDetailBrand(foundBrand);
                             }
                           }}
-                          className="font-bold text-[#c28e62] hover:underline cursor-pointer shrink-0 text-left whitespace-nowrap"
+                          className="font-bold text-[#c28e62] hover:underline cursor-pointer shrink-0 text-left"
                         >
                           {activeBatch?.brand}
                         </button>
@@ -8137,7 +8115,7 @@ export default function App() {
                               handleOpenDetailSku(foundSku);
                             }
                           }}
-                          className="font-medium text-slate-700 dark:text-zinc-300 hover:text-[#c28e62] hover:underline cursor-pointer text-left truncate"
+                          className="font-medium text-slate-700 dark:text-zinc-300 hover:text-[#c28e62] hover:underline cursor-pointer text-left"
                           title={activeBatch?.sku}
                         >
                           {activeBatch?.sku}
@@ -8146,21 +8124,27 @@ export default function App() {
                     </div>
 
                     {/* TOTAL TAG */}
-                    <div className="shrink-0 whitespace-nowrap">
+                    <div className="shrink-0 w-auto whitespace-nowrap">
                       <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Total Tag</span>
                       <span className="font-bold text-slate-800 dark:text-zinc-100 mt-0.5 block">{activeBatch?.qty} Tag</span>
                     </div>
 
-                    {/* TERSEDIA (SISA) */}
-                    <div className="shrink-0 whitespace-nowrap">
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Tersedia (Sisa)</span>
+                    {/* TERSEDIA */}
+                    <div className="shrink-0 w-auto whitespace-nowrap">
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">
+                        {isB2B ? 'Tersedia' : 'Siap Edar'}
+                      </span>
                       <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{availableCount} Tag</span>
                     </div>
 
-                    {/* TELAH TERALOKASI */}
-                    <div className="shrink-0 whitespace-nowrap">
-                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Telah Teralokasi</span>
-                      <span className="font-bold text-[#c28e62] mt-0.5 block">{usedCount} Tag ({activeBatchProjects.length} Proyek)</span>
+                    {/* TELAH TERALOKASI (B2B) ATAU TERVERIFIKASI (RETAIL) */}
+                    <div className="shrink-0 w-auto whitespace-nowrap">
+                      <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">
+                        {isB2B ? 'Teralokasi' : 'Terverifikasi'}
+                      </span>
+                      <span className="font-bold text-[#c28e62] mt-0.5 block">
+                        {usedCount} Tag {isB2B ? `(${activeBatchProjects.length} Proyek)` : ''}
+                      </span>
                     </div>
                   </div>
                 );
@@ -8201,7 +8185,7 @@ export default function App() {
                       <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                       <input 
                         type="text" 
-                        placeholder="Cari Digit PIN, No. Tag, atau Nama Proyek..." 
+                        placeholder={isB2BBatch(activeBatch) ? "Cari Digit PIN, No. Tag, atau Nama Proyek..." : "Cari Digit PIN atau No. Tag..."} 
                         value={tagSearch}
                         onChange={(e) => handleTagSearchChange(e.target.value)}
                         className="w-full pl-10 pr-9 py-2 bg-slate-50 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-600 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#cd9a6f]/20 focus:border-[#cd9a6f] dark:focus:border-[#cd9a6f] transition-all"
@@ -8252,7 +8236,7 @@ export default function App() {
                             : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100'
                         }`}
                       >
-                        Tersedia ({tagsAvailableCount})
+                        {isB2BBatch(activeBatch) ? 'Tersedia' : 'Siap Edar'} ({tagsAvailableCount})
                       </button>
                       <button
                         onClick={() => handleTagFilterChange('used')}
@@ -8262,9 +8246,9 @@ export default function App() {
                             : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-200'
                         }`}
                       >
-                        Terpakai ({tagsUsedCount})
+                        {isB2BBatch(activeBatch) ? 'Teralokasi' : 'Terverifikasi'} ({tagsUsedCount})
                       </button>
-                      {activeBatchProjects.map((p: any) => (
+                      {isB2BBatch(activeBatch) && activeBatchProjects.map((p: any) => (
                         <button
                           key={p.name}
                           onClick={() => handleTagFilterChange(p.name)}
@@ -8280,8 +8264,8 @@ export default function App() {
                     </div>
 
 
-                  {/* ACTIVE PROJECT FILTER INFO BANNER */}
-                  {tagProjectFilter !== 'all' && tagProjectFilter !== 'available' && (
+                  {/* ACTIVE PROJECT FILTER INFO BANNER (KHUSUS B2B) */}
+                  {isB2BBatch(activeBatch) && tagProjectFilter !== 'all' && tagProjectFilter !== 'available' && tagProjectFilter !== 'used' && (
                     <div className="bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-xl px-3.5 py-2 mb-3 text-xs flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Building2 size={15} className="text-[#c28e62]" />
@@ -8324,15 +8308,15 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* KONTROL TAG KHUSUS SUMAS VS BRAND SKINCARE RETAIL */}
-                  {isSumasBatch(activeBatch) ? (
+                  {/* KONTROL TAG KHUSUS B2B VS RETAIL */}
+                  {isB2BBatch(activeBatch) ? (
                     <>
-                      {/* QUICK SELECTION BAR / ALLOCATED STATUS (KHUSUS SUMAS) */}
+                      {/* QUICK SELECTION BAR / ALLOCATED STATUS (KHUSUS B2B) */}
                       {activeBatch?.status !== 'Disuspend' && (
                         availableCount > 0 ? (
                           <div className="bg-[#fcf7f3] dark:bg-zinc-800/60 border border-[#cd9a6f]/30 rounded-xl px-3 py-2 mb-3 flex flex-wrap items-center justify-between gap-2 flex-shrink-0 text-xs">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-slate-600 dark:text-zinc-400 font-semibold">Pilih Cepat Tag Tersedia:</span>
+                              <span className="text-slate-600 dark:text-zinc-400 font-semibold">Pilih Cepat:</span>
                               {[5, 10, 20].filter(qty => qty <= availableCount).map(qty => (
                                 <button
                                   key={qty}
@@ -8346,7 +8330,7 @@ export default function App() {
                                 onClick={() => handleQuickSelectAvailable(-1)}
                                 className="px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-[#c28e62] hover:text-white text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded-full font-medium transition-colors cursor-pointer"
                               >
-                                Pilih Semua Sisa ({availableCount})
+                                Pilih Semua ({availableCount})
                               </button>
                             </div>
 
@@ -8375,33 +8359,33 @@ export default function App() {
                         )
                       )}
                       
-                      {/* LEGENDA STATUS TAG SUMAS */}
+                      {/* LEGENDA STATUS TAG B2B */}
                       <div className="flex items-center gap-4 text-xs font-semibold mb-2.5 px-1 flex-wrap">
                         <div className="flex items-center gap-1.5">
                           <div className="w-3.5 h-3.5 rounded border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 dark:border-emerald-400"></div>
-                          <span className="text-emerald-700 dark:text-emerald-300 font-bold">Tersedia (Siap Alokasi)</span>
+                          <span className="text-emerald-700 dark:text-emerald-300 font-bold">Tersedia</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-3.5 h-3.5 rounded border border-[#8a5b35] dark:border-amber-400 bg-[#c28e62]"></div>
-                          <span className="text-[#c28e62] dark:text-amber-300 font-bold">Terpilih (Diproses)</span>
+                          <span className="text-[#c28e62] dark:text-amber-300 font-bold">Dipilih</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-zinc-800 bg-slate-200/90 dark:bg-zinc-950/90"></div>
-                          <span className="text-slate-400 dark:text-zinc-500 font-medium">Terpakai (Teralokasi)</span>
+                          <span className="text-slate-400 dark:text-zinc-500 font-medium">Teralokasi</span>
                         </div>
                       </div>
                     </>
                   ) : (
                     <>
-                      {/* LEGENDA STATUS TAG RETAIL SKINCARE */}
+                      {/* LEGENDA STATUS TAG RETAIL */}
                       <div className="flex items-center gap-4 text-xs font-semibold mb-2.5 px-1 flex-wrap">
                         <div className="flex items-center gap-1.5">
                           <div className="w-3.5 h-3.5 rounded border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 dark:border-emerald-400"></div>
-                          <span className="text-emerald-700 dark:text-emerald-300 font-bold">Siap Edar / Verifikasi Konsumen</span>
+                          <span className="text-emerald-700 dark:text-emerald-300 font-bold">Siap Edar</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <div className="w-3.5 h-3.5 rounded border border-slate-300 dark:border-zinc-800 bg-slate-200/90 dark:bg-zinc-950/90"></div>
-                          <span className="text-slate-400 dark:text-zinc-500 font-medium">Tervalidasi / Terdistribusi</span>
+                          <span className="text-slate-400 dark:text-zinc-500 font-medium">Terverifikasi</span>
                         </div>
                       </div>
                     </>
@@ -8427,21 +8411,18 @@ export default function App() {
                         {filteredTags.map((tag) => {
                           const isAvailable = tag.status === 'Tersedia';
                           const isSelected = selectedTagsToAllocate.includes(tag.id);
-                          const isSumas = isSumasBatch(activeBatch);
-                          const canAllocate = isSumas && !isBrandRetail;
+                          const isB2B = isB2BBatch(activeBatch);
+                          const canAllocate = isB2B;
                           const isInteractive = canAllocate && activeBatch?.status !== 'Disuspend' && isAvailable;
 
                           return (
                             <div 
                               key={tag.id}
                               onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setHoveredTagInfo({ tag, rect });
                                 if (isInteractive) {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setHoveredTagInfo({ tag, rect });
                                   toggleTagSelection(tag.id);
-                                } else {
-                                  // Brand Non-B2B / Retail atau Tag Teralokasi: Tampilkan Detail Tag
-                                  setSelectedTagForDetail(tag);
                                 }
                               }}
                               onMouseEnter={(e) => {
@@ -8450,13 +8431,13 @@ export default function App() {
                               }}
                               onMouseLeave={() => setHoveredTagInfo(null)}
                               className={`
-                                relative flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center font-mono select-none transition-all w-full cursor-pointer
-                                ${isInteractive ? 'hover:-translate-y-0.5' : 'hover:scale-[1.02]'}
+                                relative flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center font-mono select-none transition-all w-full
+                                ${isInteractive ? 'cursor-pointer hover:-translate-y-0.5' : 'cursor-default'}
                                 ${
                                   !isAvailable 
                                     ? 'bg-slate-200/90 dark:bg-zinc-950/90 border-slate-300/80 dark:border-zinc-800 text-slate-400 dark:text-zinc-600 opacity-70' 
                                     : isSelected
-                                      ? 'bg-[#c28e62] dark:bg-[#c28e62] border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10 ' 
+                                      ? 'bg-[#c28e62] dark:bg-[#c28e62] border-[#8a5b35] dark:border-amber-400 text-white scale-[1.02] z-10' 
                                       : 'bg-emerald-50/70 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-500/60 text-emerald-800 dark:text-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60'
                                 }
                               `}
@@ -8693,7 +8674,7 @@ export default function App() {
                 >
                   Unduh
                 </button>
-                {isSumasBatch(activeBatch) && !isBrandRetail && activeTab === 'tags' && selectedTagsToAllocate.length > 0 && (
+                {isB2BBatch(activeBatch) && activeTab === 'tags' && selectedTagsToAllocate.length > 0 && (
                   <button 
                     onClick={() => setIsAllocateModalOpen(true)}
                     className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
@@ -9430,70 +9411,42 @@ export default function App() {
                 </div>
               </div>
 
-              {/* MODEL BISNIS: KANAN KIRI DENGAN DESKRIPSI SINGKAT (TANPA LINGKARAN) */}
+              {/* MODEL BISNIS (TOGGLE SEPERTI TIPE QR DI TAMBAH BATCH) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
                   Model Bisnis
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 h-[42px] p-1 bg-slate-100 dark:bg-zinc-800 rounded-full">
                   <button
                     type="button"
                     onClick={() => setBrandForm({ ...brandForm, businessType: 'B2B' })}
-                    className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    className={`inline-flex items-center justify-center gap-2 text-xs font-semibold rounded-full transition-colors cursor-pointer ${
                       brandForm.businessType === 'B2B'
-                        ? 'bg-[#fcf7f3] dark:bg-[#c28e62]/10 border-[#c28e62] dark:border-[#cd9a6f] shadow-2xs'
-                        : 'bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-600'
+                        ? 'bg-white dark:bg-zinc-900 text-[#c28e62]'
+                        : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <Building2 size={16} className={brandForm.businessType === 'B2B' ? 'text-[#c28e62] dark:text-[#cd9a6f]' : 'text-slate-400 dark:text-zinc-500'} />
-                        <span className={`text-xs sm:text-sm font-bold ${brandForm.businessType === 'B2B' ? 'text-slate-900 dark:text-zinc-100' : 'text-slate-700 dark:text-zinc-300'}`}>
-                          B2B
-                        </span>
-                      </div>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                        brandForm.businessType === 'B2B'
-                          ? 'border-[#c28e62] bg-[#c28e62] text-white'
-                          : 'border-slate-300 dark:border-zinc-600 bg-transparent'
-                      }`}>
-                        {brandForm.businessType === 'B2B' && <Check size={10} className="stroke-[3]" />}
-                      </div>
-                    </div>
-                    <span className={`text-[11px] mt-2 leading-relaxed ${brandForm.businessType === 'B2B' ? 'text-slate-600 dark:text-zinc-400 font-medium' : 'text-slate-400 dark:text-zinc-500'}`}>
-                      Alokasi tag ke proyek fisik
-                    </span>
+                    <Building2 size={15} />
+                    <span>B2B</span>
                   </button>
-
                   <button
                     type="button"
                     onClick={() => setBrandForm({ ...brandForm, businessType: 'Retail' })}
-                    className={`p-3 sm:p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    className={`inline-flex items-center justify-center gap-2 text-xs font-semibold rounded-full transition-colors cursor-pointer ${
                       brandForm.businessType === 'Retail'
-                        ? 'bg-[#fcf7f3] dark:bg-[#c28e62]/10 border-[#c28e62] dark:border-[#cd9a6f] shadow-2xs'
-                        : 'bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-600'
+                        ? 'bg-white dark:bg-zinc-900 text-[#c28e62]'
+                        : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <ShoppingBag size={16} className={brandForm.businessType === 'Retail' ? 'text-[#c28e62] dark:text-[#cd9a6f]' : 'text-slate-400 dark:text-zinc-500'} />
-                        <span className={`text-xs sm:text-sm font-bold ${brandForm.businessType === 'Retail' ? 'text-slate-900 dark:text-zinc-100' : 'text-slate-700 dark:text-zinc-300'}`}>
-                          Retail
-                        </span>
-                      </div>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                        brandForm.businessType === 'Retail'
-                          ? 'border-[#c28e62] bg-[#c28e62] text-white'
-                          : 'border-slate-300 dark:border-zinc-600 bg-transparent'
-                      }`}>
-                        {brandForm.businessType === 'Retail' && <Check size={10} className="stroke-[3]" />}
-                      </div>
-                    </div>
-                    <span className={`text-[11px] mt-2 leading-relaxed ${brandForm.businessType === 'Retail' ? 'text-slate-600 dark:text-zinc-400 font-medium' : 'text-slate-400 dark:text-zinc-500'}`}>
-                      Katalog &amp; verifikasi konsumen
-                    </span>
+                    <ShoppingBag size={15} />
+                    <span>Retail</span>
                   </button>
                 </div>
+                <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1.5 px-1">
+                  {brandForm.businessType === 'B2B'
+                    ? 'B2B: Mendukung fitur alokasi tag ke proyek fisik.'
+                    : 'Retail: Katalog produk terdaftar & verifikasi keaslian konsumen.'}
+                </p>
               </div>
 
               {/* DESKRIPSI BRAND (PALING BAWAH) */}
@@ -10129,12 +10082,12 @@ export default function App() {
                               <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight leading-snug">
                                 {userToView.name}
                               </h2>
-                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                                 userToView.status === 'Aktif'
                                   ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
                                   : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
                               }`}>
-                                {userToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
+                                {userToView.status === 'Aktif' ? <CheckCircle2 size={13} /> : <Ban size={13} />}
                                 <span>{userToView.status || 'Aktif'}</span>
                               </span>
                               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
@@ -10800,12 +10753,12 @@ export default function App() {
                               <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-50 tracking-tight leading-snug">
                                 {brandToView.name}
                               </h2>
-                              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                                 brandToView.status === 'Aktif'
                                   ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
                                   : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
                               }`}>
-                                {brandToView.status === 'Aktif' ? <CheckCircle2 size={11} /> : <Ban size={11} />}
+                                {brandToView.status === 'Aktif' ? <CheckCircle2 size={13} /> : <Ban size={13} />}
                                 <span>{brandToView.status}</span>
                               </span>
                               <BusinessTypeBadge type={brandToView.businessType} brandName={brandToView.name} size="sm" />
@@ -10949,15 +10902,15 @@ export default function App() {
                                         {ownerDisplayName}
                                       </span>
                                     )}
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
                                       ownerDisplayRole === 'Administrator'
                                         ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
                                         : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
                                     }`}>
-                                      <UserCheck size={12} />
+                                      <UserCheck size={13} />
                                       <span>{ownerDisplayRole}</span>
                                     </span>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                                       {ownerDisplayStatus}
                                     </span>
                                   </div>
@@ -11177,12 +11130,12 @@ export default function App() {
                                     SKU: {b.sku} • {b.qty?.toLocaleString()} Tag • {b.date}
                                   </div>
                                 </div>
-                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium inline-flex items-center gap-1 shrink-0 ${
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shrink-0 border ${
                                   b.status === 'Disuspend'
                                     ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
                                     : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                                 }`}>
-                                  {b.status === 'Disuspend' ? <Ban size={10} /> : <CheckCircle2 size={10} />}
+                                  {b.status === 'Disuspend' ? <Ban size={12} /> : <CheckCircle2 size={12} />}
                                   <span>{b.status}</span>
                                 </span>
                               </div>
@@ -11334,7 +11287,7 @@ export default function App() {
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     Batch disuspend (Terkunci)
                   </div>
-                ) : isSumasBatch(activeBatch) ? (
+                ) : isB2BBatch(activeBatch) ? (
                   <div className="text-[10px] text-emerald-400 font-medium pt-0.5 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                     Siap dialokasikan ke proyek
@@ -12192,170 +12145,7 @@ export default function App() {
         </div>,
         document.body
       )}
-      {/* DETAIL TAG FISIK MODAL (KHUSUS UNTUK MEMERIKSA SPESIFIKASI DAN KODE QR TAG NON-B2B MAUPUN B2B) */}
-      {selectedTagForDetail && createPortal(
-        <div 
-          className="fixed inset-0 z-[999999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setSelectedTagForDetail(null)}
-        >
-          <div 
-            className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-200"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold">
-                  <QrCode size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-100 flex items-center gap-2">
-                    <span>Detail Tag Fisik</span>
-                    <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 text-[#c28e62] border border-slate-200 dark:border-zinc-700">
-                      {selectedTagForDetail.tagNumber}
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-                    Batch: {activeBatch?.batchId || selectedTagForDetail.batchId}
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedTagForDetail(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            {/* Body */}
-            <div className="py-4 space-y-4">
-              {/* QR Code Canvas / Image & PIN */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 dark:bg-zinc-800/50 p-4 rounded-xl border border-slate-100 dark:border-zinc-800">
-                <div className="w-28 h-28 bg-white p-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 flex items-center justify-center shrink-0 shadow-2xs">
-                  {tagDetailQrDataUrl ? (
-                    <img src={tagDetailQrDataUrl} alt="QR Code" className="w-full h-full object-contain" />
-                  ) : (
-                    <div className="w-6 h-6 border-2 border-[#c28e62] border-t-transparent rounded-full animate-spin"></div>
-                  )}
-                </div>
-                
-                <div className="flex-1 w-full space-y-2 text-center sm:text-left">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">PIN Keamanan (Scratch Layer)</span>
-                    <div className="flex items-center justify-center sm:justify-start gap-2 mt-0.5">
-                      <span className="font-kode-mono text-xl font-bold tracking-widest text-[#c28e62] dark:text-[#cd9a6f]">
-                        {selectedTagForDetail.pin}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedTagForDetail.pin);
-                          setIsCopiedTagPin(true);
-                          setTimeout(() => setIsCopiedTagPin(false), 2000);
-                        }}
-                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 rounded cursor-pointer"
-                        title="Salin PIN"
-                      >
-                        {isCopiedTagPin ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Status Verifikasi</span>
-                    <div className="mt-0.5">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        selectedTagForDetail.status === 'Tersedia'
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                          : 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${selectedTagForDetail.status === 'Tersedia' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                        {selectedTagForDetail.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Info Grid */}
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                  <span className="text-slate-400 dark:text-zinc-500">Merek / Brand</span>
-                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeBatch?.brand || '-'}</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                  <span className="text-slate-400 dark:text-zinc-500">SKU Produk</span>
-                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeBatch?.sku || '-'}</span>
-                </div>
-                
-                {selectedTagForDetail.project ? (
-                  <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                    <span className="text-slate-400 dark:text-zinc-500">Alokasi Proyek B2B</span>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedTagForDetail.project}</span>
-                  </div>
-                ) : null}
-
-                {selectedTagForDetail.allocatedAt ? (
-                  <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                    <span className="text-slate-400 dark:text-zinc-500">Waktu Alokasi</span>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-200">{selectedTagForDetail.allocatedAt}</span>
-                  </div>
-                ) : null}
-
-                <div className="flex flex-col gap-1 py-1.5 border-b border-slate-100 dark:border-zinc-800">
-                  <span className="text-slate-400 dark:text-zinc-500">Tautan Scan Resolver</span>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="text" 
-                      readOnly 
-                      value={`https://cek.sumas.id/q/${selectedTagForDetail.tagNumber}`}
-                      className="flex-1 bg-slate-100 dark:bg-zinc-800 text-[11px] font-mono px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`https://cek.sumas.id/q/${selectedTagForDetail.tagNumber}`);
-                        setIsCopiedTagUrl(true);
-                        setTimeout(() => setIsCopiedTagUrl(false), 2000);
-                      }}
-                      className="px-2.5 py-1.5 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      {isCopiedTagUrl ? <Check size={13} /> : <Copy size={13} />}
-                      <span>{isCopiedTagUrl ? 'Tersalin' : 'Salin'}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Business Rule Informational Note */}
-              {isSumasBatch(activeBatch) ? (
-                <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-[11px] text-blue-700 dark:text-blue-300 flex items-start gap-2">
-                  <Info size={15} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
-                  <span><strong>Brand B2B (Sumas):</strong> Tag ini dapat dialokasikan ke proyek fisik/konstruksi (seperti RS Kediri, IKN, dll.) dan dapat dipilih melalui tab Alokasi Proyek.</span>
-                </div>
-              ) : (
-                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-start gap-2">
-                  <ShieldCheck size={15} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-                  <span><strong>Brand Retail Non-B2B:</strong> Tag ini diverifikasi langsung oleh konsumen akhir melalui pemindaian QR fisik kemasan. Tag retail beroperasi secara mandiri dan tidak memerlukan alokasi proyek.</span>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedTagForDetail(null)}
-                className="px-5 py-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }
