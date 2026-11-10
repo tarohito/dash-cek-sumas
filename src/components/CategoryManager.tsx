@@ -419,12 +419,12 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
       <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
         
         {/* TOP STATUS BAR KATEGORI: SECTION STRUKTUR HIRARKI + FITUR PENCARIAN 1 INPUTAN DI ATAS KANAN */}
-        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-5 py-3.5 min-h-[62px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
               <Layers size={16} />
             </div>
-            <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+            <span className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
               Struktur Hirarki Kategori Produk (3 Level)
             </span>
           </div>

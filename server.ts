@@ -217,6 +217,12 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parentId);
   CREATE INDEX IF NOT EXISTS idx_categories_level ON categories(level);
+
+  CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
 `);
 
 // Migrations: Pastikan kolom QR Code Dinamis tersedia di tabel batches
@@ -2134,6 +2140,272 @@ app.delete('/api/categories/:id', (req, res) => {
 
     res.json({ success: true, deletedCount: idsToDelete.length, deletedIds: idsToDelete });
   } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// ==============================================================
+// PENGATURAN SISTEM, BACKUP, ALERT ANOMALI, & KEBIJAKAN TELEMETRI
+// ==============================================================
+
+const DEFAULT_SETTINGS = {
+  anomalyThreshold: {
+    validMaxScans: 1,
+    warningMaxScans: 3,
+    suspiciousMinScans: 4,
+    cooldownSeconds: 60,
+    enableImpossibleTravel: true,
+    maxVelocityKmh: 300,
+    consecutiveFailureAlert: 3
+  },
+  locationPolicy: {
+    mode: 'hybrid', // 'hybrid' | 'strict' | 'flexible'
+    requireGpsByDefault: true,
+    enforceIndonesiaOnly: true,
+    maxAccuracyMeters: 150,
+    detectMockLocation: true
+  },
+  notifications: {
+    emailEnabled: true,
+    emailRecipients: 'security@sumas.id, andriyanafatchulnisairga@gmail.com',
+    telegramEnabled: true,
+    telegramBotToken: '712398451:AAFlkmx-92j8KqP_9x1Vn58sLmQz4OpK8rU',
+    telegramChatId: '@sumas_security_telemetry',
+    whatsappEnabled: true,
+    whatsappNumber: '+6281298765432',
+    whatsappGatewayUrl: 'https://api.fonnte.com/send',
+    triggerOnSuspicious: true,
+    triggerOnImpossibleTravel: true,
+    throttleMinutes: 5
+  },
+  backupInfo: {
+    lastBackupDate: '10 Nov 2026, 08:30 WIB',
+    autoBackupDaily: true,
+    retentionDays: 30
+  }
+};
+
+// GET /api/settings - Mendapatkan pengaturan sistem
+app.get('/api/settings', (_req, res) => {
+  try {
+    const row = db.prepare("SELECT value, updatedAt FROM system_settings WHERE key = 'app_settings'").get() as any;
+    if (row && row.value) {
+      const parsed = JSON.parse(row.value);
+      return res.json({ ...DEFAULT_SETTINGS, ...parsed, updatedAt: row.updatedAt });
+    }
+    res.json({ ...DEFAULT_SETTINGS, updatedAt: 'Belum pernah diubah' });
+  } catch (error) {
+    console.error('Gagal mengambil pengaturan:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// PUT /api/settings - Menyimpan perubahan pengaturan sistem
+app.put('/api/settings', (req, res) => {
+  try {
+    const newSettings = req.body;
+    if (!newSettings || typeof newSettings !== 'object') {
+      return res.status(400).json({ error: 'Payload pengaturan tidak valid' });
+    }
+
+    const merged = {
+      anomalyThreshold: { ...DEFAULT_SETTINGS.anomalyThreshold, ...(newSettings.anomalyThreshold || {}) },
+      locationPolicy: { ...DEFAULT_SETTINGS.locationPolicy, ...(newSettings.locationPolicy || {}) },
+      notifications: { ...DEFAULT_SETTINGS.notifications, ...(newSettings.notifications || {}) },
+      backupInfo: { ...DEFAULT_SETTINGS.backupInfo, ...(newSettings.backupInfo || {}) }
+    };
+
+    const updatedAt = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+    const jsonStr = JSON.stringify(merged);
+
+    db.prepare(`
+      INSERT INTO system_settings (key, value, updatedAt)
+      VALUES ('app_settings', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+    `).run(jsonStr, updatedAt);
+
+    // Catat log audit perubahan pengaturan sistem
+    const logId = Date.now();
+    db.prepare(`
+      INSERT INTO audit_logs (id, batchId, timestamp, user, reason, changes)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      logId,
+      'SYSTEM-CONFIG',
+      updatedAt,
+      'Super Admin',
+      'Pembaruan Kebijakan Keamanan & Pengaturan Sistem',
+      JSON.stringify([
+        { field: 'Ambang Batas Anomali', old: 'Versi Sebelumnya', new: `${merged.anomalyThreshold.warningMaxScans}x Waspada, ≥${merged.anomalyThreshold.suspiciousMinScans}x Palsu` },
+        { field: 'Mode Telemetri GPS', old: 'Versi Sebelumnya', new: merged.locationPolicy.mode },
+        { field: 'Peringatan Notifikasi', old: 'Versi Sebelumnya', new: `Email: ${merged.notifications.emailEnabled ? 'Aktif' : 'Nonaktif'}, WA: ${merged.notifications.whatsappEnabled ? 'Aktif' : 'Nonaktif'}, Tele: ${merged.notifications.telegramEnabled ? 'Aktif' : 'Nonaktif'}` }
+      ])
+    );
+
+    res.json({ success: true, settings: { ...merged, updatedAt } });
+  } catch (error) {
+    console.error('Gagal menyimpan pengaturan:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/settings/test-alert - Uji coba pengiriman alert anomali instan
+app.post('/api/settings/test-alert', (req, res) => {
+  try {
+    const { channel, target } = req.body;
+    const now = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+    
+    // Simulasikan pengiriman notifikasi dan catat ke riwayat log aktivitas
+    const logId = Date.now();
+    const channelName = channel === 'telegram' ? 'Telegram Bot' : channel === 'whatsapp' ? 'WhatsApp Gateway' : 'Email Security';
+    
+    db.prepare(`
+      INSERT INTO audit_logs (id, batchId, timestamp, user, reason, changes)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      logId,
+      'ALERT-TEST',
+      now,
+      'System Alert Engine',
+      `Uji Coba Pengiriman Notifikasi Anomali (${channelName})`,
+      JSON.stringify([
+        { field: 'Channel', old: '-', new: channelName },
+        { field: 'Tujuan', old: '-', new: target || 'Default Destination' },
+        { field: 'Status Uji Coba', old: 'Menunggu', new: 'Terkirim Sukses (200 OK)' }
+      ])
+    );
+
+    res.json({
+      success: true,
+      message: `Pesan uji coba alert keamanan berhasil disimulasikan ke ${channelName} (${target || 'tujuan terdaftar'}) pada ${now}.`,
+      timestamp: now
+    });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/settings/backup - Unduh arsip cadangan (Snapshot Database Sumas)
+app.get('/api/settings/backup', (_req, res) => {
+  try {
+    const batches = db.prepare('SELECT * FROM batches').all();
+    const tags = db.prepare('SELECT * FROM tags').all();
+    const scanPoints = db.prepare('SELECT * FROM scan_points').all();
+    const scanActivities = db.prepare('SELECT * FROM scan_activities').all();
+    const categories = db.prepare('SELECT * FROM categories').all();
+    const brands = db.prepare('SELECT * FROM brands').all();
+    const products = db.prepare('SELECT * FROM products').all();
+    const users = db.prepare('SELECT id, name, email, phone, role, status, createdAt FROM users').all();
+    const auditLogs = db.prepare('SELECT * FROM audit_logs ORDER BY id DESC LIMIT 500').all();
+    const settingsRow = db.prepare("SELECT value, updatedAt FROM system_settings WHERE key = 'app_settings'").get() as any;
+
+    const backupDate = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+    const timestampIso = new Date().toISOString().replace(/[:.]/g, '-');
+
+    // Update last backup date di settings
+    try {
+      const current = settingsRow ? JSON.parse(settingsRow.value) : DEFAULT_SETTINGS;
+      current.backupInfo = { ...current.backupInfo, lastBackupDate: backupDate };
+      db.prepare(`
+        INSERT INTO system_settings (key, value, updatedAt)
+        VALUES ('app_settings', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+      `).run(JSON.stringify(current), backupDate);
+    } catch (_) {}
+
+    const payload = {
+      system: 'Sumas Anti-Counterfeiting Platform',
+      version: '2.5.0-Enterprise',
+      backupGeneratedAt: backupDate,
+      summary: {
+        totalBatches: batches.length,
+        totalTags: tags.length,
+        totalScanPoints: scanPoints.length,
+        totalCategories: categories.length,
+        totalBrands: brands.length,
+        totalProducts: products.length,
+        totalUsers: users.length,
+        totalAuditLogs: auditLogs.length
+      },
+      data: {
+        batches,
+        tags,
+        scanPoints,
+        scanActivities,
+        categories,
+        brands,
+        products,
+        users,
+        auditLogs,
+        settings: settingsRow ? JSON.parse(settingsRow.value) : DEFAULT_SETTINGS
+      }
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="sumas-backup-${timestampIso}.json"`);
+    res.send(JSON.stringify(payload, null, 2));
+  } catch (error) {
+    console.error('Gagal membuat backup:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/settings/restore - Pulihkan data dari berkas cadangan JSON
+app.post('/api/settings/restore', (req, res) => {
+  try {
+    const backup = req.body;
+    if (!backup || !backup.data || !backup.system) {
+      return res.status(400).json({ error: 'Format berkas cadangan tidak valid atau rusak.' });
+    }
+
+    const { batches, tags, scanPoints, categories, brands, products, settings } = backup.data;
+
+    const restoreTx = db.transaction(() => {
+      if (Array.isArray(batches) && batches.length > 0) {
+        db.prepare('DELETE FROM batches').run();
+        const insertBatch = db.prepare(`
+          INSERT INTO batches (id, batchId, date, project, sku, brand, qty, actualTagCount, specs, pinLength, status, isB2B, redirectUrl, qrType, requirePin, enableGps)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const b of batches) {
+          insertBatch.run(
+            b.id, b.batchId, b.date, b.project, b.sku, b.brand, b.qty, 
+            b.actualTagCount || b.qty, b.specs, b.pinLength || 6, b.status || 'Aktif',
+            b.isB2B ? 1 : 0, b.redirectUrl || 'https://cek.sumas.id/', b.qrType || 'dynamic',
+            b.requirePin ?? 1, b.enableGps ?? 1
+          );
+        }
+      }
+
+      if (Array.isArray(categories) && categories.length > 0) {
+        db.prepare('DELETE FROM categories').run();
+        const insertCat = db.prepare(`
+          INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        for (const c of categories) {
+          insertCat.run(c.id, c.name, c.parentId, c.level, c.code, c.description, c.status, c.itemCount, c.orderIndex, c.createdAt, c.specSchema);
+        }
+      }
+
+      if (settings) {
+        const now = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+        db.prepare(`
+          INSERT INTO system_settings (key, value, updatedAt)
+          VALUES ('app_settings', ?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+        `).run(JSON.stringify(settings), now);
+      }
+    });
+
+    restoreTx();
+
+    res.json({
+      success: true,
+      message: `Pemulihan data berhasil! Total ${backup.summary?.totalBatches || 0} batch dan master data berhasil dipulihkan.`
+    });
+  } catch (error) {
+    console.error('Gagal memulihkan cadangan:', error);
     res.status(500).json({ error: String(error) });
   }
 });

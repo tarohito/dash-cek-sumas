@@ -80,6 +80,7 @@ import { ScanDetailModal } from './components/ScanDetailModal';
 import { CustomTooltipProvider } from './components/CustomTooltip';
 import { CategoryManager } from './components/CategoryManager';
 import { CreateSkuPage } from './components/CreateSkuPage';
+import { SettingsManager } from './components/SettingsManager';
 import { generateA3PlusStickersPdf, generateTagsCsv, saveFileWithNativePicker } from './utils/pdfGenerator';
 import { compressAndConvertToWebP } from './utils/imageOptimizer';
 
@@ -4581,19 +4582,20 @@ export default function App() {
       >
         <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
           {/* TOP STATUS BAR / HEADER BRAND (SIMPLE) */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-5 py-3.5 min-h-[62px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
                 <Building2 size={16} />
               </div>
-              <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                Katalog Brand & Kepemilikan Tag
+              <span className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                Katalog Brand &amp; Kepemilikan Tag
               </span>
             </div>
 
             <button
+              type="button"
               onClick={handleOpenCreateBrand}
-              className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
+              className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shadow-xs active:scale-95"
             >
               <span>Tambah Brand / Merk</span>
             </button>
@@ -4962,25 +4964,26 @@ export default function App() {
       >
         <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
           {/* TOP STATUS BAR / HEADER USERS */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-5 py-3.5 min-h-[62px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
                 <Users size={16} />
               </div>
-              <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                Kelola Akun & Hak Akses Pengguna
+              <span className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                Kelola Akun &amp; Hak Akses Pengguna
               </span>
             </div>
 
             {isSuperAdmin ? (
               <button
+                type="button"
                 onClick={handleOpenCreateUser}
-                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shadow-xs active:scale-95"
               >
                 <span>Tambah Pengguna</span>
               </button>
             ) : (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 text-xs">
+              <div className="h-10 px-4 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 text-xs flex items-center gap-1.5 border border-slate-200/80 dark:border-zinc-700">
                 <CheckCircle2 size={13} className="text-[#c28e62]" />
                 <span>Mode Operator (Hanya Administrator yang dapat mengelola user)</span>
               </div>
@@ -5348,12 +5351,12 @@ export default function App() {
       >
         <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
           {/* TOP STATUS BAR / HEADER SKU */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-5 py-3.5 min-h-[62px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
                 <Box size={16} />
               </div>
-              <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+              <span className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
                 Master Katalog SKU Produk
               </span>
             </div>
@@ -5362,12 +5365,12 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleOpenCreateSku}
-                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shadow-xs active:scale-95"
               >
-                Tambah SKU Produk
+                <span>Tambah SKU Produk</span>
               </button>
             ) : (
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 text-xs font-medium">
+              <div className="h-10 px-4 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border border-slate-200/80 dark:border-zinc-700 text-xs font-medium flex items-center gap-2">
                 <Eye size={14} className="text-[#c28e62]" />
                 <span>Mode Lihat Saja: Katalog {activeBrandName}</span>
               </div>
@@ -5807,16 +5810,14 @@ export default function App() {
       >
         <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
           {/* TOP STATUS BAR AKTIVITAS SCAN */}
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-5 py-3.5 min-h-[62px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
                 <Scan size={16} />
               </div>
-              <div>
-                <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                  Log Pemantauan Aktivitas Scan
-                </span>
-              </div>
+              <span className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                Log Pemantauan Aktivitas Scan
+              </span>
             </div>
 
             <div className="flex items-center gap-2.5">
@@ -5827,9 +5828,8 @@ export default function App() {
                   triggerAlert('Diperbarui', 'Data telemetri pemindaian berhasil disinkronkan', 'success');
                 }}
                 disabled={isScanLoading}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shadow-xs active:scale-95 disabled:opacity-50"
               >
-                <RefreshCw size={15} className={isScanLoading ? 'animate-spin text-[#c28e62]' : 'text-slate-500'} />
                 <span>{isScanLoading ? 'Menyinkronkan...' : 'Segarkan Data'}</span>
               </button>
 
@@ -5839,11 +5839,9 @@ export default function App() {
                   if (!hasMapEverOpened) setHasMapEverOpened(true);
                   setIsScanMapOpen(!isScanMapOpen);
                 }}
-                className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shadow-xs active:scale-95"
               >
-                <MapPin size={15} />
                 <span>{isScanMapOpen ? 'Tutup Maps' : 'Buka Maps'}</span>
-                {isScanMapOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
               </button>
             </div>
           </div>
@@ -6301,13 +6299,13 @@ export default function App() {
             <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
             
             {/* TOP STATUS BAR / HEADER TAG / QRCODE */}
-            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-5 py-3.5 min-h-[62px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
                   <QrCode size={16} />
                 </div>
-                <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
-                  Penerbitan Batch Tag & Serial QR
+                <span className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
+                  Penerbitan Batch Tag &amp; Serial QR
                 </span>
               </div>
 
@@ -6315,12 +6313,12 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsCreateBatchModalOpen(true)}
-                  className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shadow-xs active:scale-95"
                 >
                   <span>Generate Batch Baru</span>
                 </button>
               ) : (
-                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 text-xs">
+                <div className="h-10 px-4 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 text-xs flex items-center gap-2">
                   <Lock size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
                   <span>Mode Klien (Read-Only): Penerbitan batch baru dikelola oleh Super Admin platform</span>
                 </div>
@@ -6683,17 +6681,19 @@ export default function App() {
           renderUsersContent()
         ) : activeMenu === 'scan' ? (
           renderScanContent()
+        ) : activeMenu === 'settings' ? (
+          <SettingsManager onAlert={triggerAlert} isSuperAdmin={isSuperAdmin} />
         ) : (
           /* KONTEN KOSONG (PLACEHOLDER) UNTUK MENU LAIN */
           <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 lg:p-7 xl:p-8 pb-16 sm:pb-24 animate-in fade-in duration-300">
             <div className="w-full max-w-[1720px] mx-auto space-y-5 sm:space-y-6 pb-8 sm:pb-12">
               {/* TOP STATUS BAR DI BAWAH HEADER */}
-              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl px-5 py-3.5 min-h-[62px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center shrink-0">
                     <ActiveIcon size={16} />
                   </div>
-                  <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                  <span className="text-sm font-semibold text-slate-800 dark:text-zinc-100">
                     {activeDetails.pageTitle}
                   </span>
                 </div>
@@ -7072,13 +7072,52 @@ export default function App() {
                   <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
                     Jumlah Tag (Quantity)
                   </label>
-                  <input 
-                    type="number" 
-                    placeholder="Contoh: 100" 
-                    value={formQty}
-                    onChange={(e) => setFormQty(e.target.value)}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-                  />
+                  <div className="relative flex items-center bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full transition-all focus-within:border-[#c28e62] focus-within:ring-2 focus-within:ring-[#c28e62]/20">
+                    <input 
+                      type="number" 
+                      min="1"
+                      placeholder="Contoh: 100" 
+                      value={formQty}
+                      onChange={(e) => setFormQty(e.target.value)}
+                      className="w-full h-10 pl-5 pr-10 text-xs sm:text-sm text-slate-700 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium"
+                    />
+                    <div className="absolute right-3.5 flex flex-col items-center justify-center -space-y-1 select-none pointer-events-auto">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          const delta = e.shiftKey ? 10 : 1;
+                          const current = parseInt(formQty);
+                          if (isNaN(current)) {
+                            setFormQty('10');
+                          } else {
+                            setFormQty(String(current + delta));
+                          }
+                        }}
+                        className="text-slate-400 hover:text-[#c28e62] dark:hover:text-[#cd9a6f] p-0.5 cursor-pointer transition-colors"
+                        title="Tambah (Shift+klik: +10)"
+                      >
+                        <ChevronUp size={12} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          const delta = e.shiftKey ? 10 : 1;
+                          const current = parseInt(formQty);
+                          if (isNaN(current)) {
+                            setFormQty('1');
+                          } else {
+                            setFormQty(String(Math.max(1, current - delta)));
+                          }
+                        }}
+                        className="text-slate-400 hover:text-[#c28e62] dark:hover:text-[#cd9a6f] p-0.5 cursor-pointer transition-colors"
+                        title="Kurangi (Shift+klik: -10)"
+                      >
+                        <ChevronDown size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
