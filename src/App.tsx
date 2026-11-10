@@ -10992,46 +10992,135 @@ export default function App() {
                           <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                             <span>Katalog Produk Terdaftar ({brandProducts.length})</span>
                           </div>
+                          {brandProducts.length > 4 && (
+                            <button
+                              type="button"
+                              onClick={() => setIsBrandProductsExpanded(!isBrandProductsExpanded)}
+                              className="text-xs font-semibold text-[#c28e62] hover:text-[#b07d53] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <span>{isBrandProductsExpanded ? 'Ciutkan' : `Buka Semua (${brandProducts.length})`}</span>
+                              {isBrandProductsExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            </button>
+                          )}
                         </div>
 
                         {brandProducts.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {brandProducts.map((p) => (
-                              <div 
-                                key={p.id}
-                                onClick={() => {
-                                  setIsDetailBrandModalOpen(false);
-                                  handleOpenDetailSku(p);
-                                }}
-                                className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
-                              >
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                  {p.image ? (
-                                    <img
-                                      src={p.image}
-                                      alt={p.sku}
-                                      className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
-                                    />
-                                  ) : (
-                                    <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
-                                      <Box size={16} />
-                                    </div>
-                                  )}
-                                  <div className="min-w-0 flex-1">
-                                    <div 
-                                      className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
-                                      title={p.sku}
-                                    >
-                                      {p.sku}
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {brandProducts.slice(0, 4).map((p) => (
+                                <div 
+                                  key={p.id}
+                                  onClick={() => {
+                                    setIsDetailBrandModalOpen(false);
+                                    setBrandToView(null);
+                                    setIsBrandProductsExpanded(false);
+                                    handleOpenDetailSku(p);
+                                  }}
+                                  className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    {p.image ? (
+                                      <img
+                                        src={p.image}
+                                        alt={p.sku}
+                                        className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
+                                        <Box size={16} />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <div 
+                                        className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
+                                        title={p.sku}
+                                      >
+                                        {p.sku}
+                                      </div>
+                                      <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                                        {p.skuCode || p.category || 'SKU Terdaftar'}
+                                      </div>
                                     </div>
                                   </div>
+                                  <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                                    Lihat →
+                                  </span>
                                 </div>
-                                <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                                  Lihat →
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+
+                            {/* ACCORDION SMOOTH UNTUK SISA PRODUK (MINIMIZE ACCORDION) */}
+                            {brandProducts.length > 4 && (
+                              <>
+                                <div
+                                  className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 transition-all duration-300 ease-in-out overflow-hidden ${
+                                    isBrandProductsExpanded
+                                      ? 'max-h-[3000px] opacity-100 mt-2.5'
+                                      : 'max-h-0 opacity-0 mt-0 pointer-events-none'
+                                  }`}
+                                >
+                                  {brandProducts.slice(4).map((p) => (
+                                    <div 
+                                      key={p.id}
+                                      onClick={() => {
+                                        setIsDetailBrandModalOpen(false);
+                                        setBrandToView(null);
+                                        setIsBrandProductsExpanded(false);
+                                        handleOpenDetailSku(p);
+                                      }}
+                                      className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        {p.image ? (
+                                          <img
+                                            src={p.image}
+                                            alt={p.sku}
+                                            className="w-10 h-10 rounded-xl object-cover bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62] shrink-0 font-bold text-[11px]">
+                                            <Box size={16} />
+                                          </div>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                          <div 
+                                            className="font-semibold text-slate-800 dark:text-zinc-200 line-clamp-2 leading-snug group-hover:text-[#c28e62] transition-colors"
+                                            title={p.sku}
+                                          >
+                                            {p.sku}
+                                          </div>
+                                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                                            {p.skuCode || p.category || 'SKU Terdaftar'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                                        Lihat →
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setIsBrandProductsExpanded(!isBrandProductsExpanded)}
+                                  className="w-full mt-2.5 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/80 hover:bg-slate-50 dark:hover:bg-zinc-700/80 text-xs font-semibold text-slate-700 dark:text-zinc-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:border-[#c28e62]/40"
+                                >
+                                  {isBrandProductsExpanded ? (
+                                    <>
+                                      <span>Sembunyikan ({brandProducts.length - 4} Produk)</span>
+                                      <ChevronUp size={14} className="text-[#c28e62]" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>Lihat Semua Produk (+{brandProducts.length - 4} lainnya)</span>
+                                      <ChevronDown size={14} className="text-[#c28e62]" />
+                                    </>
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </>
                         ) : (
                           <div className="p-4 bg-slate-50 dark:bg-zinc-800/40 rounded-xl border border-dashed border-slate-200 dark:border-zinc-700 text-center text-xs text-slate-400">
                             Belum ada SKU produk yang terhubung untuk merk ini.
