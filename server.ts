@@ -247,6 +247,13 @@ try {
   db.prepare("UPDATE scan_activities SET topBrand = 'Sumas' WHERE LOWER(topBrand) = 'sumas'").run();
 } catch (_) {}
 
+// Migration: Update telemetry anomaly notices to concise wording
+try {
+  db.prepare(`UPDATE scan_points 
+    SET anomalyReason = 'Terdeteksi 3x pemindaian pada tag ini. Pantau riwayat sesi untuk mencegah duplikasi fisik.' 
+    WHERE anomalyReason LIKE '%Pemindaian berulang 3x%' OR anomalyReason LIKE '%item yang sama%' OR anomalyReason LIKE '%Aktivitas pemindaian berulang%'`).run();
+} catch (_) {}
+
 // Migration: Ensure users table has all required columns in existing database
 try {
   db.prepare('ALTER TABLE users ADD COLUMN username TEXT').run();
@@ -375,264 +382,8 @@ if (categoryCountRow && categoryCountRow.count === 0) {
   insertAllCats(initialCategories);
 }
 
-// Seed real scan locations into database if empty
-const scanPointsCountRow = db.prepare('SELECT COUNT(*) as count FROM scan_points').get() as { count: number };
-if (scanPointsCountRow && scanPointsCountRow.count === 0) {
-  const insertScanPoint = db.prepare(`
-    INSERT INTO scan_points (id, city, province, venue, lat, lng, totalScans, todayScans, brand, productType, batchId, latestTagId, latestTime, isB2B, status, anomalyReason, deviceInfo, createdAt)
-    VALUES (@id, @city, @province, @venue, @lat, @lng, @totalScans, @todayScans, @brand, @productType, @batchId, @latestTagId, @latestTime, @isB2B, @status, @anomalyReason, @deviceInfo, @createdAt)
-  `);
+// Scan points and telemetry data are seeded and synchronized comprehensively via seedComprehensiveData
 
-  const initialPoints = [
-    {
-      id: 'jkt-1',
-      city: 'Jakarta Pusat',
-      province: 'DKI Jakarta',
-      venue: 'Grand Indonesia & Plaza Indonesia Mall',
-      lat: -6.1950,
-      lng: 106.8230,
-      totalScans: 4820,
-      todayScans: 184,
-      brand: 'ASSC',
-      productType: 'Streetwear Apparel Hoodie & Cap',
-      batchId: 'BATCH-ASSC-082',
-      latestTagId: 'ASSC-84920',
-      latestTime: '2 menit yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'iPhone 15 Pro • Safari Mobile iOS 17.5',
-      createdAt: '2026-10-20'
-    },
-    {
-      id: 'jkt-2',
-      city: 'Jakarta Utara',
-      province: 'DKI Jakarta',
-      venue: 'PIK 2 Central Market & Commercial Hub',
-      lat: -6.1025,
-      lng: 106.7212,
-      totalScans: 2150,
-      todayScans: 92,
-      brand: 'SUMAS',
-      productType: 'Cubicle Toilet Phenolic 12mm B2B',
-      batchId: 'BATCH-SUM-001',
-      latestTagId: 'SUMAS-B2B-1049',
-      latestTime: '4 menit yang lalu',
-      isB2B: 1,
-      status: 'suspicious',
-      anomalyReason: 'Duplikasi scan simultan dengan Surabaya (selisih 4 mnt)',
-      deviceInfo: 'Samsung Galaxy S24 • Chrome Mobile v124',
-      createdAt: '2026-10-21'
-    },
-    {
-      id: 'sby-1',
-      city: 'Surabaya',
-      province: 'Jawa Timur',
-      venue: 'Tunjungan Plaza 6 & Pakuwon Mall',
-      lat: -7.2625,
-      lng: 112.7381,
-      totalScans: 3420,
-      todayScans: 142,
-      brand: 'SUMAS',
-      productType: 'Cubicle Toilet Phenolic 12mm B2B',
-      batchId: 'BATCH-SUM-001',
-      latestTagId: 'SUMAS-B2B-1049',
-      latestTime: '8 menit yang lalu',
-      isB2B: 1,
-      status: 'suspicious',
-      anomalyReason: 'Duplikasi scan lokasi terpisah 780 km dengan Jakarta',
-      deviceInfo: 'Xiaomi Redmi Note 13 • Mi Browser',
-      createdAt: '2026-10-22'
-    },
-    {
-      id: 'bdg-1',
-      city: 'Bandung',
-      province: 'Jawa Barat',
-      venue: 'Paris Van Java & Jalan Dago Store',
-      lat: -6.8893,
-      lng: 107.5960,
-      totalScans: 2890,
-      todayScans: 110,
-      brand: 'ASSC',
-      productType: 'Graphic Tee Oversized & Accessories',
-      batchId: 'BATCH-ASSC-082',
-      latestTagId: 'ASSC-77319',
-      latestTime: '24 menit yang lalu',
-      isB2B: 0,
-      status: 'repeated',
-      anomalyReason: 'Scan Berulang Normal: Konsumen melakukan verifikasi keaslian ke-4 kalinya pada item yang sama.',
-      deviceInfo: 'iPhone 14 • Safari iOS 17.2',
-      createdAt: '2026-10-23'
-    },
-    {
-      id: 'dps-1',
-      city: 'Denpasar & Badung',
-      province: 'Bali',
-      venue: 'Seminyak Square & Canggu Coastal Hub',
-      lat: -8.6882,
-      lng: 115.1565,
-      totalScans: 2340,
-      todayScans: 98,
-      brand: 'BLIMEY!',
-      productType: 'Chino & Denim Jacket Collection',
-      batchId: 'BATCH-BLM-041',
-      latestTagId: 'BLM-92814',
-      latestTime: '15 menit yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Google Pixel 8 • Chrome Mobile',
-      createdAt: '2026-10-24'
-    },
-    {
-      id: 'ikn-1',
-      city: 'Penajam Paser / IKN',
-      province: 'Kalimantan Timur',
-      venue: 'Proyek Gedung Kemenko & Rumah Susun ASN',
-      lat: -0.9610,
-      lng: 116.7020,
-      totalScans: 1980,
-      todayScans: 76,
-      brand: 'SUMAS',
-      productType: 'High Moisture Resistant Phenolic Partition',
-      batchId: 'BATCH-SUM-002',
-      latestTagId: 'SUMAS-IKN-0042',
-      latestTime: '31 menit yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'iPad Air (5th gen) • Chrome iOS',
-      createdAt: '2026-10-25'
-    },
-    {
-      id: 'mdn-1',
-      city: 'Medan',
-      province: 'Sumatera Utara',
-      venue: 'Sun Plaza & Podomoro City Deli Park',
-      lat: 3.5852,
-      lng: 98.6750,
-      totalScans: 1750,
-      todayScans: 65,
-      brand: 'SUMAS',
-      productType: 'Interior Architectural Wall Cladding',
-      batchId: 'BATCH-SUM-003',
-      latestTagId: 'SUMAS-MDN-081',
-      latestTime: '45 menit yang lalu',
-      isB2B: 1,
-      status: 'repeated',
-      anomalyReason: 'Pengecekan Ulang Proyek: Tim kontraktor melakukan audit checklist berkala untuk material terpasang.',
-      deviceInfo: 'Samsung Tab S9 • Edge Mobile',
-      createdAt: '2026-10-25'
-    },
-    {
-      id: 'smg-1',
-      city: 'Semarang',
-      province: 'Jawa Tengah',
-      venue: 'Kawasan Industri Candi & Simpang Lima',
-      lat: -6.9932,
-      lng: 110.4203,
-      totalScans: 1180,
-      todayScans: 43,
-      brand: 'BLIMEY!',
-      productType: 'Signature Denim Overshirt',
-      batchId: 'BATCH-BLM-041',
-      latestTagId: 'BLM-11938',
-      latestTime: '1 jam yang lalu',
-      isB2B: 0,
-      status: 'suspicious',
-      anomalyReason: 'Percobaan PIN salah 7x dalam 10 menit',
-      deviceInfo: 'Unknown Device (Proxy IP Terdeteksi)',
-      createdAt: '2026-10-26'
-    },
-    {
-      id: 'mks-1',
-      city: 'Makassar',
-      province: 'Sulawesi Selatan',
-      venue: 'Trans Studio Mall & Mall Panakkukang',
-      lat: -5.1477,
-      lng: 119.4327,
-      totalScans: 1420,
-      todayScans: 54,
-      brand: 'ASSC',
-      productType: 'Capsule Collection Hoodie',
-      batchId: 'BATCH-ASSC-082',
-      latestTagId: 'ASSC-55201',
-      latestTime: '1 jam yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Oppo Find N3 • Chrome Mobile',
-      createdAt: '2026-10-26'
-    },
-    {
-      id: 'ygy-1',
-      city: 'Yogyakarta',
-      province: 'DI Yogyakarta',
-      venue: 'Ambarrukmo Plaza & RS Siloam',
-      lat: -7.7828,
-      lng: 110.4011,
-      totalScans: 1290,
-      todayScans: 51,
-      brand: 'SUMAS',
-      productType: 'Hospital Partition Board Antibacterial',
-      batchId: 'BATCH-SUM-004',
-      latestTagId: 'SUMAS-YGY-119',
-      latestTime: '2 jam yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'iPhone 13 • Safari iOS',
-      createdAt: '2026-10-27'
-    },
-    {
-      id: 'kdr-1',
-      city: 'Kediri',
-      province: 'Jawa Timur',
-      venue: 'RSUD Gambiran & Proyek RS Kediri',
-      lat: -7.8228,
-      lng: 112.0118,
-      totalScans: 890,
-      todayScans: 38,
-      brand: 'SUMAS',
-      productType: 'Pintu Cubicle Toilet Phenolic 12mm',
-      batchId: 'SUMAS-BATCH-0001-10',
-      latestTagId: 'SUMAS-TAG-00001',
-      latestTime: '10 menit yang lalu',
-      isB2B: 1,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Samsung Galaxy A54 • Chrome Mobile',
-      createdAt: '2026-10-28'
-    },
-    {
-      id: 'plm-1',
-      city: 'Palembang',
-      province: 'Sumatera Selatan',
-      venue: 'Palembang Icon & Bandara Sultan Mahmud Badaruddin II',
-      lat: -2.9761,
-      lng: 104.7754,
-      totalScans: 960,
-      todayScans: 35,
-      brand: 'BLIMEY!',
-      productType: 'Lifestyle Apparel',
-      batchId: 'BATCH-BLM-041',
-      latestTagId: 'BLM-44219',
-      latestTime: '3 jam yang lalu',
-      isB2B: 0,
-      status: 'valid',
-      anomalyReason: null,
-      deviceInfo: 'Vivo V29 • Chrome Mobile',
-      createdAt: '2026-10-28'
-    }
-  ];
-
-  const insertAllPoints = db.transaction((points) => {
-    for (const p of points) {
-      insertScanPoint.run(p);
-    }
-  });
-  insertAllPoints(initialPoints);
-}
 
 // Seed real scan activities into database if empty
 const scanActivitiesCountRow = db.prepare('SELECT COUNT(*) as count FROM scan_activities').get() as { count: number };
@@ -748,9 +499,12 @@ const insertBatchTags = db.transaction((tags) => {
   }
 });
 
-// Seed batches and tags in SQLite
+// Seed batches, tags, and scan points in SQLite with guaranteed 100% telemetry synchronization
+const firstSp = db.prepare('SELECT latestTagId FROM scan_points LIMIT 1').get() as { latestTagId: string } | undefined;
+const tagCheck = firstSp ? db.prepare('SELECT COUNT(*) as count FROM tags WHERE tagNumber = ?').get(firstSp.latestTagId) as { count: number } : { count: 0 };
 const batchCountRow = db.prepare('SELECT COUNT(*) as count FROM batches').get() as { count: number };
-if (batchCountRow && batchCountRow.count < 15) {
+
+if (!batchCountRow || batchCountRow.count < 15 || !tagCheck || tagCheck.count === 0) {
   seedComprehensiveData(db);
 } else {
   // Ensure tags table has rows for any existing batches that may have tags in batches.tags column
@@ -778,87 +532,6 @@ if (batchCountRow && batchCountRow.count < 15) {
   }
 }
 
-// Ensure b1 tags have clean project allocations (RS Kediri and RS Islam Surabaya separated)
-try {
-  const lumpedRow = db.prepare("SELECT COUNT(*) as count FROM tags WHERE batchId = 'b1' AND project LIKE '%,%'").get() as { count: number };
-  if (lumpedRow && lumpedRow.count > 0) {
-    db.prepare(`
-      UPDATE tags 
-      SET project = 'RS Kediri', 
-          specs = 'Phenolic Board 12mm', 
-          codeType = 'SUMAS-CUB-2026', 
-          warranty = '5 Tahun', 
-          prodCode = 'PRD-KDR-001', 
-          note = 'Pemasangan lantai 2 & 3 RS Kediri',
-          allocatedAt = '28 Okt 2026, 09:30'
-      WHERE batchId = 'b1' AND id IN ('tag-b1-1', 'tag-b1-2', 'tag-b1-3')
-    `).run();
-
-    db.prepare(`
-      UPDATE tags 
-      SET project = 'RS Islam Surabaya', 
-          specs = 'Phenolic Board 12mm', 
-          codeType = 'SUMAS-CUB-2026', 
-          warranty = '5 Tahun', 
-          prodCode = 'PRD-SBY-002', 
-          note = 'Gedung Rawat Inap Baru Lt 4',
-          allocatedAt = '29 Okt 2026, 14:10'
-      WHERE batchId = 'b1' AND id IN ('tag-b1-4', 'tag-b1-5')
-    `).run();
-
-    db.prepare("UPDATE batches SET project = 'RS Kediri, RS Islam Surabaya' WHERE id = 'b1'").run();
-  }
-} catch (e) {
-  console.error('Migration notice:', e);
-}
-
-// Migration: Ensure all tags across all batches have alphanumeric format ID (mixture of letters & numbers) and numeric-only PIN
-try {
-  const existingTags = db.prepare('SELECT rowid, id, batchId, tagNumber, pin FROM tags').all() as any[];
-  const idChars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const usedNumbers = new Set<string>();
-
-  for (const t of existingTags) {
-    if (/[A-Z]/.test(t.tagNumber) && /[0-9]/.test(t.tagNumber)) {
-      usedNumbers.add(t.tagNumber);
-    }
-  }
-
-  const updateTagFormatStmt = db.prepare('UPDATE tags SET tagNumber = ?, id = ?, pin = ? WHERE rowid = ?');
-  const runMigration = db.transaction(() => {
-    for (const t of existingTags) {
-      let changed = false;
-      let newTagNumber = t.tagNumber;
-      // If tagNumber doesn't have both letters and digits or length !== 8, generate an 8-character alphanumeric ID
-      if (!/[A-Z]/.test(t.tagNumber) || !/[0-9]/.test(t.tagNumber) || t.tagNumber.length !== 8) {
-        do {
-          let cand = '';
-          for (let c = 0; c < 8; c++) {
-            cand += idChars.charAt(Math.floor(Math.random() * idChars.length));
-          }
-          if (/[A-Z]/.test(cand) && /[0-9]/.test(cand)) {
-            newTagNumber = cand;
-          }
-        } while (!newTagNumber || usedNumbers.has(newTagNumber));
-        usedNumbers.add(newTagNumber);
-        changed = true;
-      }
-
-      // Ensure PIN is strictly digits (0-9)
-      let cleanPin = String(t.pin).replace(/[^0-9]/g, '');
-      if (cleanPin.length < 4) cleanPin = (cleanPin + '12345678').slice(0, 8);
-      if (cleanPin !== t.pin) changed = true;
-
-      if (changed) {
-        const newId = `tag-${t.batchId}-${newTagNumber}`;
-        updateTagFormatStmt.run(newTagNumber, newId, cleanPin, t.rowid);
-      }
-    }
-  });
-  runMigration();
-} catch (err) {
-  console.warn('Migration for alphanumeric tag numbers error:', err);
-}
 
 // ==========================================
 // REST API ENDPOINTS: SCAN LOCATIONS & TELEMETRY
@@ -1023,9 +696,12 @@ app.get('/api/batches/:id/tags', (req, res) => {
     const status = (req.query.status as string) || 'all';
     const project = (req.query.project as string) || 'all';
 
+    const batchRecord = db.prepare('SELECT id, batchId FROM batches WHERE id = ? OR batchId = ?').get(id, id) as any;
+    const actualBatchPk = batchRecord ? batchRecord.id : id;
+
     let countQuery = 'SELECT COUNT(*) as count FROM tags WHERE batchId = ?';
     let dataQuery = 'SELECT * FROM tags WHERE batchId = ?';
-    const params: any[] = [id];
+    const params: any[] = [actualBatchPk];
 
     if (search) {
       const searchClause = ' AND (LOWER(pin) LIKE ? OR LOWER(tagNumber) LIKE ? OR LOWER(COALESCE(project, "")) LIKE ?)';
@@ -1068,7 +744,7 @@ app.get('/api/batches/:id/tags', (req, res) => {
         SUM(CASE WHEN status = 'Tersedia' THEN 1 ELSE 0 END) as available,
         SUM(CASE WHEN status = 'Telah Digunakan' THEN 1 ELSE 0 END) as used
       FROM tags WHERE batchId = ?
-    `).get(id) as { total: number; available: number; used: number };
+    `).get(actualBatchPk) as { total: number; available: number; used: number };
 
     res.json({
       tags,
@@ -1091,11 +767,11 @@ app.get('/api/batches/:id/tags', (req, res) => {
 app.get('/api/batches/:id/all-tags', (req, res) => {
   try {
     const { id } = req.params;
-    const batch = db.prepare('SELECT * FROM batches WHERE id = ?').get(id) as any;
+    const batch = db.prepare('SELECT * FROM batches WHERE id = ? OR batchId = ?').get(id, id) as any;
     if (!batch) {
       return res.status(404).json({ error: 'Batch tidak ditemukan' });
     }
-    const tags = db.prepare('SELECT id, batchId, tagNumber, pin, status, project, specs FROM tags WHERE batchId = ? ORDER BY rowid ASC').all(id);
+    const tags = db.prepare('SELECT id, batchId, tagNumber, pin, status, project, specs FROM tags WHERE batchId = ? ORDER BY rowid ASC').all(batch.id);
     res.json({
       batch,
       tags,
@@ -1110,7 +786,7 @@ app.get('/api/batches/:id/all-tags', (req, res) => {
 app.get('/api/batches/:id/summary', (req, res) => {
   try {
     const { id } = req.params;
-    const batch = db.prepare('SELECT * FROM batches WHERE id = ?').get(id) as any;
+    const batch = db.prepare('SELECT * FROM batches WHERE id = ? OR batchId = ?').get(id, id) as any;
     if (!batch) {
       return res.status(404).json({ error: 'Batch tidak ditemukan' });
     }
@@ -1121,7 +797,7 @@ app.get('/api/batches/:id/summary', (req, res) => {
         SUM(CASE WHEN status = 'Tersedia' THEN 1 ELSE 0 END) as available,
         SUM(CASE WHEN status = 'Telah Digunakan' THEN 1 ELSE 0 END) as used
       FROM tags WHERE batchId = ?
-    `).get(id) as { total: number; available: number; used: number };
+    `).get(batch.id) as { total: number; available: number; used: number };
 
     const projectAllocations = db.prepare(`
       SELECT 
@@ -1136,7 +812,7 @@ app.get('/api/batches/:id/summary', (req, res) => {
       FROM tags 
       WHERE batchId = ? AND project IS NOT NULL AND status = 'Telah Digunakan'
       GROUP BY project
-    `).all(id);
+    `).all(batch.id);
 
     const isB2B = Boolean(batch.isB2B) || (batch.brand || '').trim().toLowerCase() === 'sumas';
 

@@ -9,7 +9,8 @@ import {
   MapPin, 
   ChevronDown, 
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  History
 } from 'lucide-react';
 import type { ScanSecurityStatus, ScanHistoryItem, ScanPoint } from '../types/telemetry';
 
@@ -106,6 +107,43 @@ export const ScanDetailModal: React.FC<ScanDetailModalProps> = ({
   const statusMeta = useMemo(() => {
     if (!scan) return getStatusMeta('valid');
     return getStatusMeta(scan.status);
+  }, [scan]);
+
+  // Notifikasi status telemetri: singkat, padat, dan jelas
+  const telemetryAlert = useMemo(() => {
+    if (!scan) return null;
+
+    if (scan.status === 'suspicious') {
+      const defaultDesc = `Scan ${scan.totalScans}x melampaui batas aman dengan indikasi multi-IP. Potensi kuat kloning tag fisik.`;
+      const message = scan.anomalyReason && !scan.anomalyReason.includes('item yang sama') && !scan.anomalyReason.includes('Pemindaian berulang 3x')
+        ? scan.anomalyReason
+        : defaultDesc;
+
+      return {
+        title: 'Status Palsu: Anomali Keamanan',
+        message,
+        containerClass: 'bg-rose-50 dark:bg-rose-950/30 border-rose-200/80 dark:border-rose-900/60 text-rose-800 dark:text-rose-300',
+        titleClass: 'text-rose-900 dark:text-rose-200',
+        iconClass: 'text-rose-500'
+      };
+    }
+
+    if (scan.status === 'repeated') {
+      const defaultDesc = `Terdeteksi ${scan.totalScans || 3}x pemindaian pada tag ini. Pantau riwayat sesi untuk mencegah duplikasi fisik.`;
+      const message = scan.anomalyReason && !scan.anomalyReason.includes('item yang sama') && !scan.anomalyReason.includes('Pemindaian berulang 3x')
+        ? scan.anomalyReason
+        : defaultDesc;
+
+      return {
+        title: 'Status Waspada: Pemindaian Berulang',
+        message,
+        containerClass: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200/80 dark:border-amber-900/60 text-amber-800 dark:text-amber-300',
+        titleClass: 'text-amber-900 dark:text-amber-200',
+        iconClass: 'text-amber-500'
+      };
+    }
+
+    return null;
   }, [scan]);
 
   // Generate complete history list sorted from newest (#N) to oldest (#1)
@@ -394,13 +432,17 @@ export const ScanDetailModal: React.FC<ScanDetailModalProps> = ({
         {/* MODAL BODY */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
           
-          {/* PERINGATAN ANOMALI (Hanya jika status merah/curiga atau ada reason) */}
-          {(scan.status === 'suspicious' || scan.anomalyReason) && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-400">
-              <AlertTriangle size={16} className="shrink-0 text-rose-500 mt-0.5" />
+          {/* PERINGATAN TELEMETRI SESUAI STATUS (PROFESIONAL & SELARAS) */}
+          {telemetryAlert && (
+            <div className={`p-3.5 rounded-2xl border flex items-start gap-2.5 text-xs ${telemetryAlert.containerClass}`}>
+              <AlertTriangle size={16} className={`shrink-0 mt-0.5 ${telemetryAlert.iconClass}`} />
               <div>
-                <span className="font-bold block text-rose-900 dark:text-rose-300">Peringatan Keamanan Telemetri</span>
-                <span className="leading-relaxed">{scan.anomalyReason || 'Terdeteksi anomali pemindaian lokasi atau frekuensi melebihi batas aman.'}</span>
+                <span className={`font-bold block ${telemetryAlert.titleClass}`}>
+                  {telemetryAlert.title}
+                </span>
+                <span className="leading-relaxed mt-0.5 block">
+                  {telemetryAlert.message}
+                </span>
               </div>
             </div>
           )}
@@ -483,8 +525,26 @@ export const ScanDetailModal: React.FC<ScanDetailModalProps> = ({
                 </div>
 
                 {/* Produk & Brand */}
-                <div className="mt-1 text-slate-700 dark:text-zinc-300 font-medium">
+                <div className="mt-1.5 text-slate-700 dark:text-zinc-300 font-medium">
                   {scan.productType} • <span className="font-semibold text-slate-900 dark:text-zinc-100">{scan.brand}</span>
+                </div>
+
+                {/* Batch ID */}
+                <div className="mt-2 flex items-center justify-between text-slate-500 dark:text-zinc-400">
+                  <span>Batch ID:</span>
+                  <span className="inline-flex items-center gap-1 font-mono font-semibold text-slate-800 dark:text-zinc-200">
+                    {scan.batchId || '-'}
+                    {scan.batchId && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(scan.batchId, 'Batch ID')}
+                        className="p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300"
+                        title="Salin Batch ID"
+                      >
+                        {copiedField === 'Batch ID' ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                      </button>
+                    )}
+                  </span>
                 </div>
 
                 {/* Status Keaslian (Badge persis sama seperti di tabel) */}
@@ -526,9 +586,12 @@ export const ScanDetailModal: React.FC<ScanDetailModalProps> = ({
           {/* BAGIAN BAWAH: 1 KOLOM RIWAYAT SCAN BERBENTUK AKORDEON SMOOTH SIMPEL JELAS */}
           <div className="space-y-3 pt-1">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                Riwayat Sesi Pemindaian ({historyList.length})
-              </span>
+              <div className="flex items-center gap-1.5">
+                <History size={14} className="text-[#c28e62] shrink-0" />
+                <span className="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                  Riwayat Sesi Pemindaian ({historyList.length})
+                </span>
+              </div>
               <span className="text-[11px] text-slate-400 dark:text-zinc-500">
                 Urut terbaru di atas • Klik baris untuk detail & sorot peta
               </span>

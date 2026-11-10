@@ -459,6 +459,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
             <div className="p-3.5 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-800/40">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
+                  <Layers size={14} className="text-[#c28e62]" />
                   <h3 className="font-bold text-xs text-slate-800 dark:text-zinc-100 uppercase tracking-wider">Kategori Utama</h3>
                   <span className="text-[11px] font-mono text-slate-400">({level1List.length})</span>
                 </div>
@@ -614,6 +615,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
             <div className="p-3.5 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-800/40">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
+                  <Layers size={14} className="text-[#c28e62]" />
                   <h3 className="font-bold text-xs text-slate-800 dark:text-zinc-100 uppercase tracking-wider">Sub Kategori</h3>
                   <span className="text-[11px] font-mono text-slate-400">({level2List.length})</span>
                 </div>
@@ -783,6 +785,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
             <div className="p-3.5 border-b border-slate-100 dark:border-zinc-800 bg-slate-50/70 dark:bg-zinc-800/40">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
+                  <Layers size={14} className="text-[#c28e62]" />
                   <h3 className="font-bold text-xs text-slate-800 dark:text-zinc-100 uppercase tracking-wider">Varian / Jenis</h3>
                   <span className="text-[11px] font-mono text-slate-400">({level3List.length})</span>
                 </div>

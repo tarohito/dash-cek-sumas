@@ -553,7 +553,35 @@ Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: V
     for (const b of batches) {
       const isSumasB2B = b.isB2B === 1 || b.brand.toLowerCase() === 'sumas';
       const brandPrefix = b.brand.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
-      for (let i = 1; i <= 15; i++) {
+
+      // Sinkronisasi data tag, pin, nama produk, brand, dan batch id dengan telemetri scan
+      const matchingScans = initialScanPoints.filter(sp => sp.batchId === b.batchId);
+      let tagIndex = 0;
+
+      // 1. Masukkan tag dari data pemindaian scan_points
+      for (const sp of matchingScans) {
+        tagIndex++;
+        usedTagNumbers.add(sp.latestTagId);
+        insertTag.run({
+          id: `tag-${b.id}-${sp.latestTagId}`,
+          batchId: b.id,
+          tagNumber: sp.latestTagId,
+          pin: sp.pin,
+          status: 'Telah Digunakan',
+          project: isSumasB2B ? b.project : null,
+          specs: b.specs || 'Standard Factory Spec',
+          codeType: `${brandPrefix}-${isSumasB2B ? 'B2B' : 'RET'}-2026`,
+          warranty: isSumasB2B ? '5 Tahun Garansi Resmi' : 'Garansi Keaslian BPOM Resmi',
+          prodCode: `PRD-${brandPrefix}-${String(tagIndex).padStart(3, '0')}`,
+          note: isSumasB2B
+            ? `Pemasangan & verifikasi area proyek ${b.project} (${sp.totalScans}x scan di ${sp.city})`
+            : `Kemasan produk terverifikasi (${sp.totalScans}x scan di ${sp.city})`,
+          allocatedAt: b.date
+        });
+      }
+
+      // 2. Generate sisa tag hingga 15 tag per batch
+      for (let i = tagIndex + 1; i <= 15; i++) {
         let tagNumber = '';
         do {
           let cand = '';
@@ -565,8 +593,6 @@ Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: V
         let pin = '';
         for (let p = 0; p < b.pinLength; p++) pin += pinDigits.charAt(Math.floor(Math.random() * pinDigits.length));
 
-        // For SUMAS B2B batches, tags are allocated to B2B projects (first 8 tags allocated, remainder available).
-        // For Retail batches, tags are consumer packaging verification tags (Tersedia / Siap Verifikasi) with NO project allocation.
         const isAllocated = isSumasB2B ? i <= 8 : false;
 
         insertTag.run({

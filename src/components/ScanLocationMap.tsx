@@ -273,7 +273,7 @@ export const ScanLocationMap: React.FC<ScanLocationMapProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-zinc-800">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-[#c28e62] flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center font-bold flex-shrink-0">
               <MapPin size={20} />
             </div>
             <div>

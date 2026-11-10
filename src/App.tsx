@@ -7796,36 +7796,35 @@ export default function App() {
                 );
               })()}
 
-              {/* QR CONFIGURATION & MODE BANNER (CLEAN & MINIMALIS) */}
-              <div className="bg-slate-50 dark:bg-zinc-800/70 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-700/80 mb-3 flex items-center justify-between gap-3 text-xs flex-shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
-                    activeBatch?.qrType === 'static'
-                      ? 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
-                      : 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60'
-                  }`}>
-                    {activeBatch?.qrType === 'static' ? 'QR Statis' : 'QR Dinamis'}
-                  </span>
-                  <span className="font-mono text-xs text-slate-600 dark:text-zinc-300 truncate">
-                    {activeBatch?.redirectUrl || 'https://cek.sumas.id/'}
-                  </span>
-                </div>
-
-                {activeBatch?.qrType !== 'static' && (
-                  <button
-                    type="button"
-                    onClick={() => openEditUrlModal(activeBatch)}
-                    className="px-4 py-1.5 rounded-full bg-white dark:bg-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-600 border border-slate-200 dark:border-zinc-600 text-[#c28e62] dark:text-[#cd9a6f] font-semibold text-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
-                  >
-                    <Globe size={13} />
-                    <span>Edit URL</span>
-                  </button>
-                )}
-              </div>
-
               {/* TAB 1: DAFTAR TAG & PIN */}
               {activeTab === 'tags' && (
                 <div className="flex flex-col min-h-0 relative space-y-2.5">
+                  {/* QR CONFIGURATION & MODE BANNER (HANYA MUNCUL DI MENU DAFTAR TAG) */}
+                  <div className="bg-slate-50 dark:bg-zinc-800/70 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-zinc-700/80 flex items-center justify-between gap-3 text-xs flex-shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
+                        activeBatch?.qrType === 'static'
+                          ? 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300'
+                          : 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60'
+                      }`}>
+                        {activeBatch?.qrType === 'static' ? 'QR Statis' : 'QR Dinamis'}
+                      </span>
+                      <span className="font-mono text-xs text-slate-600 dark:text-zinc-300 truncate">
+                        {activeBatch?.redirectUrl || 'https://cek.sumas.id/'}
+                      </span>
+                    </div>
+
+                    {activeBatch?.qrType !== 'static' && (
+                      <button
+                        type="button"
+                        onClick={() => openEditUrlModal(activeBatch)}
+                        className="px-4 py-1.5 rounded-full bg-white dark:bg-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-600 border border-slate-200 dark:border-zinc-600 text-[#c28e62] dark:text-[#cd9a6f] font-semibold text-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                      >
+                        <Globe size={13} />
+                        <span>Edit URL</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 flex-shrink-0">
                     <div className="relative flex-1">
                       <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
@@ -8175,7 +8174,7 @@ export default function App() {
                       <div key={idx} className="group/proj bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62]/40 rounded-2xl p-4 sm:p-5 transition-all">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-zinc-700">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-[#fcf7f3] dark:bg-zinc-700 flex items-center justify-center text-[#c28e62]">
+                            <div className="w-8 h-8 rounded-full bg-[#c28e62]/10 dark:bg-zinc-700 flex items-center justify-center text-[#c28e62]">
                               <Building2 size={16} />
                             </div>
                             <div>
@@ -8704,7 +8703,7 @@ export default function App() {
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200 dark:border-zinc-700 w-full max-w-lg overflow-hidden mx-4">
             <div className="px-5 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#fcf7f3] dark:bg-zinc-800 flex items-center justify-center text-[#c28e62]">
+                <div className="w-8 h-8 rounded-lg bg-[#c28e62]/10 dark:bg-zinc-800 flex items-center justify-center text-[#c28e62]">
                   <Download size={18} />
                 </div>
                 <h3 className="font-bold text-slate-800 dark:text-zinc-100 text-sm sm:text-base">Unduh Data Batch</h3>
@@ -9768,7 +9767,7 @@ export default function App() {
 
                             <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
                               <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                                <Box size={15} className="text-indigo-500" />
+                                <Box size={15} className="text-[#c28e62]" />
                                 <span className="font-medium">Katalog SKU</span>
                               </div>
                               <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
@@ -9778,7 +9777,7 @@ export default function App() {
 
                             <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
                               <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                                <QrCode size={15} className="text-emerald-500" />
+                                <QrCode size={15} className="text-[#c28e62]" />
                                 <span className="font-medium">Batch Produksi</span>
                               </div>
                               <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
@@ -9794,8 +9793,9 @@ export default function App() {
                     <div className="p-6 space-y-5">
                       {/* SEKSI: KONTAK & INFORMASI AKUN */}
                       <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
-                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
-                          Kontak &amp; Informasi Akun
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <UserCheck size={14} className="text-[#c28e62]" />
+                          <span>Kontak &amp; Informasi Akun</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-200/70 dark:border-zinc-700/70">
@@ -9810,7 +9810,7 @@ export default function App() {
 
                           <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-200/70 dark:border-zinc-700/70">
                             <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                              <Phone size={13} className="text-emerald-500" />
+                              <Phone size={13} className="text-[#c28e62]" />
                               <span>Nomor Telepon</span>
                             </div>
                             <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 font-mono">
@@ -9823,7 +9823,8 @@ export default function App() {
                       {/* SEKSI: BRAND YANG DIKELOLA (SIMPEL NAMA & LOGO, 3 KOLOM 2 BARIS) */}
                       <div>
                         <div className="flex items-center justify-between mb-2.5">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Building2 size={14} className="text-[#c28e62]" />
                             <span>Brand yang Dikelola ({userBrands.length})</span>
                           </div>
                           {userBrands.length > 6 && (
@@ -9959,7 +9960,8 @@ export default function App() {
                       {userProducts.length > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-2.5">
-                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <Box size={14} className="text-[#c28e62]" />
                               <span>Katalog Produk Terkait ({userProducts.length})</span>
                             </div>
                             {userProducts.length > 4 && (
@@ -10432,7 +10434,7 @@ export default function App() {
 
                             <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
                               <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                                <QrCode size={15} className="text-indigo-500" />
+                                <QrCode size={15} className="text-[#c28e62]" />
                                 <span className="font-medium">Batch Produksi</span>
                               </div>
                               <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
@@ -10442,7 +10444,7 @@ export default function App() {
 
                             <div className="p-4 sm:py-4.5 sm:px-4 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between min-h-[84px] sm:min-h-[94px]">
                               <div className="flex items-center gap-2 text-slate-400 dark:text-zinc-500 text-xs mb-1">
-                                <Tag size={15} className="text-emerald-500" />
+                                <Tag size={15} className="text-[#c28e62]" />
                                 <span className="font-medium">Tag Fisik</span>
                               </div>
                               <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-0.5">
@@ -10507,7 +10509,10 @@ export default function App() {
                         return (
                           <div className="p-4 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800">
                             <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
-                              <span>Akun Pengguna Terhubung</span>
+                              <div className="flex items-center gap-1.5">
+                                <Users size={14} className="text-[#c28e62]" />
+                                <span>Akun Pengguna Terhubung</span>
+                              </div>
                               <span className="font-mono text-[10px] text-slate-400">ID: {brandToView.ownerId}</span>
                             </div>
 
@@ -10576,8 +10581,9 @@ export default function App() {
                       {/* SEKSI: DESKRIPSI & PROFIL BISNIS */}
                       {brandToView.description && (
                         <div>
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                            Deskripsi &amp; Profil Brand
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <FileText size={14} className="text-[#c28e62]" />
+                            <span>Deskripsi &amp; Profil Brand</span>
                           </div>
                           <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-300 leading-relaxed bg-slate-50 dark:bg-zinc-800/40 p-3.5 rounded-xl border border-slate-200/80 dark:border-zinc-800">
                             {brandToView.description}
@@ -10588,7 +10594,8 @@ export default function App() {
                       {/* SEKSI: KATALOG PRODUK & SKU */}
                       <div>
                         <div className="flex items-center justify-between mb-2.5">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Box size={14} className="text-[#c28e62]" />
                             <span>Katalog Produk Terdaftar ({brandProducts.length})</span>
                           </div>
                           {brandProducts.length > 4 && (
@@ -10730,7 +10737,8 @@ export default function App() {
                       {/* SEKSI: RIWAYAT BATCH PRODUKSI */}
                       <div>
                         <div className="flex items-center justify-between mb-2.5">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <QrCode size={14} className="text-[#c28e62]" />
                             <span>Riwayat Batch Produksi ({brandBatches.length})</span>
                           </div>
                           {brandBatches.length > 0 && (
@@ -11383,7 +11391,7 @@ export default function App() {
                             >
                               <div className="flex items-center justify-between text-xs mb-1">
                                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500">
-                                  <UserCheck size={14} className="text-indigo-500 shrink-0" />
+                                  <UserCheck size={14} className="text-[#c28e62] shrink-0" />
                                   <span>Akun Pengguna</span>
                                 </div>
                                 {targetUser && (
@@ -11412,7 +11420,7 @@ export default function App() {
                             <div className="p-3.5 bg-slate-50 dark:bg-zinc-800/60 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col justify-between">
                               <div className="flex items-center justify-between text-xs mb-1">
                                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500">
-                                  <QrCode size={14} className="text-emerald-500 shrink-0" />
+                                  <QrCode size={14} className="text-[#c28e62] shrink-0" />
                                   <span>Batch Produksi</span>
                                 </div>
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
