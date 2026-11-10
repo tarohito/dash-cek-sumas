@@ -35,4 +35,5 @@ export interface ScanPoint {
   anomalyReason?: string;
   deviceInfo: string;
   scanHistory?: ScanHistoryItem[];
+  createdAt?: string;
 }
