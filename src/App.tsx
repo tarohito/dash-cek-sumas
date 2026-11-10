@@ -1357,6 +1357,7 @@ export default function App() {
 
   const [brandToDelete, setBrandToDelete] = useState<BrandItem | null>(null);
   const [brandToView, setBrandToView] = useState<BrandItem | null>(null);
+  const [isBrandProductsExpanded, setIsBrandProductsExpanded] = useState(false);
 
   const [brandForm, setBrandForm] = useState({
     id: '',
@@ -2400,6 +2401,7 @@ export default function App() {
 
   const handleOpenDetailBrand = (brand: BrandItem) => {
     setBrandToView(brand);
+    setIsBrandProductsExpanded(false);
     setIsDetailBrandModalOpen(true);
   };
 
@@ -4346,14 +4348,13 @@ export default function App() {
                   {currentUser ? currentUser.name : 'Super Admin'}
                 </p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
-                    isSuperAdmin 
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                      : isBrandB2B
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                    (currentUser?.role === 'Administrator' || isSuperAdmin)
+                      ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
                   }`}>
-                    {currentUser?.role || (isSuperAdmin ? 'Super Admin' : 'Brand Owner')}
+                    <UserCheck size={11} />
+                    <span>{currentUser?.role || (isSuperAdmin ? 'Administrator' : 'Operator')}</span>
                   </span>
                 </div>
               </div>
@@ -6683,9 +6684,8 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsCreateBatchModalOpen(true)}
-                  className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  className="w-full sm:w-auto bg-[#c28e62] hover:bg-[#b07d53] text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold flex items-center justify-center transition-colors cursor-pointer"
                 >
-                  <Plus size={15} />
                   <span>Generate Batch Baru</span>
                 </button>
               ) : (
@@ -7005,7 +7005,7 @@ export default function App() {
                                   onClick={() => setIsCreateBatchModalOpen(true)}
                                   className="mt-1 px-4 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold cursor-pointer"
                                 >
-                                  + Generate Batch Pertama
+                                  Generate Batch Pertama
                                 </button>
                               ) : (
                                 <p className="text-xs text-slate-400 dark:text-zinc-500 italic mt-0.5">
@@ -8114,22 +8114,19 @@ export default function App() {
                     <div className="flex-1 min-w-[200px] max-w-full">
                       <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-semibold tracking-wider">Brand &amp; SKU</span>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap sm:flex-nowrap">
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const foundBrand = brands.find(b => b.name.toLowerCase() === (activeBatch?.brand || '').toLowerCase());
-                              if (foundBrand) {
-                                closeDetailModal();
-                                handleOpenDetailBrand(foundBrand);
-                              }
-                            }}
-                            className="font-bold text-[#c28e62] hover:underline cursor-pointer shrink-0 text-left whitespace-nowrap"
-                          >
-                            {activeBatch?.brand}
-                          </button>
-                          <BusinessTypeBadge brandName={activeBatch?.brand} size="sm" />
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const foundBrand = brands.find(b => b.name.toLowerCase() === (activeBatch?.brand || '').toLowerCase());
+                            if (foundBrand) {
+                              closeDetailModal();
+                              handleOpenDetailBrand(foundBrand);
+                            }
+                          }}
+                          className="font-bold text-[#c28e62] hover:underline cursor-pointer shrink-0 text-left whitespace-nowrap"
+                        >
+                          {activeBatch?.brand}
+                        </button>
                         <span className="text-slate-300 dark:text-zinc-600 font-bold shrink-0">•</span>
                         <button
                           type="button"
@@ -10224,13 +10221,13 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* SEKSI: BRAND YANG DIKELOLA */}
+                      {/* SEKSI: BRAND YANG DIKELOLA (SIMPEL NAMA & LOGO, 3 KOLOM 2 BARIS) */}
                       <div>
                         <div className="flex items-center justify-between mb-2.5">
                           <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                             <span>Brand yang Dikelola ({userBrands.length})</span>
                           </div>
-                          {userBrands.length > 4 && (
+                          {userBrands.length > 6 && (
                             <button
                               type="button"
                               onClick={() => setIsUserBrandsExpanded(!isUserBrandsExpanded)}
@@ -10244,105 +10241,87 @@ export default function App() {
 
                         {userBrands.length > 0 ? (
                           <>
-                            {/* 2 BARIS PERTAMA (4 BRAND PADA GRID 2 KOLOM) */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                              {userBrands.slice(0, 4).map(b => (
+                            {/* 2 BARIS PERTAMA (6 BRAND PADA GRID 3 KOLOM) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                              {userBrands.slice(0, 6).map(b => (
                                 <div
                                   key={b.id}
                                   onClick={() => {
                                     setIsDetailUserModalOpen(false);
                                     setUserToView(null);
                                     setIsUserBrandsExpanded(false);
+                                    setIsUserProductsExpanded(false);
                                     handleOpenDetailBrand(b);
                                   }}
-                                  className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                                  className="p-2.5 sm:p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center gap-2.5 hover:border-[#c28e62] dark:hover:border-[#c28e62] hover:bg-white dark:hover:bg-zinc-800/80 transition-all cursor-pointer group shadow-2xs"
                                 >
-                                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-1.5 flex items-center justify-center shrink-0">
-                                      {b.logo ? (
-                                        <img 
-                                          src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
-                                          alt={b.name} 
-                                          onError={(e) => {
-                                            const el = e.currentTarget;
-                                            el.onerror = null;
-                                            el.src = getBrandInitialsLogo(b.name);
-                                          }}
-                                          className="w-full h-full object-contain" 
-                                        />
-                                      ) : (
-                                        <span className="font-bold text-xs text-[#c28e62]">
-                                          {b.name.slice(0, 2).toUpperCase()}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
-                                        {b.name}
-                                      </div>
-                                      <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                                        {b.category || 'Brand Mitra'}
-                                      </div>
-                                    </div>
+                                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200/80 dark:border-zinc-700/80 p-1 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                    {b.logo ? (
+                                      <img 
+                                        src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
+                                        alt={b.name} 
+                                        onError={(e) => {
+                                          const el = e.currentTarget;
+                                          el.onerror = null;
+                                          el.src = getBrandInitialsLogo(b.name);
+                                        }}
+                                        className="w-full h-full object-contain" 
+                                      />
+                                    ) : (
+                                      <span className="font-bold text-[11px] text-[#c28e62]">
+                                        {b.name.slice(0, 2).toUpperCase()}
+                                      </span>
+                                    )}
                                   </div>
-                                  <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                                    Lihat →
+                                  <span className="font-semibold text-xs text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
+                                    {b.name}
                                   </span>
                                 </div>
                               ))}
                             </div>
 
                             {/* ACCORDION SMOOTH UNTUK SISA BRAND (MINIMIZE ACCORDION) */}
-                            {userBrands.length > 4 && (
+                            {userBrands.length > 6 && (
                               <>
                                 <div
-                                  className={`grid grid-cols-1 sm:grid-cols-2 gap-2.5 transition-all duration-300 ease-in-out overflow-hidden ${
+                                  className={`grid grid-cols-2 sm:grid-cols-3 gap-2.5 transition-all duration-300 ease-in-out overflow-hidden ${
                                     isUserBrandsExpanded
                                       ? 'max-h-[2000px] opacity-100 mt-2.5'
                                       : 'max-h-0 opacity-0 mt-0 pointer-events-none'
                                   }`}
                                 >
-                                  {userBrands.slice(4).map(b => (
+                                  {userBrands.slice(6).map(b => (
                                     <div
                                       key={b.id}
                                       onClick={() => {
                                         setIsDetailUserModalOpen(false);
                                         setUserToView(null);
                                         setIsUserBrandsExpanded(false);
+                                        setIsUserProductsExpanded(false);
                                         handleOpenDetailBrand(b);
                                       }}
-                                      className="p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center justify-between text-xs hover:border-[#c28e62] dark:hover:border-[#c28e62] transition-colors cursor-pointer group"
+                                      className="p-2.5 sm:p-3 bg-slate-50 dark:bg-zinc-800/50 rounded-2xl border border-slate-200/80 dark:border-zinc-800 flex items-center gap-2.5 hover:border-[#c28e62] dark:hover:border-[#c28e62] hover:bg-white dark:hover:bg-zinc-800/80 transition-all cursor-pointer group shadow-2xs"
                                     >
-                                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 p-1.5 flex items-center justify-center shrink-0">
-                                          {b.logo ? (
-                                            <img 
-                                              src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
-                                              alt={b.name} 
-                                              onError={(e) => {
-                                                const el = e.currentTarget;
-                                                el.onerror = null;
-                                                el.src = getBrandInitialsLogo(b.name);
-                                              }}
-                                              className="w-full h-full object-contain" 
-                                            />
-                                          ) : (
-                                            <span className="font-bold text-xs text-[#c28e62]">
-                                              {b.name.slice(0, 2).toUpperCase()}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <div className="font-semibold text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
-                                            {b.name}
-                                          </div>
-                                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                                            {b.category || 'Brand Mitra'}
-                                          </div>
-                                        </div>
+                                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200/80 dark:border-zinc-700/80 p-1 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                        {b.logo ? (
+                                          <img 
+                                            src={b.name.toLowerCase() === 'sumas' && (!b.logo || b.logo.includes('541888946425') || b.logo.includes('logo_vertikal')) ? '/assets/brand/logo_horizontal.svg' : b.logo} 
+                                            alt={b.name} 
+                                            onError={(e) => {
+                                              const el = e.currentTarget;
+                                              el.onerror = null;
+                                              el.src = getBrandInitialsLogo(b.name);
+                                            }}
+                                            className="w-full h-full object-contain" 
+                                          />
+                                        ) : (
+                                          <span className="font-bold text-[11px] text-[#c28e62]">
+                                            {b.name.slice(0, 2).toUpperCase()}
+                                          </span>
+                                        )}
                                       </div>
-                                      <span className="text-[11px] text-[#c28e62] font-semibold shrink-0 ml-1 flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                                        Lihat →
+                                      <span className="font-semibold text-xs text-slate-800 dark:text-zinc-200 truncate group-hover:text-[#c28e62] transition-colors">
+                                        {b.name}
                                       </span>
                                     </div>
                                   ))}
@@ -10355,12 +10334,12 @@ export default function App() {
                                 >
                                   {isUserBrandsExpanded ? (
                                     <>
-                                      <span>Sembunyikan ({userBrands.length - 4} Brand)</span>
+                                      <span>Sembunyikan ({userBrands.length - 6} Brand)</span>
                                       <ChevronUp size={14} className="text-[#c28e62]" />
                                     </>
                                   ) : (
                                     <>
-                                      <span>Lihat Semua Brand (+{userBrands.length - 4} lainnya)</span>
+                                      <span>Lihat Semua Brand (+{userBrands.length - 6} lainnya)</span>
                                       <ChevronDown size={14} className="text-[#c28e62]" />
                                     </>
                                   )}
@@ -10374,6 +10353,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
+
 
 
                       {/* SEKSI: KATALOG PRODUK TERKAIT */}
@@ -10753,7 +10733,7 @@ export default function App() {
       {/* MODAL 3: DETAIL BRAND (CLEAN, DATABASE-RELATIONAL & PROFESSIONAL) */}
       {isDetailBrandModalOpen && brandToView && (
         <div 
-          onClick={(e) => { if (e.target === e.currentTarget) { setIsDetailBrandModalOpen(false); setBrandToView(null); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setIsDetailBrandModalOpen(false); setBrandToView(null); setIsBrandProductsExpanded(false); } }}
           className="fixed inset-0 bg-black/60 z-[10005] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800 w-full max-w-3xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] shadow-2xl">
@@ -10769,7 +10749,7 @@ export default function App() {
               </div>
               <button 
                 type="button"
-                onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); }} 
+                onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); setIsBrandProductsExpanded(false); }} 
                 data-tooltip="Tutup" data-tooltip-shortcut="Esc" data-tooltip-pos="bottom" 
                 className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-200 p-2 rounded-full hover:bg-slate-200/70 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
               >
@@ -10916,9 +10896,8 @@ export default function App() {
                                     setIsDetailBrandModalOpen(false);
                                     handleOpenEditBrand(brandToView);
                                   }}
-                                  className="px-3.5 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-xl text-xs font-bold transition-all shadow-sm hover:shadow shrink-0 cursor-pointer flex items-center justify-center gap-1.5 self-start sm:self-auto"
+                                  className="px-4 py-2 bg-[#c28e62] hover:bg-[#b07d53] text-white rounded-full text-xs font-semibold transition-all shadow-sm hover:shadow shrink-0 cursor-pointer flex items-center justify-center self-start sm:self-auto"
                                 >
-                                  <UserCheck size={14} />
                                   <span>Tetapkan Akun Pengguna</span>
                                 </button>
                               </div>
@@ -10970,8 +10949,13 @@ export default function App() {
                                         {ownerDisplayName}
                                       </span>
                                     )}
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-300">
-                                      {ownerDisplayRole}
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                                      ownerDisplayRole === 'Administrator'
+                                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                                    }`}>
+                                      <UserCheck size={12} />
+                                      <span>{ownerDisplayRole}</span>
                                     </span>
                                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                                       {ownerDisplayStatus}
@@ -11135,7 +11119,7 @@ export default function App() {
               <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 <button
                   type="button"
-                  onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); }}
+                  onClick={() => { setIsDetailBrandModalOpen(false); setBrandToView(null); setIsBrandProductsExpanded(false); }}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Tutup
@@ -11144,6 +11128,8 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setIsDetailBrandModalOpen(false);
+                    setBrandToView(null);
+                    setIsBrandProductsExpanded(false);
                     handleOpenEditBrand(brandToView);
                   }}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center"
@@ -11721,8 +11707,16 @@ export default function App() {
                               <div className="font-bold text-slate-800 dark:text-zinc-100 group-hover:text-[#c28e62] transition-colors truncate">
                                 {targetUser?.name || brand?.ownerName || '-'}
                               </div>
-                              <div className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 truncate">
-                                {targetUser?.role || 'Admin'} • <span className="text-emerald-600 dark:text-emerald-400 font-medium">{targetUser?.status || 'Aktif'}</span>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                  (targetUser?.role || 'Administrator') === 'Administrator'
+                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                                }`}>
+                                  <UserCheck size={10} />
+                                  <span>{targetUser?.role || 'Administrator'}</span>
+                                </span>
+                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">• {targetUser?.status || 'Aktif'}</span>
                               </div>
                             </div>
 
@@ -12199,10 +12193,7 @@ export default function App() {
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-zinc-800">
                   <span className="text-slate-400 dark:text-zinc-500">Merek / Brand</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeBatch?.brand || '-'}</span>
-                    <BusinessTypeBadge brandName={activeBatch?.brand} size="sm" />
-                  </div>
+                  <span className="font-semibold text-slate-800 dark:text-zinc-200">{activeBatch?.brand || '-'}</span>
                 </div>
                 <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-zinc-800">
                   <span className="text-slate-400 dark:text-zinc-500">SKU Produk</span>
