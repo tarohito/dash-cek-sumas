@@ -4179,7 +4179,7 @@ export default function App() {
           className={`group flex items-center transition-all ${
             isMin 
               ? 'justify-center w-9 h-9 min-w-[36px] min-h-[36px] max-w-[36px] max-h-[36px] rounded-full aspect-square mx-auto p-0 shrink-0' 
-              : 'gap-2.5 rounded-xl w-full px-3 py-2 text-xs sm:text-[13px]'
+              : 'gap-3 rounded-full w-full px-4 py-2 text-xs sm:text-[13px]'
           } ${
             isSelected 
               ? 'bg-[#fcf7f3] dark:bg-zinc-800 text-[#c28e62] font-semibold border border-[#cd9a6f]/30 dark:border-zinc-700' 
@@ -4202,21 +4202,21 @@ export default function App() {
     return (
       <div className="flex flex-col h-full bg-white dark:bg-zinc-900 overflow-hidden">
         {/* TOP HEADER LOGO */}
-        <div className={`h-14 flex items-center border-b border-slate-100 dark:border-zinc-800 flex-shrink-0 relative ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : 'px-4'}`}>
+        <div className={`h-16 flex items-center border-b border-slate-200 dark:border-zinc-700 flex-shrink-0 relative ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : 'px-5'}`}>
           <div className={`flex items-center gap-2 overflow-hidden w-full ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : ''}`}>
             {isSidebarMinimized && !isMobile ? (
               <div 
                 onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
-                className="cursor-pointer flex items-center justify-center hover:opacity-80 transition-opacity py-0.5 select-none"
+                className="cursor-pointer flex items-center justify-center hover:opacity-80 transition-opacity py-1 select-none"
               >
-                <SumasEmblem className="h-6 w-auto object-contain" />
+                <SumasEmblem className="h-7 w-auto object-contain" />
               </div>
             ) : (
               <div 
                 onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
-                className="cursor-pointer py-0.5 flex items-center"
+                className="cursor-pointer py-1 flex items-center"
               >
-                <SumasLogo className="h-6 w-auto object-contain" />
+                <SumasLogo className="h-7 w-auto object-contain" />
               </div>
             )}
           </div>
