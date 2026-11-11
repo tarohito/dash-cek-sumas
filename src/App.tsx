@@ -4328,16 +4328,9 @@ export default function App() {
                 <p className="text-sm font-bold text-slate-700 dark:text-zinc-200 truncate">
                   {currentUser ? currentUser.name : 'Super Admin'}
                 </p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                    (currentUser?.role === 'Administrator' || isSuperAdmin)
-                      ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
-                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
-                  }`}>
-                    <UserCheck size={11} />
-                    <span>{currentUser?.role || (isSuperAdmin ? 'Administrator' : 'Operator')}</span>
-                  </span>
-                </div>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium truncate mt-0.5">
+                  {currentUser?.role || (isSuperAdmin ? 'Administrator' : 'Operator')}
+                </p>
               </div>
             )}
           </div>
