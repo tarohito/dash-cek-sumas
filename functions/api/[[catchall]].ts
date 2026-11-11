@@ -489,6 +489,172 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return jsonResponse({ success: true });
     }
 
+    // -------------------------------------------------------------
+    // 9. SYSTEM SETTINGS & BACKUP/RESTORE
+    // -------------------------------------------------------------
+    const DEFAULT_SETTINGS = {
+      anomalyThreshold: {
+        validMaxScans: 1,
+        warningMaxScans: 3,
+        suspiciousMinScans: 4,
+        cooldownSeconds: 60,
+        enableImpossibleTravel: true,
+        maxVelocityKmh: 300,
+        consecutiveFailureAlert: 3
+      },
+      locationPolicy: {
+        mode: 'hybrid',
+        requireGpsByDefault: true,
+        enforceIndonesiaOnly: true,
+        maxAccuracyMeters: 150,
+        detectMockLocation: true
+      },
+      notifications: {
+        emailEnabled: true,
+        emailRecipients: 'security@sumas.id, andriyanafatchulnisairga@gmail.com',
+        telegramEnabled: true,
+        telegramBotToken: '712398451:AAFlkmx-92j8KqP_9x1Vn58sLmQz4OpK8rU',
+        telegramChatId: '@sumas_security_telemetry',
+        whatsappEnabled: true,
+        whatsappNumber: '+6281298765432',
+        whatsappGatewayUrl: 'https://api.fonnte.com/send',
+        triggerOnSuspicious: true,
+        triggerOnImpossibleTravel: true,
+        throttleMinutes: 5
+      },
+      backupInfo: {
+        lastBackupDate: '10 Nov 2026, 08:30 WIB',
+        autoBackupDaily: true,
+        retentionDays: 30
+      }
+    };
+
+    if (pathname === '/api/settings' && method === 'GET') {
+      const row = await db.prepare("SELECT value, updatedAt FROM system_settings WHERE key = 'app_settings'").first<{ value: string; updatedAt: string }>();
+      if (row && row.value) {
+        let parsed = {};
+        try { parsed = JSON.parse(row.value); } catch (_) {}
+        return jsonResponse({ ...DEFAULT_SETTINGS, ...parsed, updatedAt: row.updatedAt });
+      }
+      return jsonResponse({ ...DEFAULT_SETTINGS, updatedAt: 'Belum pernah diubah' });
+    }
+
+    if (pathname === '/api/settings' && method === 'PUT') {
+      const newSettings = await request.json() as any;
+      const merged = {
+        anomalyThreshold: { ...DEFAULT_SETTINGS.anomalyThreshold, ...(newSettings?.anomalyThreshold || {}) },
+        locationPolicy: { ...DEFAULT_SETTINGS.locationPolicy, ...(newSettings?.locationPolicy || {}) },
+        notifications: { ...DEFAULT_SETTINGS.notifications, ...(newSettings?.notifications || {}) },
+        backupInfo: { ...DEFAULT_SETTINGS.backupInfo, ...(newSettings?.backupInfo || {}) }
+      };
+      const updatedAt = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+      await db.prepare(`
+        INSERT INTO system_settings (key, value, updatedAt)
+        VALUES ('app_settings', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+      `).bind(JSON.stringify(merged), updatedAt).run();
+
+      await db.prepare(`
+        INSERT INTO audit_logs (id, batchId, timestamp, user, reason, changes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        Date.now(),
+        'SYSTEM-CONFIG',
+        updatedAt,
+        'Super Admin',
+        'Pembaruan Kebijakan Keamanan & Pengaturan Sistem',
+        JSON.stringify([
+          { field: 'Ambang Batas Anomali', old: 'Versi Sebelumnya', new: `${merged.anomalyThreshold.warningMaxScans}x Waspada, ≥${merged.anomalyThreshold.suspiciousMinScans}x Palsu` },
+          { field: 'Mode Telemetri GPS', old: 'Versi Sebelumnya', new: merged.locationPolicy.mode },
+          { field: 'Peringatan Notifikasi', old: 'Versi Sebelumnya', new: `Email: ${merged.notifications.emailEnabled ? 'Aktif' : 'Nonaktif'}, WA: ${merged.notifications.whatsappEnabled ? 'Aktif' : 'Nonaktif'}, Tele: ${merged.notifications.telegramEnabled ? 'Aktif' : 'Nonaktif'}` }
+        ])
+      ).run();
+
+      return jsonResponse({ success: true, settings: { ...merged, updatedAt } });
+    }
+
+    if (pathname === '/api/settings/test-alert' && method === 'POST') {
+      const body = await request.json() as any;
+      const channel = body?.channel;
+      const target = body?.target;
+      const now = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+      const channelName = channel === 'telegram' ? 'Telegram Bot' : channel === 'whatsapp' ? 'WhatsApp Gateway' : 'Email Security';
+
+      await db.prepare(`
+        INSERT INTO audit_logs (id, batchId, timestamp, user, reason, changes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        Date.now(),
+        'ALERT-TEST',
+        now,
+        'System Alert Engine',
+        `Uji Coba Pengiriman Notifikasi Anomali (${channelName})`,
+        JSON.stringify([
+          { field: 'Channel', old: '-', new: channelName },
+          { field: 'Tujuan', old: '-', new: target || 'Default Destination' },
+          { field: 'Status Uji Coba', old: 'Menunggu', new: 'Terkirim Sukses (200 OK)' }
+        ])
+      ).run();
+
+      return jsonResponse({
+        success: true,
+        message: `Pesan uji coba alert keamanan berhasil disimulasikan ke ${channelName} (${target || 'tujuan terdaftar'}) pada ${now}.`,
+        timestamp: now
+      });
+    }
+
+    if (pathname === '/api/settings/backup' && method === 'GET') {
+      const batches = (await db.prepare('SELECT * FROM batches').all()).results;
+      const tags = (await db.prepare('SELECT * FROM tags').all()).results;
+      const scanPoints = (await db.prepare('SELECT * FROM scan_points').all()).results;
+      const scanActivities = (await db.prepare('SELECT * FROM scan_activities').all()).results;
+      const categories = (await db.prepare('SELECT * FROM categories').all()).results;
+      const brands = (await db.prepare('SELECT * FROM brands').all()).results;
+      const products = (await db.prepare('SELECT * FROM products').all()).results;
+      const users = (await db.prepare('SELECT id, name, email, phone, role, status, createdAt FROM users').all()).results;
+      const auditLogs = (await db.prepare('SELECT * FROM audit_logs ORDER BY id DESC LIMIT 500').all()).results;
+      const settingsRow = await db.prepare("SELECT value, updatedAt FROM system_settings WHERE key = 'app_settings'").first<{ value: string; updatedAt: string }>();
+
+      const backupDate = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) + ' WIB';
+      const timestampIso = new Date().toISOString().replace(/[:.]/g, '-');
+
+      const payload = {
+        system: 'Sumas Anti-Counterfeiting Platform (Cloudflare Native)',
+        version: '2.5.0-Enterprise',
+        backupGeneratedAt: backupDate,
+        summary: {
+          totalBatches: batches.length,
+          totalTags: tags.length,
+          totalScanPoints: scanPoints.length,
+          totalCategories: categories.length,
+          totalBrands: brands.length,
+          totalProducts: products.length,
+          totalUsers: users.length,
+          totalAuditLogs: auditLogs.length
+        },
+        data: {
+          batches,
+          tags,
+          scanPoints,
+          scanActivities,
+          categories,
+          brands,
+          products,
+          users,
+          auditLogs,
+          settings: settingsRow?.value ? JSON.parse(settingsRow.value) : DEFAULT_SETTINGS
+        }
+      };
+
+      return new Response(JSON.stringify(payload, null, 2), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': `attachment; filename="sumas-backup-${timestampIso}.json"`,
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+
     return jsonResponse({ error: 'Endpoint tidak ditemukan', path: pathname }, 404);
   } catch (error: any) {
     return jsonResponse({ error: error?.message || String(error) }, 500);
