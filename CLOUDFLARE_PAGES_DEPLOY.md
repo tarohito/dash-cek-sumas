@@ -23,7 +23,7 @@ Repositori ini telah disiapkan dengan arsitektur **Full Cloudflare Native**:
 ## 🚀 Langkah 2: Deploy dari GitHub di Cloudflare Pages
 
 1. Masuk ke menu **Workers & Pages** > **Create application** > Tab **Pages**.
-2. Pilih **Connect to Git** dan pilih repositori GitHub Anda: `dash.cek.sumas`.
+2. Pilih **Connect to Git** dan pilih repositori GitHub Anda: `dash-cek-sumas`.
 3. Isi konfigurasi build:
    * **Project name:** `dash-cek-sumas`
    * **Production branch:** `main`

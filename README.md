@@ -1,4 +1,4 @@
-# dash.cek.sumas
+# dash-cek-sumas
 
 > Dasbor Pemantauan Geolokasi Pemindaian & Manajemen Tag Fisik Produk SUMAS.
 
@@ -41,8 +41,8 @@ Aplikasi manajemen dan pemantauan distribusi tag fisik QR Code verifikasi keasli
 
 1. **Clone repositori**:
    ```bash
-   git clone https://github.com/tarohito/dash.cek.sumas.git
-   cd dash.cek.sumas
+   git clone https://github.com/tarohito/dash-cek-sumas.git
+   cd dash-cek-sumas
    ```
 
 2. **Pasang dependensi**:
