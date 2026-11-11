@@ -4178,8 +4178,8 @@ export default function App() {
           }} 
           className={`group flex items-center transition-all ${
             isMin 
-              ? 'justify-center w-10 h-10 min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full aspect-square mx-auto p-0 shrink-0' 
-              : 'gap-3 rounded-full w-full px-4 py-2.5 text-xs sm:text-sm'
+              ? 'justify-center w-9 h-9 min-w-[36px] min-h-[36px] max-w-[36px] max-h-[36px] rounded-full aspect-square mx-auto p-0 shrink-0' 
+              : 'gap-2.5 rounded-xl w-full px-3 py-2 text-xs sm:text-[13px]'
           } ${
             isSelected 
               ? 'bg-[#fcf7f3] dark:bg-zinc-800 text-[#c28e62] font-semibold border border-[#cd9a6f]/30 dark:border-zinc-700' 
@@ -4200,112 +4200,112 @@ export default function App() {
     };
 
     return (
-      <div className="flex flex-col justify-between h-full bg-white dark:bg-zinc-900">
-        <div>
-          <div className={`h-16 flex items-center border-b border-slate-100 dark:border-zinc-700 relative ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : 'px-5'}`}>
-            <div className={`flex items-center gap-2 overflow-hidden w-full ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : ''}`}>
-              {isSidebarMinimized && !isMobile ? (
-                <div 
-                  onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
-                  className="cursor-pointer flex items-center justify-center hover:opacity-80 transition-opacity py-1 select-none"
-                >
-                  <SumasEmblem className="h-7 w-auto object-contain" />
-                </div>
-              ) : (
-                <div 
-                  onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
-                  className="cursor-pointer py-1 flex items-center"
-                >
-                  <SumasLogo className="h-7 w-auto object-contain" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SIDEBAR NAVIGATION ITEMS (SCOPED PER ROLE) */}
-          <div className={`${isSidebarMinimized && !isMobile ? 'px-2 flex flex-col items-center' : 'px-3.5'} py-4 space-y-1.5`}>
-            <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-
-            {isSuperAdmin ? (
-              <>
-                {/* MASTER DATA SECTION (SUPER ADMIN) */}
-                {(!isSidebarMinimized || isMobile) && (
-                  <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">
-                      Master Data
-                    </span>
-                    <span className="w-8 h-px bg-slate-200 dark:bg-zinc-700/60"></span>
-                  </div>
-                )}
-                
-                <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
-                  <NavItem id="brand" icon={Building2} label="Brand / Merk" />
-                  <NavItem id="category" icon={Layers} label="Kategori Produk" />
-                  <NavItem id="sku" icon={Box} label="SKU Produk" />
-                  <NavItem id="tag-qr" icon={QrCode} label="Tag / QRCode" />
-                </div>
-
-                {/* SISTEM & OPERASIONAL SECTION (SUPER ADMIN) */}
-                {(!isSidebarMinimized || isMobile) && (
-                  <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-widest uppercase">
-                      Sistem & Log
-                    </span>
-                    <span className="w-8 h-px bg-slate-200 dark:bg-zinc-700/60"></span>
-                  </div>
-                )}
-
-                <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
-                  <NavItem id="scan" icon={Scan} label="Aktivitas Scan" />
-                  <NavItem id="users" icon={Users} label="Akun Pengguna" />
-                  <NavItem id="settings" icon={Settings} label="Pengaturan" />
-                </div>
-              </>
+      <div className="flex flex-col h-full bg-white dark:bg-zinc-900 overflow-hidden">
+        {/* TOP HEADER LOGO */}
+        <div className={`h-14 flex items-center border-b border-slate-100 dark:border-zinc-800 flex-shrink-0 relative ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : 'px-4'}`}>
+          <div className={`flex items-center gap-2 overflow-hidden w-full ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : ''}`}>
+            {isSidebarMinimized && !isMobile ? (
+              <div 
+                onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
+                className="cursor-pointer flex items-center justify-center hover:opacity-80 transition-opacity py-0.5 select-none"
+              >
+                <SumasEmblem className="h-6 w-auto object-contain" />
+              </div>
             ) : (
-              <>
-                {/* BRAND OWNER SCOPE SECTION */}
-                {(!isSidebarMinimized || isMobile) && (
-                  <div className="pt-4 pb-1.5 px-3.5 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-[#c28e62] tracking-wider uppercase truncate">
-                      Brand: {activeBrandName}
-                    </span>
-                    <span className="w-6 h-px bg-[#cd9a6f]/40"></span>
-                  </div>
-                )}
-
-                <div className={`space-y-1.5 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
-                  <NavItem id="sku" icon={Box} label={`Katalog SKU (${activeBrandName})`} />
-                  <NavItem id="tag-qr" icon={QrCode} label={`Batch Tag (${activeBrandName})`} />
-                  <NavItem id="scan" icon={Scan} label={`Aktivitas Scan (${activeBrandName})`} />
-                </div>
-
-                {/* INFORMATIONAL NOTICE: READ-ONLY & SCOPE RULE */}
-                {(!isSidebarMinimized || isMobile) && (
-                  <div className="mt-5 p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/60 text-[11px] space-y-1 text-slate-500 dark:text-zinc-400">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-zinc-300">
-                      <Lock size={12} className="text-[#c28e62]" />
-                      <span>Hak Akses Terisolasi</span>
-                    </div>
-                    <p className="leading-snug">
-                      Data terbatas pada brand <strong>{activeBrandName}</strong>.
-                      {isCurrentBrandB2B ? (
-                        <span className="block mt-1 text-blue-600 dark:text-blue-400 font-medium">
-                          🏗️ Brand B2B: Alokasi proyek fisik aktif.
-                        </span>
-                      ) : (
-                        <span className="block mt-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                          🛍️ Brand Retail: Distribusi langsung ke konsumen akhir.
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </>
+              <div 
+                onClick={() => requestLeaveSkuPage(() => setActiveMenu('dashboard'))}
+                className="cursor-pointer py-0.5 flex items-center"
+              >
+                <SumasLogo className="h-6 w-auto object-contain" />
+              </div>
             )}
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-100 dark:border-zinc-700">
+        {/* SIDEBAR NAVIGATION ITEMS (SCROLLABLE INNER) */}
+        <div className={`flex-1 overflow-y-auto overflow-x-hidden ${isSidebarMinimized && !isMobile ? 'px-1.5 flex flex-col items-center' : 'px-2.5'} py-2 space-y-1`}>
+          <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+
+          {isSuperAdmin ? (
+            <>
+              {/* MASTER DATA SECTION (SUPER ADMIN) */}
+              {(!isSidebarMinimized || isMobile) && (
+                <div className="pt-2 pb-0.5 px-3 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-wider uppercase">
+                    Master Data
+                  </span>
+                  <span className="w-6 h-px bg-slate-200 dark:bg-zinc-800"></span>
+                </div>
+              )}
+              
+              <div className={`space-y-1 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
+                <NavItem id="brand" icon={Building2} label="Brand / Merk" />
+                <NavItem id="category" icon={Layers} label="Kategori Produk" />
+                <NavItem id="sku" icon={Box} label="SKU Produk" />
+                <NavItem id="tag-qr" icon={QrCode} label="Tag / QRCode" />
+              </div>
+
+              {/* SISTEM & OPERASIONAL SECTION (SUPER ADMIN) */}
+              {(!isSidebarMinimized || isMobile) && (
+                <div className="pt-2 pb-0.5 px-3 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 tracking-wider uppercase">
+                    Sistem & Log
+                  </span>
+                  <span className="w-6 h-px bg-slate-200 dark:bg-zinc-800"></span>
+                </div>
+              )}
+
+              <div className={`space-y-1 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
+                <NavItem id="scan" icon={Scan} label="Aktivitas Scan" />
+                <NavItem id="users" icon={Users} label="Akun Pengguna" />
+                <NavItem id="settings" icon={Settings} label="Pengaturan" />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* BRAND OWNER SCOPE SECTION */}
+              {(!isSidebarMinimized || isMobile) && (
+                <div className="pt-2 pb-0.5 px-3 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-[#c28e62] tracking-wider uppercase truncate">
+                    Brand: {activeBrandName}
+                  </span>
+                  <span className="w-5 h-px bg-[#cd9a6f]/40"></span>
+                </div>
+              )}
+
+              <div className={`space-y-1 ${isSidebarMinimized && !isMobile ? 'w-full flex flex-col items-center' : ''}`}>
+                <NavItem id="sku" icon={Box} label={`Katalog SKU (${activeBrandName})`} />
+                <NavItem id="tag-qr" icon={QrCode} label={`Batch Tag (${activeBrandName})`} />
+                <NavItem id="scan" icon={Scan} label={`Aktivitas Scan (${activeBrandName})`} />
+              </div>
+
+              {/* INFORMATIONAL NOTICE: READ-ONLY & SCOPE RULE */}
+              {(!isSidebarMinimized || isMobile) && (
+                <div className="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/60 text-[11px] space-y-1 text-slate-500 dark:text-zinc-400">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-zinc-300">
+                    <Lock size={12} className="text-[#c28e62]" />
+                    <span>Hak Akses Terisolasi</span>
+                  </div>
+                  <p className="leading-snug">
+                    Data terbatas pada brand <strong>{activeBrandName}</strong>.
+                    {isCurrentBrandB2B ? (
+                      <span className="block mt-1 text-blue-600 dark:text-blue-400 font-medium">
+                        🏗️ Brand B2B: Alokasi proyek fisik aktif.
+                      </span>
+                    ) : (
+                      <span className="block mt-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                        🛍️ Brand Retail: Distribusi langsung ke konsumen akhir.
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* BOTTOM USER PROFILE CARD */}
+        <div className="p-3 border-t border-slate-100 dark:border-zinc-800 flex-shrink-0 bg-white dark:bg-zinc-900">
           <div className={`flex items-center gap-3 ${isSidebarMinimized && !isMobile ? 'justify-center px-0' : 'px-2'}`}>
             {currentUser?.avatar ? (
               <img 
@@ -4316,10 +4316,10 @@ export default function App() {
                   el.onerror = null;
                   el.src = getInitialsAvatar(currentUser.name);
                 }}
-                className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-[#c28e62]/40" 
+                className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-[#c28e62]/40" 
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-[#c28e62] flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 aspect-square overflow-hidden">
+              <div className="w-9 h-9 rounded-full bg-[#c28e62] flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 aspect-square overflow-hidden">
                 {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : (isSuperAdmin ? 'SA' : isBrandB2B ? 'SM' : 'RT')}
               </div>
             )}
