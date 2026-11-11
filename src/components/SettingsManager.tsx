@@ -203,7 +203,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     emailEnabled: true,
     emailRecipients: 'security@sumas.id, andriyanafatchulnisairga@gmail.com',
     telegramEnabled: true,
-    telegramBotToken: '712398451:AAFlkmx-92j8KqP_9x1Vn58sLmQz4OpK8rU',
+    telegramBotToken: '',
     telegramChatId: '@sumas_security_telemetry',
     whatsappEnabled: true,
     whatsappNumber: '+6281298765432',
