@@ -286,22 +286,36 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const id = batchIdMatch[1];
       if (method === 'PUT') {
         const body = await request.json() as any;
+        const existing = await db.prepare('SELECT * FROM batches WHERE id = ?').bind(id).first<any>();
+        if (!existing) {
+          return jsonResponse({ error: 'Batch tidak ditemukan' }, 404);
+        }
+        const updated = {
+          sku: body.sku !== undefined ? body.sku : existing.sku,
+          brand: body.brand !== undefined ? body.brand : existing.brand,
+          specs: body.specs !== undefined ? body.specs : existing.specs,
+          status: body.status !== undefined ? body.status : existing.status,
+          redirectUrl: body.redirectUrl !== undefined ? body.redirectUrl : (existing.redirectUrl || 'https://cek.sumas.id/'),
+          qrType: body.qrType !== undefined ? body.qrType : (existing.qrType || 'dynamic'),
+          requirePin: body.requirePin !== undefined ? (body.requirePin ? 1 : 0) : existing.requirePin,
+          enableGps: body.enableGps !== undefined ? (body.enableGps ? 1 : 0) : existing.enableGps
+        };
         await db.prepare(`
           UPDATE batches 
           SET sku = ?, brand = ?, specs = ?, status = ?, redirectUrl = ?, qrType = ?, requirePin = ?, enableGps = ?
           WHERE id = ?
         `).bind(
-          body.sku,
-          body.brand,
-          body.specs,
-          body.status,
-          body.redirectUrl || 'https://cek.sumas.id/',
-          body.qrType || 'dynamic',
-          body.requirePin ? 1 : 0,
-          body.enableGps ? 1 : 0,
+          updated.sku,
+          updated.brand,
+          updated.specs,
+          updated.status,
+          updated.redirectUrl,
+          updated.qrType,
+          updated.requirePin,
+          updated.enableGps,
           id
         ).run();
-        return jsonResponse({ success: true, id });
+        return jsonResponse({ success: true, id, ...updated });
       }
 
       if (method === 'DELETE') {
@@ -334,10 +348,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const id = brandIdMatch[1];
       if (method === 'PUT') {
         const b = await request.json() as any;
+        const existing = await db.prepare('SELECT * FROM brands WHERE id = ?').bind(id).first<any>();
+        if (!existing) {
+          return jsonResponse({ error: 'Brand tidak ditemukan' }, 404);
+        }
+        const updated = {
+          name: b.name !== undefined ? b.name : existing.name,
+          owner: b.owner !== undefined ? b.owner : (existing.owner || ''),
+          description: b.description !== undefined ? b.description : (existing.description || ''),
+          status: b.status !== undefined ? b.status : (existing.status || 'Aktif'),
+          logo: b.logo !== undefined ? b.logo : (existing.logo || '')
+        };
         await db.prepare(`
           UPDATE brands SET name = ?, owner = ?, description = ?, status = ?, logo = ? WHERE id = ?
-        `).bind(b.name, b.owner || '', b.description || '', b.status || 'Aktif', b.logo || '', id).run();
-        return jsonResponse({ success: true, id });
+        `).bind(updated.name, updated.owner, updated.description, updated.status, updated.logo, id).run();
+        return jsonResponse({ success: true, id, ...updated });
       }
       if (method === 'DELETE') {
         await db.prepare('DELETE FROM brands WHERE id = ?').bind(id).run();
@@ -368,10 +393,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const id = prodIdMatch[1];
       if (method === 'PUT') {
         const p = await request.json() as any;
+        const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<any>();
+        if (!existing) {
+          return jsonResponse({ error: 'Produk tidak ditemukan' }, 404);
+        }
+        const updated = {
+          name: p.name !== undefined ? p.name : existing.name,
+          brand: p.brand !== undefined ? p.brand : existing.brand,
+          category: p.category !== undefined ? p.category : (existing.category || ''),
+          description: p.description !== undefined ? p.description : (existing.description || ''),
+          skuCode: p.skuCode !== undefined ? p.skuCode : (existing.skuCode || ''),
+          image: p.image !== undefined ? p.image : (existing.image || '')
+        };
         await db.prepare(`
           UPDATE products SET name = ?, brand = ?, category = ?, description = ?, skuCode = ?, image = ? WHERE id = ?
-        `).bind(p.name, p.brand, p.category || '', p.description || '', p.skuCode || '', p.image || '', id).run();
-        return jsonResponse({ success: true, id });
+        `).bind(updated.name, updated.brand, updated.category, updated.description, updated.skuCode, updated.image, id).run();
+        return jsonResponse({ success: true, id, ...updated });
       }
       if (method === 'DELETE') {
         await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
@@ -434,10 +471,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const id = userIdMatch[1];
       if (method === 'PUT') {
         const u = await request.json() as any;
+        const existing = await db.prepare('SELECT * FROM users WHERE id = ?').bind(id).first<any>();
+        if (!existing) {
+          return jsonResponse({ error: 'User tidak ditemukan' }, 404);
+        }
+        const updated = {
+          name: u.name !== undefined ? u.name : existing.name,
+          username: u.username !== undefined ? u.username : existing.username,
+          email: u.email !== undefined ? u.email : existing.email,
+          phone: u.phone !== undefined ? u.phone : (existing.phone || ''),
+          role: u.role !== undefined ? u.role : (existing.role || 'Staff'),
+          status: u.status !== undefined ? u.status : (existing.status || 'Aktif')
+        };
         await db.prepare(`
           UPDATE users SET name = ?, username = ?, email = ?, phone = ?, role = ?, status = ? WHERE id = ?
-        `).bind(u.name, u.username || u.email, u.email, u.phone || '', u.role || 'Staff', u.status || 'Aktif', id).run();
-        return jsonResponse({ success: true, id });
+        `).bind(updated.name, updated.username, updated.email, updated.phone, updated.role, updated.status, id).run();
+        return jsonResponse({ success: true, id, ...updated });
       }
       if (method === 'DELETE') {
         await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();

@@ -2292,16 +2292,18 @@ export default function App() {
   };
 
   const handleToggleBrandStatus = async (brand: BrandItem) => {
+    const prevStatus = brand.status;
     const nextStatus = brand.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
     setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, status: nextStatus } : b));
-    triggerAlert(
-      'Status Brand Diperbarui',
-      `Brand "${brand.name}" berhasil diubah menjadi: ${nextStatus}`,
-      nextStatus === 'Aktif' ? 'success' : 'warning'
-    );
     try {
       await api.updateBrand(brand.id, { status: nextStatus });
+      triggerAlert(
+        'Status Brand Diperbarui',
+        `Brand "${brand.name}" berhasil diubah menjadi: ${nextStatus}`,
+        nextStatus === 'Aktif' ? 'success' : 'warning'
+      );
     } catch (err) {
+      setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, status: prevStatus } : b));
       console.error('Gagal ubah status brand:', err);
       triggerAlert(
         'Gagal Mengubah Status',
@@ -2312,17 +2314,19 @@ export default function App() {
   };
 
   const handleToggleUserStatus = async (user: UserItem) => {
-    const nextStatus = (user.status || 'Aktif') === 'Aktif' ? 'Nonaktif' : 'Aktif';
+    const prevStatus = user.status || 'Aktif';
+    const nextStatus = prevStatus === 'Aktif' ? 'Nonaktif' : 'Aktif';
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: nextStatus } : u));
-    triggerAlert(
-      'Status Akun Diperbarui',
-      `Akun pengguna "${user.name}" berhasil diubah menjadi: ${nextStatus}`,
-      nextStatus === 'Aktif' ? 'success' : 'warning'
-    );
     try {
       await api.updateUser(user.id, { status: nextStatus });
+      triggerAlert(
+        'Status Akun Diperbarui',
+        `Akun pengguna "${user.name}" berhasil diubah menjadi: ${nextStatus}`,
+        nextStatus === 'Aktif' ? 'success' : 'warning'
+      );
     } catch (err) {
-      console.error('Gagal ubah status akun pengguna di SQLite:', err);
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: prevStatus } : u));
+      console.error('Gagal ubah status akun pengguna:', err);
       triggerAlert(
         'Gagal Mengubah Status',
         'Terjadi kesalahan saat memperbarui status akun pengguna.',
