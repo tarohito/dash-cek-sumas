@@ -15,9 +15,17 @@ interface Env {
   DB: D1Database;
 }
 
+const escapeHtml = (input: unknown): string =>
+  String(input ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const { params, env, request } = context;
-  const tagNumber = params.tagNumber as string;
+  const tagNumber = decodeURIComponent(String(params.tagNumber || ''));
 
   if (!env.DB) {
     return new Response('Database tidak terhubung.', { status: 500 });
@@ -45,7 +53,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           <div class="card">
             <h2>Tag Tidak Terdaftar</h2>
             <p>Nomor tag fisik berikut tidak terdata pada sistem verifikasi keamanan:</p>
-            <div class="badge">${tagNumber}</div>
+            <div class="badge">${escapeHtml(tagNumber)}</div>
           </div>
         </body>
       </html>
@@ -56,9 +64,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   const batch = await env.DB.prepare('SELECT * FROM batches WHERE id = ?').bind(tag.batchId).first<any>();
-  const targetUrl = (batch && batch.redirectUrl && batch.redirectUrl.trim())
-    ? batch.redirectUrl.trim()
-    : 'https://cek.sumas.id/';
+  const rawTarget = (batch && batch.redirectUrl && batch.redirectUrl.trim()) ? batch.redirectUrl.trim() : 'https://cek.sumas.id/';
+  const targetUrl = /^https?:\/\//i.test(rawTarget) ? rawTarget : 'https://cek.sumas.id/';
 
   const settingsRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'app_settings'").first<{ value: string }>();
   let settings = mergeSystemSettings(DEFAULT_SYSTEM_SETTINGS);

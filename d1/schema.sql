@@ -2,7 +2,7 @@
 -- Cloudflare D1 Database Schema for SUMAS
 -- ==========================================
 
-CREATE TABLE batches (
+CREATE TABLE IF NOT EXISTS batches (
     id TEXT PRIMARY KEY,
     batchId TEXT NOT NULL,
     date TEXT NOT NULL,
@@ -15,13 +15,13 @@ CREATE TABLE batches (
     status TEXT NOT NULL,
     isB2B INTEGER NOT NULL,
     tags TEXT,
-    redirectUrl TEXT DEFAULT 'https://cek.sumas.id/verify',
+    redirectUrl TEXT DEFAULT 'https://cek.sumas.id/',
     qrType TEXT DEFAULT 'dynamic',
     requirePin INTEGER DEFAULT 1,
     enableGps INTEGER DEFAULT 1
   );
 
-CREATE TABLE tags (
+CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY,
     batchId TEXT NOT NULL,
     tagNumber TEXT NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE tags (
     allocatedAt TEXT
   );
 
-CREATE TABLE scan_points (
+CREATE TABLE IF NOT EXISTS scan_points (
     id TEXT PRIMARY KEY,
     city TEXT NOT NULL,
     province TEXT NOT NULL,
@@ -49,15 +49,17 @@ CREATE TABLE scan_points (
     productType TEXT,
     batchId TEXT,
     latestTagId TEXT,
+    pin TEXT,
     latestTime TEXT,
     isB2B INTEGER DEFAULT 0,
     status TEXT DEFAULT 'valid',
     anomalyReason TEXT,
     deviceInfo TEXT,
+    scanHistory TEXT,
     createdAt TEXT
-  , pin TEXT, scanHistory TEXT);
+  , updatedAt INTEGER);
 
-CREATE TABLE scan_activities (
+CREATE TABLE IF NOT EXISTS scan_activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     rangeType TEXT NOT NULL,
     label TEXT NOT NULL,
@@ -68,7 +70,7 @@ CREATE TABLE scan_activities (
     sortOrder INTEGER NOT NULL
   );
 
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY,
     batchId TEXT NOT NULL,
     timestamp TEXT NOT NULL,
@@ -77,7 +79,7 @@ CREATE TABLE audit_logs (
     changes TEXT NOT NULL
   );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     username TEXT,
@@ -89,7 +91,7 @@ CREATE TABLE users (
     createdAt TEXT
   , password TEXT);
 
-CREATE TABLE brands (
+CREATE TABLE IF NOT EXISTS brands (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     logo TEXT,
@@ -99,20 +101,25 @@ CREATE TABLE brands (
     ownerRole TEXT,
     description TEXT,
     category TEXT,
+    businessType TEXT DEFAULT 'Retail',
     status TEXT NOT NULL,
     createdAt TEXT NOT NULL
   );
 
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id TEXT PRIMARY KEY,
     brandId TEXT,
     brandName TEXT NOT NULL,
     sku TEXT NOT NULL,
     category TEXT,
-    isB2B INTEGER DEFAULT 0
-  , description TEXT, skuCode TEXT, createdAt TEXT, image TEXT);
+    isB2B INTEGER DEFAULT 0,
+    description TEXT,
+    createdAt TEXT,
+    skuCode TEXT,
+    image TEXT
+  );
 
-CREATE TABLE password_reset_requests (
+CREATE TABLE IF NOT EXISTS password_reset_requests (
     id TEXT PRIMARY KEY,
     userId TEXT,
     userName TEXT NOT NULL,
@@ -122,14 +129,37 @@ CREATE TABLE password_reset_requests (
     requestedAt TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Menunggu',
     actionNote TEXT,
-    isRead INTEGER DEFAULT 0
+    isRead INTEGER DEFAULT 0,
+    createdAtTs INTEGER
   );
 
-CREATE TABLE read_notifications (
-    id TEXT PRIMARY KEY
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'info',
+    audience TEXT NOT NULL DEFAULT 'brand_scope',
+    targetUserId TEXT,
+    brandName TEXT,
+    brandId TEXT,
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    description TEXT,
+    entityType TEXT,
+    entityId TEXT,
+    status TEXT DEFAULT 'info',
+    metadata TEXT,
+    dedupeKey TEXT,
+    createdAtTs INTEGER NOT NULL
   );
 
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS read_notifications (
+    userId TEXT NOT NULL,
+    notificationId TEXT NOT NULL,
+    readAt TEXT NOT NULL,
+    PRIMARY KEY (userId, notificationId)
+  );
+
+CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     parentId TEXT,
@@ -139,18 +169,47 @@ CREATE TABLE categories (
     status TEXT DEFAULT 'Aktif',
     itemCount INTEGER DEFAULT 0,
     orderIndex INTEGER DEFAULT 0,
-    createdAt TEXT NOT NULL
-  , specSchema TEXT);
+    createdAt TEXT NOT NULL,
+    specSchema TEXT
+  );
 
-CREATE INDEX idx_tags_batchId ON tags(batchId);
-CREATE INDEX idx_tags_status ON tags(status);
-CREATE INDEX idx_tags_search ON tags(batchId, status, tagNumber);
-CREATE INDEX idx_tags_pin ON tags(pin);
-CREATE INDEX idx_scan_points_status ON scan_points(status);
-CREATE INDEX idx_scan_points_brand ON scan_points(brand);
-CREATE INDEX idx_scan_activities_range ON scan_activities(rangeType, sortOrder);
-CREATE INDEX idx_audit_logs_batchId ON audit_logs(batchId);
-CREATE INDEX idx_categories_parent ON categories(parentId);
-CREATE INDEX idx_categories_level ON categories(level);
-CREATE INDEX idx_scan_points_tagId ON scan_points(latestTagId);
-CREATE INDEX idx_scan_points_pin ON scan_points(pin);
+CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
+CREATE TABLE IF NOT EXISTS server_secrets (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    tokenHash TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    expiresAt INTEGER NOT NULL,
+    ipAddress TEXT,
+    userAgent TEXT
+  );
+
+CREATE INDEX IF NOT EXISTS idx_tags_batchId ON tags(batchId);
+CREATE INDEX IF NOT EXISTS idx_tags_status ON tags(status);
+CREATE INDEX IF NOT EXISTS idx_tags_search ON tags(batchId, status, tagNumber);
+CREATE INDEX IF NOT EXISTS idx_tags_pin ON tags(pin);
+CREATE INDEX IF NOT EXISTS idx_scan_points_status ON scan_points(status);
+CREATE INDEX IF NOT EXISTS idx_scan_points_brand ON scan_points(brand);
+CREATE INDEX IF NOT EXISTS idx_scan_points_tagId ON scan_points(latestTagId);
+CREATE INDEX IF NOT EXISTS idx_scan_points_pin ON scan_points(pin);
+CREATE INDEX IF NOT EXISTS idx_scan_activities_range ON scan_activities(rangeType, sortOrder);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_batchId ON audit_logs(batchId);
+CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(createdAtTs DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_audience ON notifications(audience, createdAtTs DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_entity ON notifications(entityType, entityId);
+CREATE INDEX IF NOT EXISTS idx_notifications_dedupe ON notifications(dedupeKey, createdAtTs DESC);
+CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parentId);
+CREATE INDEX IF NOT EXISTS idx_categories_level ON categories(level);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_userId ON user_sessions(userId);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expiresAt ON user_sessions(expiresAt);
+CREATE INDEX IF NOT EXISTS idx_read_notifications_user ON read_notifications(userId);

@@ -185,8 +185,10 @@ interface SettingsManagerProps {
 
 export const SettingsManager: React.FC<SettingsManagerProps> = ({
   onAlert,
+  isSuperAdmin = true,
   currentUser,
 }) => {
+  const canManage = Boolean(isSuperAdmin);
   const [activeTab, setActiveTab] = useState<'anomaly' | 'location' | 'notifications' | 'backup'>('anomaly');
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -237,6 +239,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
     section: K,
     patch: Partial<SystemSettings[K]>
   ) => {
+    if (!canManage) return;
     setSettings((prev) => ({
       ...prev,
       [section]: {
@@ -248,6 +251,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   };
 
   const handleSaveSettings = async () => {
+    if (!canManage) return;
     setIsSaving(true);
     try {
       const res = await apiFetch('/api/settings', {
@@ -277,6 +281,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   };
 
   const handleTestAlert = async (channel: 'email' | 'telegram' | 'whatsapp', target: string) => {
+    if (!canManage) return;
     setTestingChannel(channel);
     try {
       const res = await apiFetch('/api/settings/test-alert', {
@@ -306,6 +311,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   };
 
   const handleDownloadBackup = async () => {
+    if (!canManage) return;
     setIsDownloadingBackup(true);
     try {
       const res = await apiFetch(`/api/settings/backup?format=${backupFormat}`);
@@ -361,6 +367,10 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   };
 
   const handleRestoreFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canManage) {
+      e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -389,7 +399,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   };
 
   const handleExecuteRestore = async () => {
-    if (!restoreFile) return;
+    if (!canManage || !restoreFile) return;
     setIsRestoring(true);
     try {
       const text = await restoreFile.text();
@@ -439,19 +449,27 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
           </div>
 
           <div className="flex items-center gap-3 self-start sm:self-auto">
-            {hasChanges && (
-              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                Belum disimpan
+            {canManage ? (
+              <>
+                {hasChanges && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                    Belum disimpan
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSaveSettings}
+                  disabled={isSaving || !hasChanges}
+                  className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                >
+                  <span>{isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}</span>
+                </button>
+              </>
+            ) : (
+              <span className="text-xs font-medium text-slate-500 dark:text-zinc-400 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700">
+                Mode Baca Saja
               </span>
             )}
-            <button
-              type="button"
-              onClick={handleSaveSettings}
-              disabled={isSaving || !hasChanges}
-              className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
-            >
-              <span>{isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}</span>
-            </button>
           </div>
         </div>
 
@@ -533,6 +551,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
                     <NumberInput
+                      disabled={!canManage}
                       min={2}
                       max={10}
                       step={1}
@@ -560,6 +579,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
                     <NumberInput
+                      disabled={!canManage}
                       min={10}
                       max={600}
                       step={10}
@@ -587,7 +607,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="flex items-center gap-2.5">
                       <NumberInput
-                        disabled={!settings.anomalyThreshold.enableImpossibleTravel}
+                        disabled={!canManage || !settings.anomalyThreshold.enableImpossibleTravel}
                         min={100}
                         max={1000}
                         step={50}
@@ -601,6 +621,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                       <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">km/jam</span>
                     </div>
                     <CustomCheckbox
+                      disabled={!canManage}
                       checked={settings.anomalyThreshold.enableImpossibleTravel}
                       onChange={(val) =>
                         handleUpdate('anomalyThreshold', {
@@ -653,8 +674,11 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                         <button
                           key={opt.value}
                           type="button"
+                          disabled={!canManage}
                           onClick={() => handleUpdate('locationPolicy', { mode: opt.value })}
-                          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 h-full ${
+                          className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2.5 h-full ${
+                            canManage ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'
+                          } ${
                             isActive
                               ? 'border-[#c28e62] bg-[#c28e62]/[0.04] dark:bg-[#c28e62]/10'
                               : 'border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-slate-300 dark:hover:border-zinc-700'
@@ -704,7 +728,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
                     <NumberInput
-                      disabled={settings.locationPolicy.mode === 'flexible'}
+                      disabled={!canManage || settings.locationPolicy.mode === 'flexible'}
                       min={20}
                       max={500}
                       step={10}
@@ -728,6 +752,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                     </span>
                   </div>
                   <CustomCheckbox
+                    disabled={!canManage}
                     checked={settings.locationPolicy.enforceIndonesiaOnly}
                     onChange={(val) => handleUpdate('locationPolicy', { enforceIndonesiaOnly: val })}
                   />
@@ -744,6 +769,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                     </span>
                   </div>
                   <CustomCheckbox
+                    disabled={!canManage}
                     checked={settings.locationPolicy.detectMockLocation}
                     onChange={(val) => handleUpdate('locationPolicy', { detectMockLocation: val })}
                   />
@@ -766,6 +792,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                       </span>
                     </div>
                     <CustomCheckbox
+                      disabled={!canManage}
                       checked={settings.notifications.emailEnabled}
                       onChange={(val) => handleUpdate('notifications', { emailEnabled: val })}
                     />
@@ -773,7 +800,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                   <div className="flex flex-col sm:flex-row gap-2.5">
                     <input
                       type="text"
-                      disabled={!settings.notifications.emailEnabled}
+                      disabled={!canManage || !settings.notifications.emailEnabled}
                       value={settings.notifications.emailRecipients}
                       onChange={(e) => handleUpdate('notifications', { emailRecipients: e.target.value })}
                       placeholder="security@sumas.id, admin@brand.com"
@@ -781,7 +808,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                     />
                     <button
                       type="button"
-                      disabled={!settings.notifications.emailEnabled || testingChannel === 'email'}
+                      disabled={!canManage || !settings.notifications.emailEnabled || testingChannel === 'email'}
                       onClick={() => handleTestAlert('email', settings.notifications.emailRecipients)}
                       className="h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shrink-0 active:scale-95"
                     >
@@ -889,6 +916,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                     </span>
                   </div>
                   <CustomCheckbox
+                    disabled={!canManage}
                     checked={settings.notifications.triggerOnSuspicious}
                     onChange={(val) => handleUpdate('notifications', { triggerOnSuspicious: val })}
                   />
@@ -905,6 +933,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                     </span>
                   </div>
                   <CustomCheckbox
+                    disabled={!canManage}
                     checked={settings.notifications.triggerOnImpossibleTravel}
                     onChange={(val) => handleUpdate('notifications', { triggerOnImpossibleTravel: val })}
                   />
@@ -922,6 +951,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
                     <NumberInput
+                      disabled={!canManage}
                       min={1}
                       max={120}
                       step={1}
@@ -1036,7 +1066,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
 
                     <button
                       type="button"
-                      disabled={isDownloadingBackup}
+                      disabled={!canManage || isDownloadingBackup}
                       onClick={handleDownloadBackup}
                       className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap shrink-0 active:scale-95"
                     >
@@ -1066,7 +1096,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="flex items-center gap-2.5">
                       <NumberInput
-                        disabled={!settings.backupInfo.autoBackupDaily}
+                        disabled={!canManage || !settings.backupInfo.autoBackupDaily}
                         min={1}
                         max={365}
                         step={1}
@@ -1078,6 +1108,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                       <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">Hari</span>
                     </div>
                     <CustomCheckbox
+                      disabled={!canManage}
                       checked={settings.backupInfo.autoBackupDaily}
                       onChange={(val) =>
                         handleUpdate('backupInfo', { autoBackupDaily: val })
@@ -1102,12 +1133,17 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
                       type="file"
                       id="cleanBackupInput"
                       accept=".json,application/json"
+                      disabled={!canManage}
                       onChange={handleRestoreFileChange}
                       className="hidden"
                     />
                     <label
-                      htmlFor="cleanBackupInput"
-                      className="w-full sm:w-auto h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                      htmlFor={canManage ? 'cleanBackupInput' : undefined}
+                      className={`w-full sm:w-auto h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all whitespace-nowrap ${
+                        canManage
+                          ? 'hover:bg-slate-50 dark:hover:bg-zinc-700 cursor-pointer active:scale-95'
+                          : 'opacity-50 cursor-not-allowed pointer-events-none'
+                      }`}
                     >
                       <span>Pilih Berkas (.json)</span>
                     </label>

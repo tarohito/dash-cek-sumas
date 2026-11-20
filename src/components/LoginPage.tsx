@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Eye,
   EyeOff,
@@ -46,6 +46,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [resetSuccessMessage, setResetSuccessMessage] = useState('');
   const [resetErrorMessage, setResetErrorMessage] = useState('');
   const [isSubmittingReset, setIsSubmittingReset] = useState(false);
+  const [demoAccounts, setDemoAccounts] = useState<Array<{ name?: string; role: string; email: string }>>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    apiFetch('/api/auth/demo-accounts')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setDemoAccounts(data);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const currentYear = new Date().getFullYear();
 
@@ -319,51 +335,40 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </form>
 
                 {/* Informasi Akun Login Sementara (klik untuk isi otomatis) */}
-                <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-2.5">
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500">
-                    <span className="font-semibold text-slate-500 dark:text-zinc-400">Akun Sementara</span>
-                    <span className="font-mono">Sandi: SumasPass2026!</span>
-                  </div>
-                  <div className="divide-y divide-slate-100 dark:divide-zinc-800/80 rounded-xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/40 overflow-hidden">
-                    {[
-                      {
-                        role: 'Super Admin',
-                        email: 'kalinggajeandy3@gmail.com',
-                      },
-                      {
-                        role: 'Admin Brand · 1 Brand (Sumas)',
-                        email: 'budi.s@sumas.id',
-                      },
-                      {
-                        role: 'Admin Brand · 3 Brand (Skintific, Somethinc, Whitelab)',
-                        email: 'rina.w@sumas.id',
-                      },
-                    ].map((acc) => (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        onClick={() => {
-                          setIdentifier(acc.email);
-                          setPassword('SumasPass2026!');
-                          setErrorMessage('');
-                        }}
-                        className="w-full px-3.5 py-2.5 text-left hover:bg-white dark:hover:bg-zinc-900 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-slate-700 dark:text-zinc-200">
-                            {acc.role}
+                {demoAccounts.length > 0 && (
+                  <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-2.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500">
+                      <span className="font-semibold text-slate-500 dark:text-zinc-400">Akun Terdaftar</span>
+                      <span className="font-mono">Sandi: SumasPass2026!</span>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-zinc-800/80 rounded-xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/40 overflow-hidden">
+                      {demoAccounts.map((acc) => (
+                        <button
+                          key={acc.email}
+                          type="button"
+                          onClick={() => {
+                            setIdentifier(acc.email);
+                            setPassword('SumasPass2026!');
+                            setErrorMessage('');
+                          }}
+                          className="w-full px-3.5 py-2.5 text-left hover:bg-white dark:hover:bg-zinc-900 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-slate-700 dark:text-zinc-200">
+                              {acc.role}
+                            </div>
+                            <div className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 truncate">
+                              {acc.email}
+                            </div>
                           </div>
-                          <div className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 truncate">
-                            {acc.email}
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-medium text-[#b07d53] dark:text-[#d4a379] opacity-80 group-hover:opacity-100 whitespace-nowrap shrink-0">
-                          Gunakan
-                        </span>
-                      </button>
-                    ))}
+                          <span className="text-[11px] font-medium text-[#b07d53] dark:text-[#d4a379] opacity-80 group-hover:opacity-100 whitespace-nowrap shrink-0">
+                            Gunakan
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="space-y-5">

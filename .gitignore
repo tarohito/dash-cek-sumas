@@ -9,3 +9,5 @@ coverage/
 *.sqlite*
 backups/
 .aistudio/
+.wrangler/
+.dev.vars

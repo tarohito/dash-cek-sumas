@@ -216,8 +216,8 @@ const formatDateTimeDisplay = (dateVal?: string | null, idVal?: string | null): 
   return dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-// Registry untuk mendeteksi brand B2B yang berhak alokasi proyek (seperti Sumas atau brand B2B lainnya)
-export const b2bBrandsRegistry = new Set<string>(['sumas']);
+// Registry untuk mendeteksi brand B2B yang berhak alokasi proyek (dinamis berdasarkan businessType di master database)
+export const b2bBrandsRegistry = new Set<string>();
 export const registerB2BBrand = (brandName: string, isB2B: boolean) => {
   const normalized = brandName.trim().toLowerCase();
   if (isB2B) {
@@ -233,7 +233,7 @@ export const isB2BBatch = (batch?: { brand?: string; isB2B?: number | boolean } 
   if (batch.isB2B === 0 || batch.isB2B === false) return false;
   if (!batch.brand) return false;
   const normalized = batch.brand.trim().toLowerCase();
-  return b2bBrandsRegistry.has(normalized) || normalized === 'sumas';
+  return b2bBrandsRegistry.has(normalized);
 };
 
 export const isSumasBatch = isB2BBatch;
@@ -256,8 +256,7 @@ export const BusinessTypeBadge: React.FC<{
 }) => {
   const isB2B = isB2BProp !== undefined && isB2BProp !== null
     ? Boolean(isB2BProp)
-    : (type === 'B2B' || 
-      (brandName ? brandName.trim().toLowerCase() === 'sumas' || b2bBrandsRegistry.has(brandName.trim().toLowerCase()) : false));
+    : (type === 'B2B' || (brandName ? b2bBrandsRegistry.has(brandName.trim().toLowerCase()) : false));
 
   const sizeClasses = size === 'md' 
     ? 'px-3.5 py-1 text-xs' 
@@ -970,18 +969,15 @@ export default function App() {
         project
       });
       const res = await apiFetch(`/api/batches/${batchId}/tags?${q.toString()}`);
-      if (!res.ok) throw new Error('Gagal memuat tags');
-      return res.json();
+      return parseApiResponse(res, 'Gagal memuat tags');
     },
     async getAllBatchTags(batchId: string) {
       const res = await apiFetch(`/api/batches/${batchId}/all-tags`);
-      if (!res.ok) throw new Error('Gagal memuat seluruh data tag batch');
-      return res.json();
+      return parseApiResponse(res, 'Gagal memuat seluruh data tag batch');
     },
     async getBatchSummary(batchId: string) {
       const res = await apiFetch(`/api/batches/${batchId}/summary`);
-      if (!res.ok) throw new Error('Gagal memuat ringkasan batch');
-      return res.json();
+      return parseApiResponse(res, 'Gagal memuat ringkasan batch');
     },
     async allocateTags(batchId: string, payload: any) {
       const res = await apiFetch(`/api/batches/${batchId}/allocate`, {
@@ -989,8 +985,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Gagal mengalokasikan tag');
-      return res.json();
+      return parseApiResponse(res, 'Gagal mengalokasikan tag');
     },
     async deallocateProject(batchId: string, project: string) {
       const res = await apiFetch(`/api/batches/${batchId}/deallocate`, {
@@ -998,8 +993,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project }),
       });
-      if (!res.ok) throw new Error('Gagal membatalkan alokasi');
-      return res.json();
+      return parseApiResponse(res, 'Gagal membatalkan alokasi');
     },
     async updateProject(batchId: string, payload: any) {
       const res = await apiFetch(`/api/batches/${batchId}/projects`, {
@@ -1007,13 +1001,11 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Gagal memperbarui data proyek');
-      return res.json();
+      return parseApiResponse(res, 'Gagal memperbarui data proyek');
     },
     async getAuditLogs() {
       const res = await apiFetch('/api/audit-logs');
-      if (!res.ok) throw new Error('Gagal memuat audit log');
-      return res.json();
+      return parseApiResponse(res, 'Gagal memuat audit log');
     },
     async createAuditLog(log: any) {
       const res = await apiFetch('/api/audit-logs', {
@@ -1021,18 +1013,15 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(log),
       });
-      if (!res.ok) throw new Error('Gagal menyimpan log');
-      return res.json();
+      return parseApiResponse(res, 'Gagal menyimpan log');
     },
     async getDashboardStats() {
       const res = await apiFetch('/api/dashboard/stats');
-      if (!res.ok) throw new Error('Gagal memuat stats');
-      return res.json();
+      return parseApiResponse(res, 'Gagal memuat stats');
     },
     async getBrands() {
       const res = await apiFetch('/api/brands');
-      if (!res.ok) throw new Error('Gagal memuat brands');
-      return res.json();
+      return parseApiResponse(res, 'Gagal memuat brands');
     },
     async createBrand(brand: any) {
       const res = await apiFetch('/api/brands', {
@@ -1159,18 +1148,12 @@ export default function App() {
       }
     },
     async markNotificationsRead(payload?: { id?: string; all?: boolean; ids?: string[] }) {
-      try {
-        const res = await apiFetch('/api/notifications/mark-read', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload || { all: true }),
-        });
-        if (!res.ok) throw new Error('Gagal menandai notifikasi');
-        return await res.json();
-      } catch (err) {
-        console.warn('Gagal menandai notifikasi di server:', err);
-        return { success: true };
-      }
+      const res = await apiFetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || { all: true }),
+      });
+      return parseApiResponse(res, 'Gagal menandai notifikasi');
     },
     async respondPasswordReset(id: string, action: 'approve' | 'reject', actionNote?: string) {
       const res = await apiFetch(`/api/password-resets/${id}/respond`, {
@@ -1362,7 +1345,7 @@ export default function App() {
   }, [users]);
 
   const handleToggleRbacPermission = (role: RoleName, perm: PermissionKey) => {
-    if (!canManageUsers || role === 'Super Admin') return;
+    if (!isAdminRole || role === 'Super Admin') return;
     setRbacDraft((prev) => {
       const current = prev[role] || [];
       const exists = current.includes(perm);
@@ -1372,7 +1355,7 @@ export default function App() {
   };
 
   const handleToggleRbacGroup = (role: RoleName, permKeys: PermissionKey[], enable: boolean) => {
-    if (!canManageUsers || role === 'Super Admin') return;
+    if (!isAdminRole || role === 'Super Admin') return;
     setRbacDraft((prev) => {
       const current = new Set(prev[role] || []);
       for (const key of permKeys) {
@@ -1384,7 +1367,7 @@ export default function App() {
   };
 
   const handleResetRbacDefaults = () => {
-    if (!canManageUsers) return;
+    if (!isAdminRole) return;
     setRbacDraft({
       'Super Admin': [...ALL_PERMISSIONS],
       'Admin Brand': [...DEFAULT_ROLE_PERMISSIONS['Admin Brand']],
@@ -1396,7 +1379,7 @@ export default function App() {
   };
 
   const handleSaveRbacMatrix = async () => {
-    if (!canManageUsers || !rbacHasChanges || isSavingRbac) return;
+    if (!isAdminRole || !rbacHasChanges || isSavingRbac) return;
     setIsSavingRbac(true);
     try {
       const res = await apiFetch('/api/rbac/permissions', {
@@ -1550,7 +1533,7 @@ export default function App() {
 
   useEffect(() => {
     brands.forEach(b => {
-      registerB2BBrand(b.name, b.businessType === 'B2B' || b.name.toLowerCase() === 'sumas');
+      registerB2BBrand(b.name, b.businessType === 'B2B');
     });
     try {
       localStorage.setItem('sumas_brands', JSON.stringify(brands));
@@ -1616,8 +1599,8 @@ export default function App() {
     logo: '',
     ownerId: '',
     description: '',
-    category: 'Skincare & Dermo-Cosmetics',
-    businessType: 'Retail' as 'B2B' | 'Retail',
+    category: 'Umum',
+    businessType: 'B2B' as 'B2B' | 'Retail',
     status: 'Aktif' as 'Aktif' | 'Nonaktif'
   });
 
@@ -1966,7 +1949,6 @@ export default function App() {
     return managedBrands.some(
       (b) =>
         b.businessType === 'B2B' ||
-        b.name?.toLowerCase() === 'sumas' ||
         b2bBrandsRegistry.has((b.name || '').toLowerCase())
     );
   }, [canViewAllBrands, managedBrands]);
@@ -1978,7 +1960,9 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     if (!canAccessMenu(currentUser.role, activeMenu as AppMenuId, rbacMatrix)) {
-      setActiveMenu('dashboard');
+      const orderedMenus: AppMenuId[] = ['dashboard', 'brand', 'category', 'sku', 'tag-qr', 'scan', 'users', 'settings'];
+      const firstAllowed = orderedMenus.find((m) => canAccessMenu(currentUser.role, m, rbacMatrix));
+      setActiveMenu(firstAllowed || 'users');
     }
   }, [currentUser, activeMenu, rbacMatrix]);
 
@@ -2072,10 +2056,11 @@ export default function App() {
 
   const userRolesList = [...ALL_ROLES];
 
-  const brandCategoriesList = [
-    'SUMAS Architectural & Partisi',
-    'Skincare & Dermo-Cosmetics'
-  ];
+  const brandCategoriesList = React.useMemo(() => {
+    const fromCats = categories.filter(c => c.level === 1).map(c => c.name);
+    const fromBrands = brands.map(b => b.category).filter(Boolean) as string[];
+    return Array.from(new Set([...fromCats, ...fromBrands, 'Umum']));
+  }, [categories, brands]);
 
   const presetUserAvatars = [
     { label: 'Kalingga Jeandy (Super Admin)', url: '/assets/avatars/user_kalingga.svg' },
@@ -2693,8 +2678,8 @@ export default function App() {
       logo: '',
       ownerId: '', // Default kosong: Penanggung Jawab bersifat opsional / bisa diatur nanti
       description: '',
-      category: 'Skincare & Dermo-Cosmetics',
-      businessType: 'Retail',
+      category: categories.length > 0 ? categories[0].name : 'Umum',
+      businessType: 'B2B',
       status: 'Aktif'
     });
     setLogoInputTab('upload');
@@ -2723,8 +2708,8 @@ export default function App() {
       logo: brand.logo || '',
       ownerId: targetOwnerId,
       description: brand.description || '',
-      category: brand.category || (brand.name.toLowerCase() === 'sumas' ? 'SUMAS Architectural & Partisi' : 'Skincare & Dermo-Cosmetics'),
-      businessType: brand.businessType || (brand.name.toLowerCase() === 'sumas' ? 'B2B' : 'Retail'),
+      category: brand.category || (categories.length > 0 ? categories[0].name : 'Umum'),
+      businessType: brand.businessType || 'B2B',
       status: brand.status
     });
     setLogoInputTab(brand.logo ? (brand.logo.startsWith('data:') ? 'upload' : 'url') : 'upload');
@@ -2734,7 +2719,7 @@ export default function App() {
   const handleCreateBrand = async () => {
     if (!brandForm.name.trim()) return;
     const owner = users.find(u => u.id === brandForm.ownerId);
-    const resolvedBusinessType = brandForm.businessType || (brandForm.name.toLowerCase() === 'sumas' ? 'B2B' : 'Retail');
+    const resolvedBusinessType = brandForm.businessType || 'B2B';
     const newBrand: BrandItem = {
       id: `br-${Date.now()}`,
       name: brandForm.name.trim(),
@@ -2743,7 +2728,7 @@ export default function App() {
       ownerName: owner?.name || 'Belum Ditentukan',
       ownerEmail: owner?.email,
       ownerRole: owner?.role,
-      description: brandForm.description.trim() || 'Katalog brand resmi PT Mitra Kreasi Inovasi.',
+      description: brandForm.description.trim() || '',
       category: brandForm.category || 'Umum',
       businessType: resolvedBusinessType,
       status: brandForm.status,
@@ -2777,7 +2762,7 @@ export default function App() {
   const handleUpdateBrand = async () => {
     if (!brandForm.id || !brandForm.name.trim()) return;
     const owner = users.find(u => u.id === brandForm.ownerId);
-    const resolvedBusinessType = brandForm.businessType || (brandForm.name.toLowerCase() === 'sumas' ? 'B2B' : 'Retail');
+    const resolvedBusinessType = brandForm.businessType || 'B2B';
 
     const updatedData: Partial<BrandItem> = {
       name: brandForm.name.trim(),
@@ -2871,6 +2856,10 @@ export default function App() {
   };
 
   const handleToggleUserStatus = async (user: UserItem) => {
+    if (!isAdminRole && normalizeRole(user.role) === 'Super Admin') {
+      triggerAlert('Akses Ditolak', 'Hanya Super Admin yang dapat mengubah status akun Super Admin.', 'warning');
+      return;
+    }
     const prevStatus = user.status || 'Aktif';
     const nextStatus = prevStatus === 'Aktif' ? 'Nonaktif' : 'Aktif';
     if (currentUser && user.id === currentUser.id && nextStatus === 'Nonaktif') {
@@ -2901,10 +2890,11 @@ export default function App() {
   };
 
   const handleToggleBatchStatus = async (batch: any) => {
-    const isCurrentlySuspended = batch.status === 'Disuspend';
+    const prevStatus = batch.status || 'Aktif';
+    const isCurrentlySuspended = prevStatus === 'Disuspend';
     const nextStatus = isCurrentlySuspended ? 'Aktif' : 'Disuspend';
 
-    // Update state batches & activeBatch secara langsung
+    // Update state batches & activeBatch secara optimistik
     setBatches(prev => prev.map(b => b.id === batch.id ? { ...b, status: nextStatus } : b));
     setActiveBatch((prev: any) => prev && prev.id === batch.id ? { ...prev, status: nextStatus } : prev);
 
@@ -2917,25 +2907,27 @@ export default function App() {
         ? 'Pemulihan status langsung melalui badge status' 
         : 'Suspensi langsung melalui badge status',
       changes: [
-        { field: 'Status Batch', old: batch.status, new: nextStatus }
+        { field: 'Status Batch', old: prevStatus, new: nextStatus }
       ]
     };
-    setAuditLogs(prev => [newLog, ...prev]);
-
-    triggerAlert(
-      nextStatus === 'Disuspend' ? 'Batch Disuspend' : 'Batch Dipulihkan',
-      `Status batch "${batch.batchId}" berhasil diubah menjadi: ${nextStatus}.`,
-      nextStatus === 'Disuspend' ? 'warning' : 'success'
-    );
 
     try {
       await api.updateBatch(batch.id, { status: nextStatus });
-      await api.createAuditLog(newLog);
-    } catch (err) {
+      setAuditLogs(prev => [newLog, ...prev]);
+      api.createAuditLog(newLog).catch(e => console.error('Gagal catat audit log status batch:', e));
+      triggerAlert(
+        nextStatus === 'Disuspend' ? 'Batch Disuspend' : 'Batch Dipulihkan',
+        `Status batch "${batch.batchId}" berhasil diubah menjadi: ${nextStatus}.`,
+        nextStatus === 'Disuspend' ? 'warning' : 'success'
+      );
+    } catch (err: any) {
+      // Rollback state jika server menolak
+      setBatches(prev => prev.map(b => b.id === batch.id ? { ...b, status: prevStatus } : b));
+      setActiveBatch((prev: any) => prev && prev.id === batch.id ? { ...prev, status: prevStatus } : prev);
       console.error('Gagal memperbarui status batch di SQLite:', err);
       triggerAlert(
         'Gagal Mengubah Status',
-        'Terjadi kesalahan saat memperbarui status batch.',
+        err?.message || 'Terjadi kesalahan saat memperbarui status batch.',
         'error'
       );
     }
@@ -2969,6 +2961,7 @@ export default function App() {
       avatar: userForm.avatar.trim() || null
     };
 
+    const prevOwnerId = brandForm.ownerId;
     setUsers(prev => [newUser, ...prev]);
     setBrandForm(prev => ({ ...prev, ownerId: newUser.id }));
     setIsAddUserModalOpen(false);
@@ -2986,11 +2979,13 @@ export default function App() {
         `Akun baru "${newUser.name}" (${newUser.role}) berhasil dibuat.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
+      setUsers(prev => prev.filter(u => u.id !== newUser.id));
+      setBrandForm(prev => ({ ...prev, ownerId: prevOwnerId }));
       console.error('Gagal membuat user baru di SQLite:', err);
       triggerAlert(
         'Gagal Menyimpan Akun',
-        'Terjadi kesalahan sistem saat menambahkan akun pengguna.',
+        err?.message || 'Terjadi kesalahan sistem saat menambahkan akun pengguna.',
         'error'
       );
     }
@@ -3017,6 +3012,10 @@ export default function App() {
   };
 
   const handleOpenEditUser = (user: UserItem, resetPasswordDirectly = false) => {
+    if (!isAdminRole && normalizeRole(user.role) === 'Super Admin') {
+      triggerAlert('Akses Ditolak', 'Hanya Super Admin yang dapat menyunting akun Super Admin.', 'warning');
+      return;
+    }
     const ownedBrandIds = brands.filter(b => b.ownerId === user.id).map(b => b.id);
     setUserForm({
       id: user.id,
@@ -3066,6 +3065,10 @@ export default function App() {
   };
 
   const handleOpenDeleteUser = (user: UserItem) => {
+    if (!isAdminRole && normalizeRole(user.role) === 'Super Admin') {
+      triggerAlert('Akses Ditolak', 'Hanya Super Admin yang dapat menghapus akun Super Admin.', 'warning');
+      return;
+    }
     if (currentUser && user.id === currentUser.id) {
       triggerAlert(
         'Aksi Ditolak',
@@ -3109,6 +3112,9 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
+    const prevUsers = users;
+    const prevBrands = brands;
+    const prevOwnerId = brandForm.ownerId;
     setUsers(prev => [newUser, ...prev]);
 
     // Update brands owned by this newly created user
@@ -3149,11 +3155,14 @@ export default function App() {
         `Akun pengguna "${newUser.name}" (${newUser.role}) berhasil ditambahkan.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
+      setUsers(prevUsers);
+      setBrands(prevBrands);
+      setBrandForm(prev => ({ ...prev, ownerId: prevOwnerId }));
       console.error('Gagal membuat user di SQLite:', err);
       triggerAlert(
         'Gagal Menyimpan Akun',
-        'Terjadi kesalahan sistem saat membuat akun pengguna.',
+        err?.message || 'Terjadi kesalahan sistem saat membuat akun pengguna.',
         'error'
       );
     }
@@ -3219,6 +3228,8 @@ export default function App() {
       return b;
     });
 
+    const prevUsers = users;
+    const prevBrands = brands;
     setUsers(prev => prev.map(u => u.id === userForm.id ? { ...u, ...updatedUser } : u));
     setBrands(updatedBrands);
 
@@ -3230,7 +3241,7 @@ export default function App() {
 
       // Persist changed brands in SQLite
       for (const b of updatedBrands) {
-        const prevB = brands.find(ob => ob.id === b.id);
+        const prevB = prevBrands.find(ob => ob.id === b.id);
         if (prevB && (prevB.ownerId !== b.ownerId || prevB.ownerName !== b.ownerName)) {
           await api.updateBrand(b.id, {
             ownerId: b.ownerId,
@@ -3249,11 +3260,13 @@ export default function App() {
         `Perubahan data pengguna "${updatedUser.name}" berhasil disimpan.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
+      setUsers(prevUsers);
+      setBrands(prevBrands);
       console.error('Gagal update user di SQLite:', err);
       triggerAlert(
         'Gagal Memperbarui Akun',
-        'Terjadi kesalahan saat menyimpan pembaruan akun pengguna.',
+        err?.message || 'Terjadi kesalahan saat menyimpan pembaruan akun pengguna.',
         'error'
       );
     }
@@ -3283,11 +3296,11 @@ export default function App() {
         `Pengguna "${userName}" berhasil dihapus dari sistem.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal hapus user di SQLite:', err);
       triggerAlert(
         'Gagal Menghapus Akun',
-        'Terjadi kesalahan sistem saat menghapus akun pengguna.',
+        err?.message || 'Terjadi kesalahan sistem saat menghapus akun pengguna.',
         'error'
       );
     }
@@ -3441,10 +3454,16 @@ export default function App() {
     image?: string;
   }) => {
     const matchedBrand = brands.find(b => b.id === productData.brandId) || brands.find(b => b.name === productData.brandName) || brands[0];
+    const resolvedBrandId = matchedBrand?.id || productData.brandId || '';
+    const resolvedBrandName = matchedBrand?.name || productData.brandName?.trim() || '';
+    if (!resolvedBrandName) {
+      triggerAlert('Brand Wajib Dipilih', 'Silakan pilih atau daftarkan brand terlebih dahulu sebelum membuat SKU.', 'warning');
+      return;
+    }
     const newSkuItem: ProductItem = {
       id: `p-${Date.now()}`,
-      brandId: matchedBrand?.id || 'br-sumas',
-      brandName: matchedBrand?.name || 'Sumas',
+      brandId: resolvedBrandId,
+      brandName: resolvedBrandName,
       sku: productData.sku.trim(),
       skuCode: productData.skuCode.trim() || `SKU-${Date.now().toString().slice(-4)}`,
       category: productData.category.trim() || 'Umum',
@@ -3466,12 +3485,12 @@ export default function App() {
         `Produk "${newSkuItem.sku}" (${newSkuItem.brandName}) berhasil didaftarkan ke katalog master.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal membuat SKU di SQLite:', err);
       setProducts(prev => prev.filter(p => p.id !== newSkuItem.id));
       triggerAlert(
         'Gagal Menyimpan SKU',
-        'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
+        err?.message || 'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
         'error'
       );
     }
@@ -3484,10 +3503,16 @@ export default function App() {
     }
 
     const matchedBrand = brands.find(b => b.id === skuForm.brandId) || brands.find(b => b.name === skuForm.brandName) || brands[0];
+    const resolvedBrandId = matchedBrand?.id || skuForm.brandId || '';
+    const resolvedBrandName = matchedBrand?.name || skuForm.brandName?.trim() || '';
+    if (!resolvedBrandName) {
+      triggerAlert('Brand Wajib Dipilih', 'Silakan pilih atau daftarkan brand terlebih dahulu sebelum membuat SKU.', 'warning');
+      return;
+    }
     const newSkuItem: ProductItem = {
       id: `p-${Date.now()}`,
-      brandId: matchedBrand?.id || 'br-sumas',
-      brandName: matchedBrand?.name || 'Sumas',
+      brandId: resolvedBrandId,
+      brandName: resolvedBrandName,
       sku: skuForm.sku.trim(),
       skuCode: skuForm.skuCode.trim() || `SKU-${Date.now().toString().slice(-4)}`,
       category: skuForm.category.trim() || 'Umum',
@@ -3507,12 +3532,12 @@ export default function App() {
         `Produk "${newSkuItem.sku}" (${newSkuItem.brandName}) berhasil didaftarkan ke katalog master.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal membuat SKU di SQLite:', err);
       setProducts(prev => prev.filter(p => p.id !== newSkuItem.id));
       triggerAlert(
         'Gagal Menyimpan SKU',
-        'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
+        err?.message || 'Terjadi kesalahan sistem saat menyimpan data SKU ke database.',
         'error'
       );
     }
@@ -3548,6 +3573,7 @@ export default function App() {
       image: productData.image
     };
 
+    const prevProducts = products;
     setProducts(prev => prev.map(p => p.id === editingId ? { ...p, ...updatedData } : p));
     setIsSkuFormDirty(false);
     setSkuSubView('list');
@@ -3562,11 +3588,12 @@ export default function App() {
         `Data produk "${productData.sku.trim()}" telah diperbarui di katalog master.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
+      setProducts(prevProducts);
       console.error('Gagal memperbarui SKU di SQLite:', err);
       triggerAlert(
         'Gagal Memperbarui SKU',
-        'Terjadi kesalahan saat menyimpan perubahan ke database.',
+        err?.message || 'Terjadi kesalahan saat menyimpan perubahan ke database.',
         'error'
       );
     }
@@ -3588,6 +3615,7 @@ export default function App() {
       description: skuForm.description.trim()
     };
 
+    const prevProducts = products;
     setProducts(prev => prev.map(p => p.id === skuForm.id ? { ...p, ...updatedData } : p));
     setIsEditSkuModalOpen(false);
     setSkuToEdit(null);
@@ -3601,11 +3629,12 @@ export default function App() {
         `Data produk "${skuForm.sku.trim()}" telah diperbarui di database.`,
         'success'
       );
-    } catch (err) {
+    } catch (err: any) {
+      setProducts(prevProducts);
       console.error('Gagal memperbarui SKU di SQLite:', err);
       triggerAlert(
         'Gagal Memperbarui SKU',
-        'Terjadi kesalahan sistem saat memperbarui data SKU.',
+        err?.message || 'Terjadi kesalahan sistem saat memperbarui data SKU.',
         'error'
       );
     }
@@ -3846,41 +3875,38 @@ export default function App() {
   };
 
   const getBrandBatchCode = (brandName: string, skuCode?: string) => {
+    // 1. Jika produk sudah memiliki kode SKU dengan prefix (misal SMS-001, WHL-002), gunakan prefix tersebut
     const skuPrefix = skuCode?.split('-')[0]?.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     if (skuPrefix && skuPrefix.length >= 2 && skuPrefix.length <= 4) {
       return skuPrefix;
     }
 
-    const normalized = (brandName || '').trim().toLowerCase();
-    const knownBrandCodes: Record<string, string> = {
-      sumas: 'SMS',
-      somethinc: 'SMT',
-      skintific: 'SKT',
-      whitelab: 'WHL',
-      avoskin: 'AVO',
-      'the originote': 'ORG',
-      wardah: 'WRD',
-      azarine: 'AZR',
-      'true to skin': 'TTS',
-      'studio tropik': 'STP',
-      'dear me beauty': 'DMB',
-      npure: 'NPR',
-      'bio beauty lab': 'BBL',
-      lacoco: 'LCC',
-      'hada labo': 'HDL',
-    };
-    if (knownBrandCodes[normalized]) {
-      return knownBrandCodes[normalized];
+    // 2. Cek apakah brand memiliki properti code di master data brands
+    const matchedBrand = brands.find(b => b.name?.trim().toLowerCase() === (brandName || '').trim().toLowerCase());
+    if (matchedBrand && (matchedBrand as any).code) {
+      const bCode = String((matchedBrand as any).code).trim().toUpperCase();
+      if (bCode.length >= 2 && bCode.length <= 4) return bCode;
     }
 
-    const words = (brandName || '').trim().split(/\s+/).filter(Boolean);
+    // 3. Algoritma akronim dinamis berdasarkan kata dan konsonan brandName
+    const cleanName = (brandName || '').trim();
+    const words = cleanName.split(/\s+/).filter(Boolean);
     if (words.length >= 3) {
       return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
     }
     if (words.length === 2) {
       return `${words[0].slice(0, 2)}${words[1].slice(0, 1)}`.toUpperCase();
     }
-    return (brandName || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || 'BCH';
+    
+    // Satu kata: ambil huruf pertama + konsonan berikutnya
+    const letters = cleanName.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    if (letters.length <= 3) return letters.padEnd(3, 'X');
+    const firstLetter = letters[0];
+    const restConsonants = letters.slice(1).replace(/[AEIOU]/g, '');
+    if (restConsonants.length >= 2) {
+      return `${firstLetter}${restConsonants.slice(0, 2)}`;
+    }
+    return letters.slice(0, 3);
   };
 
   const generateNextBatchId = (brandName: string, skuCode?: string) => {
@@ -3971,6 +3997,14 @@ export default function App() {
   };
 
   const openEditUrlModal = (batch: any) => {
+    if (!batch || batch.qrType === 'static') {
+      triggerAlert(
+        'Aksi Dibatasi',
+        'Batch dengan tipe QR Statis tidak mendukung pengeditan URL karena URL tertanam permanen pada stiker fisik.',
+        'warning'
+      );
+      return;
+    }
     setBatchToEditUrl(batch);
     setEditRedirectUrlInput(batch.redirectUrl || 'https://cek.sumas.id/');
     setEditQrTypeInput(batch.qrType || 'dynamic');
@@ -3981,6 +4015,11 @@ export default function App() {
 
   const handleSaveRedirectUrl = async () => {
     if (!batchToEditUrl) return;
+    if (batchToEditUrl.qrType === 'static') {
+      triggerAlert('Aksi Dibatasi', 'Batch dengan tipe QR Statis tidak mendukung pengeditan URL.', 'error');
+      setIsEditUrlModalOpen(false);
+      return;
+    }
     if (!editRedirectUrlInput.trim()) {
       triggerAlert('URL Tidak Boleh Kosong', 'Harap masukkan alamat URL tujuan pemindaian yang valid.', 'error');
       return;
@@ -4056,9 +4095,12 @@ export default function App() {
 
   const handleDeleteBatch = () => {
     if (!batchToDelete) return;
-    const targetBatch = batches.find(b => b.id === batchToDelete);
-    const batchName = targetBatch ? targetBatch.batchId : batchToDelete;
-    setBatches(batches.filter(b => b.id !== batchToDelete));
+    const prevBatches = batches;
+    const prevLogs = auditLogs;
+    const targetId = batchToDelete;
+    const targetBatch = batches.find(b => b.id === targetId);
+    const batchName = targetBatch ? targetBatch.batchId : targetId;
+    setBatches(batches.filter(b => b.id !== targetId));
     if (targetBatch) {
       setAuditLogs(auditLogs.filter(log => log.batchId !== targetBatch.batchId));
     }
@@ -4066,7 +4108,7 @@ export default function App() {
     setBatchToDelete(null);
 
     // Hapus dari SQLite backend
-    api.deleteBatch(batchToDelete)
+    api.deleteBatch(targetId)
       .then(() => {
         triggerAlert(
           'Batch Berhasil Dihapus',
@@ -4074,11 +4116,13 @@ export default function App() {
           'success'
         );
       })
-      .catch(err => {
+      .catch((err: any) => {
+        setBatches(prevBatches);
+        setAuditLogs(prevLogs);
         console.error('Gagal hapus batch dari SQLite:', err);
         triggerAlert(
           'Gagal Menghapus Batch',
-          'Terjadi kesalahan sistem saat menghapus data batch.',
+          err?.message || 'Terjadi kesalahan sistem saat menghapus data batch.',
           'error'
         );
       });
@@ -4094,36 +4138,44 @@ export default function App() {
   const handleSuspendBatch = () => {
     if (!suspendForm.reason.trim() || !activeBatch) return;
 
+    const targetBatch = activeBatch;
+    const prevStatus = targetBatch.status || 'Aktif';
+    const prevBatches = batches;
+    const prevLogs = auditLogs;
+
     const newLog = {
       id: Date.now(),
-      batchId: activeBatch.batchId,
+      batchId: targetBatch.batchId,
       timestamp: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
       user: currentUser?.name || currentRole,
       reason: suspendForm.reason,
       changes: [
-        { field: 'Status Batch', old: activeBatch.status, new: 'Disuspend' }
+        { field: 'Status Batch', old: prevStatus, new: 'Disuspend' }
       ]
     };
     
     setAuditLogs([newLog, ...auditLogs]);
-    setBatches(batches.map(b => b.id === activeBatch.id ? { ...b, status: 'Disuspend' } : b));
-    setActiveBatch((prev: any) => prev ? { ...prev, status: 'Disuspend' } : null);
+    setBatches(batches.map(b => b.id === targetBatch.id ? { ...b, status: 'Disuspend' } : b));
+    setActiveBatch((prev: any) => prev && prev.id === targetBatch.id ? { ...prev, status: 'Disuspend' } : prev);
     setIsSuspendModalOpen(false);
 
     // Sinkronkan ke SQLite
-    api.updateBatch(activeBatch.id, { status: 'Disuspend' })
+    api.updateBatch(targetBatch.id, { status: 'Disuspend' })
       .then(() => {
+        api.createAuditLog(newLog).catch(err => console.error(err));
         triggerAlert(
           'Batch Disuspend',
-          `Batch "${activeBatch.batchId}" berhasil dinonaktifkan sementara.`,
+          `Batch "${targetBatch.batchId}" berhasil dinonaktifkan sementara.`,
           'warning'
         );
       })
-      .catch(err => {
+      .catch((err: any) => {
+        setBatches(prevBatches);
+        setAuditLogs(prevLogs);
+        setActiveBatch((prev: any) => prev && prev.id === targetBatch.id ? { ...prev, status: prevStatus } : prev);
         console.error(err);
-        triggerAlert('Gagal Mengubah Status', 'Terjadi kesalahan saat suspend batch.', 'error');
+        triggerAlert('Gagal Mengubah Status', err?.message || 'Terjadi kesalahan saat suspend batch.', 'error');
       });
-    api.createAuditLog(newLog).catch(err => console.error(err));
   };
 
   const openUnsuspendModal = (batch: any) => {
@@ -4136,36 +4188,44 @@ export default function App() {
   const handleUnsuspendBatch = () => {
     if (!unsuspendForm.reason.trim() || !activeBatch) return;
 
+    const targetBatch = activeBatch;
+    const prevStatus = targetBatch.status || 'Disuspend';
+    const prevBatches = batches;
+    const prevLogs = auditLogs;
+
     const newLog = {
       id: Date.now(),
-      batchId: activeBatch.batchId,
+      batchId: targetBatch.batchId,
       timestamp: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
       user: currentUser?.name || currentRole,
       reason: unsuspendForm.reason,
       changes: [
-        { field: 'Status Batch', old: activeBatch.status, new: 'Aktif' }
+        { field: 'Status Batch', old: prevStatus, new: 'Aktif' }
       ]
     };
     
     setAuditLogs([newLog, ...auditLogs]);
-    setBatches(batches.map(b => b.id === activeBatch.id ? { ...b, status: 'Aktif' } : b));
-    setActiveBatch((prev: any) => prev ? { ...prev, status: 'Aktif' } : null);
+    setBatches(batches.map(b => b.id === targetBatch.id ? { ...b, status: 'Aktif' } : b));
+    setActiveBatch((prev: any) => prev && prev.id === targetBatch.id ? { ...prev, status: 'Aktif' } : prev);
     setIsUnsuspendModalOpen(false);
 
     // Sinkronkan ke SQLite
-    api.updateBatch(activeBatch.id, { status: 'Aktif' })
+    api.updateBatch(targetBatch.id, { status: 'Aktif' })
       .then(() => {
+        api.createAuditLog(newLog).catch(err => console.error(err));
         triggerAlert(
           'Batch Diaktifkan Kembali',
-          `Batch "${activeBatch.batchId}" telah aktif dan siap digunakan.`,
+          `Batch "${targetBatch.batchId}" telah aktif dan siap digunakan.`,
           'success'
         );
       })
-      .catch(err => {
+      .catch((err: any) => {
+        setBatches(prevBatches);
+        setAuditLogs(prevLogs);
+        setActiveBatch((prev: any) => prev && prev.id === targetBatch.id ? { ...prev, status: prevStatus } : prev);
         console.error(err);
-        triggerAlert('Gagal Mengaktifkan Batch', 'Terjadi kesalahan saat mengaktifkan batch.', 'error');
+        triggerAlert('Gagal Mengaktifkan Batch', err?.message || 'Terjadi kesalahan saat mengaktifkan batch.', 'error');
       });
-    api.createAuditLog(newLog).catch(err => console.error(err));
   };
 
   const openEditProjectModal = (proj: any) => {
@@ -5219,7 +5279,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  data-tooltip={`Keluar · ${currentUser?.name || 'Akun'}`}
+                  data-tooltip="Keluar"
                   data-tooltip-pos="right"
                   aria-label="Keluar dari akun"
                   className="absolute inset-0 w-9 h-9 rounded-full bg-rose-600/90 hover:bg-rose-600 text-white flex items-center justify-center opacity-0 scale-90 group-hover/profile:opacity-100 group-hover/profile:scale-100 focus-visible:opacity-100 focus-visible:scale-100 transition-all duration-150 cursor-pointer"
@@ -5259,7 +5319,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleLogout}
-                data-tooltip="Keluar / Ganti Akun"
+                data-tooltip="Keluar"
                 data-tooltip-pos="top"
                 aria-label="Keluar dari akun"
                 className="p-2 rounded-full text-slate-400 dark:text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shrink-0"
@@ -5926,8 +5986,8 @@ export default function App() {
               </h2>
             </div>
 
-            {canManageUsers ? (
-              usersSubTab === 'list' ? (
+            {usersSubTab === 'list' ? (
+              canManageUsers ? (
                 <button
                   type="button"
                   onClick={handleOpenCreateUser}
@@ -5935,32 +5995,36 @@ export default function App() {
                 >
                   <span>Tambah Pengguna</span>
                 </button>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
-                  {rbacHasChanges && (
-                    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
-                      Belum disimpan
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleResetRbacDefaults}
-                    disabled={isSavingRbac || isRbacAtDefaults}
-                    className="h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
-                  >
-                    <span>Reset Default</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveRbacMatrix}
-                    disabled={!rbacHasChanges || isSavingRbac}
-                    className="h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
-                  >
-                    <span>{isSavingRbac ? 'Menyimpan...' : 'Simpan Hak Akses'}</span>
-                  </button>
-                </div>
-              )
-            ) : null}
+              ) : null
+            ) : isAdminRole ? (
+              <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+                {rbacHasChanges && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
+                    Belum disimpan
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleResetRbacDefaults}
+                  disabled={isSavingRbac || isRbacAtDefaults}
+                  className="h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                >
+                  <span>Reset Default</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveRbacMatrix}
+                  disabled={!rbacHasChanges || isSavingRbac}
+                  className="h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                >
+                  <span>{isSavingRbac ? 'Menyimpan...' : 'Simpan Hak Akses'}</span>
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs font-medium text-slate-500 dark:text-zinc-400 px-3 py-1 rounded-full bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700">
+                Mode Baca Saja · Khusus Super Admin
+              </span>
+            )}
           </div>
 
           {/* UNIFIED CARD: TAB SWITCHER BERGAYA UNDERLINE (KONSISTEN DENGAN TAMBAH SKU) */}
@@ -6009,7 +6073,7 @@ export default function App() {
                 >
                   <ShieldCheck size={15} />
                   <span>Matriks Hak Akses</span>
-                  {rbacHasChanges && canManageUsers && (
+                  {rbacHasChanges && isAdminRole && (
                     <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
                       · Diubah
                     </span>
@@ -6022,7 +6086,7 @@ export default function App() {
               <RolePermissionsPanel
                 draft={rbacDraft}
                 changedKeys={rbacChangedKeys}
-                canManage={canManageUsers}
+                canManage={isAdminRole}
                 roleUserCounts={roleUserCounts}
                 onTogglePermission={handleToggleRbacPermission}
                 onToggleGroup={handleToggleRbacGroup}
@@ -6229,23 +6293,27 @@ export default function App() {
                         <td className="px-5 py-3.5">
                           {(() => {
                             const isSelfAccount = Boolean(currentUser && user.id === currentUser.id);
+                            const isProtectedAdmin = !isAdminRole && normalizeRole(user.role) === 'Super Admin';
+                            const canToggleThisUser = canManageUsers && !isProtectedAdmin && !(isSelfAccount && (user.status || 'Aktif') === 'Aktif');
                             return (
                               <button
                                 type="button"
-                                disabled={!canManageUsers || (isSelfAccount && (user.status || 'Aktif') === 'Aktif')}
-                                onClick={() => { if (canManageUsers) handleToggleUserStatus(user); }}
+                                disabled={!canToggleThisUser}
+                                onClick={() => { if (canToggleThisUser) handleToggleUserStatus(user); }}
                                 data-tooltip={
                                   !canManageUsers
                                     ? 'Akses Baca Saja'
-                                    : isSelfAccount
-                                      ? 'Akun aktif Anda tidak dapat dinonaktifkan sendiri'
-                                      : (user.status || 'Aktif') === 'Nonaktif'
-                                        ? 'Klik untuk Aktifkan Akun'
-                                        : 'Klik untuk Nonaktifkan Akun'
+                                    : isProtectedAdmin
+                                      ? 'Akun Super Admin dilindungi'
+                                      : isSelfAccount
+                                        ? 'Akun aktif Anda tidak dapat dinonaktifkan sendiri'
+                                        : (user.status || 'Aktif') === 'Nonaktif'
+                                          ? 'Klik untuk Aktifkan Akun'
+                                          : 'Klik untuk Nonaktifkan Akun'
                                 }
                                 data-tooltip-pos="top"
                                 className={`relative inline-flex items-center select-none transition-transform ${
-                                  !canManageUsers || (isSelfAccount && (user.status || 'Aktif') === 'Aktif')
+                                  !canToggleThisUser
                                     ? 'cursor-not-allowed opacity-85'
                                     : 'cursor-pointer hover:scale-105 active:scale-95'
                                 }`}
@@ -8640,7 +8708,7 @@ export default function App() {
                       </span>
                     </div>
 
-                    {activeBatch?.qrType !== 'static' && (
+                    {canEditRedirectUrl && activeBatch?.qrType !== 'static' && (
                       <button
                         type="button"
                         onClick={() => openEditUrlModal(activeBatch)}
@@ -9215,7 +9283,7 @@ export default function App() {
             <Download size={16} className="text-slate-400 dark:text-zinc-500 group-hover:text-[#c28e62] dark:group-hover:text-[#c28e62] transition-colors" /> Unduh
           </button>
 
-          {canEditRedirectUrl && (
+          {canEditRedirectUrl && activeDropdownBatch.qrType !== 'static' && (
             <button 
               onClick={() => {
                 const b = activeDropdownBatch;
@@ -9338,7 +9406,7 @@ export default function App() {
             left: Math.max(12, Math.min(userDropdownPos.left - 192, window.innerWidth - 204)), 
           }}
         >
-          {canManageUsers ? (
+          {canManageUsers && (isAdminRole || normalizeRole(activeDropdownUser.role) !== 'Super Admin') ? (
             <>
               <button 
                 onClick={() => { closeAllActionDropdowns(); handleOpenEditUser(activeDropdownUser); }}
@@ -10199,7 +10267,7 @@ export default function App() {
                       onChange={(val) => setUserForm({ ...userForm, role: val })}
                       placeholder="Pilih Peran"
                       buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
-                      options={userRolesList.map(r => ({
+                      options={(isAdminRole ? userRolesList : userRolesList.filter(r => r !== 'Super Admin')).map(r => ({
                         value: r,
                         label: r
                       }))}
@@ -11218,7 +11286,7 @@ export default function App() {
                   onChange={(val) => setUserForm({ ...userForm, role: val })}
                   placeholder="Pilih Hak Akses"
                   buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
-                  options={userRolesList.map(r => ({
+                  options={(isAdminRole ? userRolesList : userRolesList.filter(r => r !== 'Super Admin')).map(r => ({
                     value: r,
                     label: r,
                     sublabel: r === 'Super Admin' 
@@ -12126,13 +12194,9 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <option value="SUMAS Architectural & Partisi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard" />
-                      <option value="SUMAS Architectural & Partisi > Aksesoris & Hardware SUS 304" />
-                      <option value="Skincare & Dermo-Cosmetics > Serum & Ampoule > Niacinamide & Brightening Serum" />
-                      <option value="Skincare & Dermo-Cosmetics > Moisturizer & Barrier Cream > Ceramide Barrier Cream" />
-                      <option value="Skincare & Dermo-Cosmetics > Sunscreen & UV Defense > Broad Spectrum SPF 50+ PA++++" />
-                      <option value="Skincare & Dermo-Cosmetics > Toner & Essence" />
-                      <option value="Skincare & Dermo-Cosmetics > Facial Cleanser & Micellar" />
+                      {Array.from(new Set(products.map(p => p.category))).filter(Boolean).map(catName => (
+                        <option key={catName} value={catName} />
+                      ))}
                     </>
                   )}
                 </datalist>
@@ -12459,7 +12523,7 @@ export default function App() {
                               </h4>
                             </div>
                             <p className="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
-                              {pureDesc || 'Produk panel akustik premium terdaftar resmi pada katalog perlindungan Sumas.'}
+                              {pureDesc || `Produk ${prod.sku} (${prod.brandName || 'Terdaftar'}) terdaftar resmi pada katalog sistem.`}
                             </p>
                           </div>
                         </div>

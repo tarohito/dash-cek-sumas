@@ -538,11 +538,12 @@ try {
   if (oldCat || brandsCountRow.count < 15 || productsCountRow.count < 15 || (dirtyRetailRow && dirtyRetailRow.count > 0)) {
     seedComprehensiveData(db);
   } else {
-    db.prepare("UPDATE batches SET project = NULL WHERE isB2B = 0 OR LOWER(brand) != 'sumas'").run();
-    db.prepare("UPDATE tags SET project = NULL, allocatedAt = NULL WHERE batchId IN (SELECT id FROM batches WHERE isB2B = 0 OR LOWER(brand) != 'sumas')").run();
-    db.prepare("UPDATE batches SET isB2B = 1 WHERE LOWER(brand) = 'sumas'").run();
-    db.prepare("UPDATE products SET isB2B = 1 WHERE LOWER(brandName) = 'sumas'").run();
-    db.prepare("UPDATE brands SET businessType = 'B2B' WHERE LOWER(name) = 'sumas'").run();
+    db.prepare("UPDATE batches SET project = NULL WHERE isB2B = 0").run();
+    db.prepare("UPDATE tags SET project = NULL, allocatedAt = NULL WHERE batchId IN (SELECT id FROM batches WHERE isB2B = 0)").run();
+    db.prepare("UPDATE batches SET isB2B = 1 WHERE brand IN (SELECT name FROM brands WHERE businessType = 'B2B')").run();
+    db.prepare("UPDATE batches SET isB2B = 0 WHERE brand IN (SELECT name FROM brands WHERE businessType = 'Retail')").run();
+    db.prepare("UPDATE products SET isB2B = 1 WHERE brandName IN (SELECT name FROM brands WHERE businessType = 'B2B')").run();
+    db.prepare("UPDATE products SET isB2B = 0 WHERE brandName IN (SELECT name FROM brands WHERE businessType = 'Retail')").run();
   }
 } catch (err) {
   console.error('Seeding check notice:', err);
@@ -947,6 +948,18 @@ function assertBrandAccess(
   return false;
 }
 
+function isBrandB2BDb(brandName?: string | null, batchIsB2B?: number | boolean | null): boolean {
+  if (batchIsB2B === 1 || batchIsB2B === true) return true;
+  if (batchIsB2B === 0 || batchIsB2B === false) return false;
+  if (!brandName) return false;
+  try {
+    const row = db.prepare('SELECT businessType FROM brands WHERE LOWER(name) = ?').get(brandName.trim().toLowerCase()) as { businessType?: string } | undefined;
+    return row?.businessType === 'B2B';
+  } catch (_) {
+    return false;
+  }
+}
+
 function buildSessionCookieFlags(req: express.Request, maxAgeSeconds: number): string {
   const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
   return isHttps
@@ -973,6 +986,32 @@ app.get('/api/auth/me', (req, res) => {
     return res.json({ authenticated: true, user, permissions, matrix });
   } catch (error) {
     return sendInternalError(res, 'GET /api/auth/me', error);
+  }
+});
+
+// GET /api/auth/demo-accounts - Daftar akun pengguna aktif dinamis untuk tombol bantuan login cepat
+app.get('/api/auth/demo-accounts', (_req, res) => {
+  try {
+    const users = db.prepare(`
+      SELECT u.id, u.name, u.email, u.role,
+        (SELECT GROUP_CONCAT(b.name, ', ') FROM brands b WHERE b.ownerId = u.id) as managedBrandNames
+      FROM users u
+      WHERE u.status = 'Aktif'
+      ORDER BY CASE WHEN u.role = 'Super Admin' THEN 1 ELSE 2 END, u.id ASC
+      LIMIT 3
+    `).all() as any[];
+
+    const result = users.map(u => ({
+      name: u.name,
+      email: u.email,
+      role: u.role === 'Super Admin'
+        ? 'Super Admin'
+        : `Admin Brand ${u.managedBrandNames ? `· (${u.managedBrandNames})` : ''}`
+    }));
+
+    res.json(result);
+  } catch (error) {
+    res.json([]);
   }
 });
 
@@ -1174,6 +1213,7 @@ app.use('/api', (req, res, next) => {
     reqPath === '/auth/me' ||
     reqPath === '/auth/login' ||
     reqPath === '/auth/logout' ||
+    reqPath === '/auth/demo-accounts' ||
     (method === 'POST' && reqPath === '/password-resets') ||
     (method === 'POST' && /^\/q\/[^/]+\/verify$/.test(reqPath)) ||
     (method === 'POST' && reqPath === '/scans/record')
@@ -1206,7 +1246,11 @@ app.use('/api', (req, res, next) => {
   // RBAC permissions endpoint
   if (reqPath === '/rbac/permissions') {
     if (method === 'GET') return next();
-    if (method === 'PUT') return can('users.manage') ? next() : deny();
+    if (method === 'PUT') {
+      return normalizeRole(user.role) === 'Super Admin'
+        ? next()
+        : deny('Hanya Super Admin yang berwenang mengubah matriks hak akses (RBAC).');
+    }
   }
 
   // Dashboard & Telemetri Scan
@@ -2034,7 +2078,7 @@ async function evaluateAndPersistScan(params: {
       evaluation.lng,
       evaluation.newTotalScans,
       evaluation.newTodayScans,
-      params.brand || 'Sumas',
+      params.brand || 'Umum',
       params.productType || '',
       params.batchId || '',
       params.tagNumber || '',
@@ -2072,7 +2116,7 @@ async function evaluateAndPersistScan(params: {
   }
 
   // Emit notifikasi real-time terpusat (brand-scoped untuk Admin Brand & global untuk Super Admin)
-  const scanBrand = params.brand || existingRow?.brand || 'Sumas';
+  const scanBrand = params.brand || existingRow?.brand || 'Umum';
   const scanProduct = params.productType || existingRow?.productType || scanBrand;
   const isAnomalyScan = finalStatus === 'suspicious' || evaluation.impossibleTravelDetected;
   createSystemNotification({
@@ -2127,7 +2171,7 @@ app.post('/api/scans/record', publicScanRateLimiter, async (req, res) => {
     const { evaluation, scanId } = await evaluateAndPersistScan({
       tagNumber: s.latestTagId || s.tagNumber || '',
       pin: s.pin || tagRecord?.pin || '',
-      brand: s.brand || batchRecord?.brand || 'Sumas',
+      brand: s.brand || batchRecord?.brand || 'Umum',
       productType: s.productType || batchRecord?.sku || '',
       batchId: s.batchId || batchRecord?.batchId || '',
       isB2B: s.isB2B !== undefined ? Boolean(s.isB2B) : Boolean(batchRecord?.isB2B),
@@ -2374,7 +2418,7 @@ app.get('/api/batches/:id/summary', (req, res) => {
       GROUP BY project
     `).all(batch.id);
 
-    const isB2B = Boolean(batch.isB2B) || (batch.brand || '').trim().toLowerCase() === 'sumas';
+    const isB2B = isBrandB2BDb(batch.brand, batch.isB2B);
 
     res.json({
       batch: { ...batch, isB2B },
@@ -2487,6 +2531,12 @@ app.patch('/api/batches/:id/redirect-url', (req, res) => {
     }
     if (!assertBrandAccess(req, res, batch.brand)) return;
 
+    if (batch.qrType === 'static') {
+      return res.status(400).json({
+        error: 'Batch dengan tipe QR Statis tidak mendukung perubahan URL karena alamat URL telah tertanam permanen pada stiker fisik.'
+      });
+    }
+
     let newUrl = batch.redirectUrl || 'https://cek.sumas.id/';
     if (redirectUrl !== undefined) {
       const urlCheck = validateHttpUrl(redirectUrl, { allowEmpty: false });
@@ -2595,7 +2645,7 @@ app.get('/q/:tagNumber', async (req, res) => {
     const { evaluation } = await evaluateAndPersistScan({
       tagNumber: tag.tagNumber,
       pin: tag.pin,
-      brand: batch?.brand || 'Sumas',
+      brand: batch?.brand || 'Umum',
       productType: batch?.sku || 'Material',
       batchId: batch?.batchId || tag.batchId,
       isB2B: Boolean(batch?.isB2B),
@@ -2637,7 +2687,7 @@ app.post('/api/q/:tagNumber/verify', publicScanRateLimiter, async (req, res) => 
     const { evaluation, scanId } = await evaluateAndPersistScan({
       tagNumber: tag.tagNumber,
       pin: tag.pin,
-      brand: batch?.brand || 'Sumas',
+      brand: batch?.brand || 'Umum',
       productType: batch?.sku || 'Material',
       batchId: batch?.batchId || tag.batchId,
       isB2B: Boolean(batch?.isB2B),
@@ -2693,7 +2743,7 @@ app.post('/api/batches/:id/allocate', (req, res) => {
     }
     if (!assertBrandAccess(req, res, batch.brand)) return;
 
-    const isBatchB2B = Boolean(batch.isB2B) || (batch.brand || '').trim().toLowerCase() === 'sumas';
+    const isBatchB2B = isBrandB2BDb(batch.brand, batch.isB2B);
     if (!isBatchB2B) {
       return res.status(403).json({
         error: `Batch milik brand "${batch.brand}" bertipe Retail dan tidak memiliki fitur alokasi proyek. Alokasi proyek hanya berlaku untuk brand/batch B2B.`
@@ -2755,7 +2805,7 @@ app.post('/api/batches/:id/deallocate', (req, res) => {
     }
     if (!assertBrandAccess(req, res, batch.brand)) return;
 
-    const isBatchB2B = Boolean(batch.isB2B) || (batch.brand || '').trim().toLowerCase() === 'sumas';
+    const isBatchB2B = isBrandB2BDb(batch.brand, batch.isB2B);
     if (!isBatchB2B) {
       return res.status(403).json({ error: 'Operasi alokasi proyek hanya berlaku untuk brand/batch B2B.' });
     }
@@ -2789,7 +2839,7 @@ app.put('/api/batches/:id/projects', (req, res) => {
     }
     if (!assertBrandAccess(req, res, batch.brand)) return;
 
-    const isBatchB2B = Boolean(batch.isB2B) || (batch.brand || '').trim().toLowerCase() === 'sumas';
+    const isBatchB2B = isBrandB2BDb(batch.brand, batch.isB2B);
     if (!isBatchB2B) {
       return res.status(403).json({ error: 'Pengeditan data proyek hanya berlaku untuk brand/batch B2B.' });
     }
@@ -2847,10 +2897,31 @@ app.put('/api/batches/:id', (req, res) => {
     }
     if (!assertBrandAccess(req, res, existing.brand)) return;
 
+    const actor = getActorFromRequest(req);
+    const matrix = getRbacMatrix();
+    const hasEditPerm = hasPermission(actor.role, 'batches.edit', matrix);
+    const hasSuspendPerm = hasPermission(actor.role, 'batches.suspend', matrix);
+
+    const nextProject = b.project !== undefined ? (b.project === null ? null : sanitizeStringInput(b.project, 200)) : existing.project;
+    const nextSpecs = b.specs !== undefined ? sanitizeStringInput(b.specs, 500) : existing.specs;
+    const nextStatus = b.status !== undefined ? (b.status === 'Disuspend' ? 'Disuspend' : 'Aktif') : existing.status;
+
+    const isModifyingDetails =
+      (b.project !== undefined && nextProject !== existing.project) ||
+      (b.specs !== undefined && nextSpecs !== existing.specs);
+    const isModifyingStatus = b.status !== undefined && nextStatus !== existing.status;
+
+    if (isModifyingDetails && !hasEditPerm) {
+      return res.status(403).json({ error: 'Akses ditolak. Anda tidak memiliki izin untuk mengubah detail batch.' });
+    }
+    if (isModifyingStatus && !hasSuspendPerm) {
+      return res.status(403).json({ error: 'Akses ditolak. Anda tidak memiliki izin untuk menangguhkan atau memulihkan batch.' });
+    }
+
     const updated = {
-      project: b.project !== undefined ? (b.project === null ? null : sanitizeStringInput(b.project, 200)) : existing.project,
-      specs: b.specs !== undefined ? sanitizeStringInput(b.specs, 500) : existing.specs,
-      status: b.status !== undefined ? (b.status === 'Disuspend' ? 'Disuspend' : 'Aktif') : existing.status,
+      project: nextProject,
+      specs: nextSpecs,
+      status: nextStatus,
     };
 
     db.prepare(`
@@ -2863,7 +2934,6 @@ app.put('/api/batches/:id', (req, res) => {
 
     // Notifikasi perubahan status kritis batch (Suspend / Pulihkan) ke Super Admin & Admin Brand pemilik brand
     if (existing.status !== updated.status) {
-      const actor = getActorFromRequest(req);
       const actorLabel = getNotificationActorLabel(actor);
       const isSuspendedNow = updated.status === 'Disuspend';
       createSystemNotification({
@@ -2956,8 +3026,14 @@ app.post('/api/audit-logs', (req, res) => {
     if (!batchIdStr) {
       return res.status(400).json({ error: 'batchId audit log wajib diisi.' });
     }
+    const scope = getUserBrandScope(req);
     const relatedBatch = db.prepare('SELECT brand FROM batches WHERE batchId = ? OR id = ?').get(batchIdStr, batchIdStr) as { brand: string } | undefined;
-    if (relatedBatch && !assertBrandAccess(req, res, relatedBatch.brand)) return;
+    if (!scope.isGlobal) {
+      if (!relatedBatch) {
+        return res.status(403).json({ error: 'Akses ditolak. Audit log hanya dapat dicatat untuk batch milik brand yang Anda kelola.' });
+      }
+      if (!assertBrandAccess(req, res, relatedBatch.brand)) return;
+    }
 
     const safeId = Number.isSafeInteger(Number(log.id)) && Number(log.id) > 0 ? Number(log.id) : Date.now();
     const safeTimestamp = sanitizeStringInput(log.timestamp, 80) || new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
@@ -3117,10 +3193,17 @@ app.get('/api/users', (req, res) => {
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-// Create user (validasi email unik, sandi min 8 karakter, validasi avatar anti-XSS)
+// Create user (validasi email unik, sandi min 8 karakter, validasi avatar anti-XSS, anti-eskalasi peran)
 app.post('/api/users', (req, res) => {
   try {
     const u = req.body || {};
+    const actor = getActorFromRequest(req);
+    const isActorSuperAdmin = normalizeRole(actor.role) === 'Super Admin';
+    const requestedRole = normalizeRole(u.role || 'Admin Brand');
+    if (!isActorSuperAdmin && requestedRole === 'Super Admin') {
+      return res.status(403).json({ error: 'Hanya Super Admin yang berwenang membuat akun dengan peran Super Admin.' });
+    }
+
     const cleanEmail = sanitizeStringInput(u.email, 160).toLowerCase();
     const cleanName = sanitizeStringInput(u.name, 120);
     const cleanUsername = u.username ? sanitizeStringInput(u.username, 80) : null;
@@ -3201,10 +3284,19 @@ app.put('/api/users/:id', (req, res) => {
       return res.status(404).json({ error: 'User tidak ditemukan' });
     }
 
+    const isActorSuperAdmin = normalizeRole(actor.role) === 'Super Admin';
+    if (!isActorSuperAdmin && normalizeRole(existing.role) === 'Super Admin') {
+      return res.status(403).json({ error: 'Anda tidak memiliki izin untuk mengubah akun Super Admin.' });
+    }
+
     const nextEmail = u.email !== undefined ? sanitizeStringInput(u.email, 160).toLowerCase() : existing.email;
     const nextUsername = u.username !== undefined ? (u.username ? sanitizeStringInput(u.username, 80) : null) : existing.username;
     const nextRole = normalizeRole(u.role !== undefined ? u.role : existing.role);
     const nextStatus = u.status !== undefined ? (u.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : (existing.status || 'Aktif');
+
+    if (!isActorSuperAdmin && nextRole === 'Super Admin') {
+      return res.status(403).json({ error: 'Hanya Super Admin yang berwenang menetapkan peran Super Admin.' });
+    }
 
     // Cegah penghapusan / penonaktifan Super Admin aktif terakhir
     if (normalizeRole(existing.role) === 'Super Admin' && (nextRole !== 'Super Admin' || nextStatus === 'Nonaktif')) {
@@ -3320,6 +3412,10 @@ app.delete('/api/users/:id', (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'User tidak ditemukan.' });
     }
+    const isActorSuperAdmin = normalizeRole(actor.role) === 'Super Admin';
+    if (!isActorSuperAdmin && normalizeRole(existing.role) === 'Super Admin') {
+      return res.status(403).json({ error: 'Anda tidak memiliki izin untuk menghapus akun Super Admin.' });
+    }
     if (normalizeRole(existing.role) === 'Super Admin') {
       const otherAdmins = db.prepare(
         "SELECT COUNT(*) as count FROM users WHERE id != ? AND role = 'Super Admin' AND (status IS NULL OR status != 'Nonaktif')"
@@ -3395,7 +3491,9 @@ app.post('/api/brands', (req, res) => {
     let ownerName = sanitizeStringInput(b.ownerName, 120) || 'Belum Ditentukan';
     let ownerEmail: string | null = b.ownerEmail ? sanitizeStringInput(b.ownerEmail, 160) : null;
     let ownerRole: string | null = b.ownerRole ? normalizeRole(b.ownerRole) : null;
-    const finalOwnerId = b.ownerId && typeof b.ownerId === 'string' && b.ownerId.trim() !== '' ? sanitizeStringInput(b.ownerId, 80) : '';
+    const scope = getUserBrandScope(req);
+    const requestedOwnerId = b.ownerId && typeof b.ownerId === 'string' && b.ownerId.trim() !== '' ? sanitizeStringInput(b.ownerId, 80) : '';
+    const finalOwnerId = scope.isGlobal ? requestedOwnerId : (scope.user?.id || '');
 
     if (finalOwnerId) {
       const u = db.prepare('SELECT * FROM users WHERE id = ?').get(finalOwnerId) as any;
@@ -3410,7 +3508,7 @@ app.post('/api/brands', (req, res) => {
       ownerRole = null;
     }
 
-    const businessType = b.businessType === 'B2B' ? 'B2B' : (cleanName.toLowerCase() === 'sumas' ? 'B2B' : 'Retail');
+    const businessType = b.businessType === 'B2B' ? 'B2B' : 'Retail';
     const safeStatus = b.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif';
     const safeDesc = sanitizeStringInput(b.description, 1000);
     const safeCat = sanitizeStringInput(b.category, 120) || 'Umum';
@@ -3463,7 +3561,9 @@ app.put('/api/brands/:id', (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Brand tidak ditemukan' });
     }
+    if (!assertBrandAccess(req, res, existing.name, existing.id)) return;
 
+    const scope = getUserBrandScope(req);
     let nextLogo = existing.logo;
     if (b.logo !== undefined) {
       const logoCheck = validateSafeImageSource(b.logo);
@@ -3474,7 +3574,11 @@ app.put('/api/brands/:id', (req, res) => {
     }
 
     const rawOwnerId = b.ownerId !== undefined ? b.ownerId : existing.ownerId;
-    const targetOwnerId = rawOwnerId && typeof rawOwnerId === 'string' && rawOwnerId.trim() !== '' ? sanitizeStringInput(rawOwnerId, 80) : '';
+    const requestedOwnerId = rawOwnerId && typeof rawOwnerId === 'string' && rawOwnerId.trim() !== '' ? sanitizeStringInput(rawOwnerId, 80) : '';
+    if (!scope.isGlobal && b.ownerId !== undefined && requestedOwnerId !== String(existing.ownerId || '')) {
+      return res.status(403).json({ error: 'Hanya Super Admin atau pemilik akses lintas brand yang berwenang memindahkan kepemilikan brand.' });
+    }
+    const targetOwnerId = scope.isGlobal ? requestedOwnerId : String(existing.ownerId || '');
     let ownerName = b.ownerName !== undefined ? sanitizeStringInput(b.ownerName, 120) : existing.ownerName;
     let ownerEmail = b.ownerEmail !== undefined ? sanitizeStringInput(b.ownerEmail, 160) : existing.ownerEmail;
     let ownerRole = b.ownerRole !== undefined ? normalizeRole(b.ownerRole) : existing.ownerRole;
@@ -3501,7 +3605,7 @@ app.put('/api/brands/:id', (req, res) => {
       ownerRole,
       description: b.description !== undefined ? sanitizeStringInput(b.description, 1000) : existing.description,
       category: b.category !== undefined ? sanitizeStringInput(b.category, 120) : existing.category,
-      businessType: b.businessType !== undefined ? (b.businessType === 'B2B' ? 'B2B' : 'Retail') : (existing.businessType || (existing.name?.toLowerCase() === 'sumas' ? 'B2B' : 'Retail')),
+      businessType: b.businessType !== undefined ? (b.businessType === 'B2B' ? 'B2B' : 'Retail') : (existing.businessType || 'Retail'),
       status: b.status !== undefined ? (b.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : existing.status,
     };
 
@@ -3530,10 +3634,16 @@ app.put('/api/brands/:id', (req, res) => {
   }
 });
 
-// Delete brand
+// Delete brand (terisolasi brand scope)
 app.delete('/api/brands/:id', (req, res) => {
   try {
     const { id } = req.params;
+    const existing = db.prepare('SELECT id, name FROM brands WHERE id = ?').get(id) as any;
+    if (!existing) {
+      return res.status(404).json({ error: 'Brand tidak ditemukan' });
+    }
+    if (!assertBrandAccess(req, res, existing.name, existing.id)) return;
+
     db.prepare('DELETE FROM brands WHERE id = ?').run(id);
     res.json({ success: true });
   } catch (error) {
@@ -5831,6 +5941,14 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
   }
 });
 
+// Fallback 404 JSON untuk endpoint /api/* yang tidak terdaftar (mencegah fallback HTML dari SPA router)
+app.use('/api', (_req, res) => {
+  return res.status(404).json({
+    success: false,
+    error: 'Endpoint API tidak ditemukan.',
+  });
+});
+
 // Global Express JSON/Body Error Handler (mencegah kebocoran stack trace HTML pada malformed JSON / payload terlalu besar)
 app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (!err) return next();
@@ -5936,5 +6054,13 @@ async function startServer() {
     }
   });
 }
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[SERVER UNHANDLED REJECTION]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER UNCAUGHT EXCEPTION]', err);
+});
 
 startServer();
