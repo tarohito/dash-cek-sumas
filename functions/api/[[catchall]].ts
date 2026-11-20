@@ -1751,6 +1751,31 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
           .bind(updated.name, updated.email, updated.role, id)
           .run();
 
+        if (
+          authUser.id &&
+          authUser.id !== id &&
+          (hasNewPassword || nextRole !== normalizeRole(existing.role) || nextStatus !== (existing.status || 'Aktif'))
+        ) {
+          const changeParts: string[] = [];
+          if (hasNewPassword) changeParts.push('kata sandi diperbarui');
+          if (nextRole !== normalizeRole(existing.role)) changeParts.push(`peran diubah menjadi ${nextRole}`);
+          if (nextStatus !== (existing.status || 'Aktif')) changeParts.push(`status akun menjadi ${nextStatus}`);
+
+          await createD1Notification(db, {
+            type: 'system',
+            severity: nextStatus === 'Nonaktif' ? 'warning' : 'info',
+            audience: 'user',
+            targetUserId: id,
+            title: hasNewPassword ? 'Kata Sandi Akun Diperbarui' : 'Pembaruan Keamanan Akun Anda',
+            subtitle: `Diproses oleh ${actorLabel}`,
+            description: `Perubahan akun Anda: ${changeParts.join(', ')}.`,
+            entityType: 'user',
+            entityId: id,
+            status: 'info',
+            metadata: { actor: actorLabel, userId: id },
+          });
+        }
+
         const result = await db.prepare('SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ?').bind(id).first();
         return jsonResponse(result);
       }
@@ -1863,6 +1888,32 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         description: note,
         metadata: { emailSent, tempPassword: emailSent ? null : tempPassword, actionBy: actorLabel },
       });
+
+      if (targetUserRow?.id) {
+        await createD1Notification(db, {
+          type: 'system',
+          severity: action === 'approve' ? 'info' : 'warning',
+          audience: 'user',
+          targetUserId: targetUserRow.id,
+          title: action === 'approve' ? 'Permohonan Reset Kata Sandi Disetujui' : 'Permohonan Reset Kata Sandi Ditolak',
+          subtitle: `Diproses oleh ${actorLabel}`,
+          description:
+            action === 'approve'
+              ? `Kata sandi sementara baru untuk akun Anda telah diterbitkan pada ${nowStr}.`
+              : note,
+          entityType: 'user',
+          entityId: targetUserRow.id,
+          status: newStatus,
+          metadata: { actor: actorLabel, userId: targetUserRow.id, requestId: id },
+        });
+      }
+
+      if (authUser.id) {
+        await db
+          .prepare('INSERT OR IGNORE INTO read_notifications (userId, notificationId, readAt) VALUES (?, ?, ?)')
+          .bind(authUser.id, `notif-reset-${id}`, new Date().toISOString())
+          .run();
+      }
 
       return jsonResponse({ success: true, id, status: newStatus, actionNote: note, tempPassword: emailSent ? null : tempPassword, emailSent, targetUser: formattedTargetUser });
     }

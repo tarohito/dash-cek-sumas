@@ -4795,23 +4795,26 @@ app.post('/api/password-resets/:id/respond', async (req, res) => {
     updateSystemNotificationByEntity('password_reset', id, {
       status: newStatus,
       description: note,
-      severity: 'info',
+      severity: action === 'approve' ? 'info' : 'warning',
     });
 
-    if (action === 'approve' && targetUserRow?.id) {
+    if (targetUserRow?.id) {
       const actorLabel = getNotificationActorLabel(actor);
       createSystemNotification({
         type: 'system',
-        severity: 'info',
+        severity: action === 'approve' ? 'info' : 'warning',
         audience: 'user',
         targetUserId: targetUserRow.id,
-        title: 'Permohonan Reset Kata Sandi Disetujui',
+        title: action === 'approve' ? 'Permohonan Reset Kata Sandi Disetujui' : 'Permohonan Reset Kata Sandi Ditolak',
         subtitle: `Diproses oleh ${actorLabel}`,
-        description: `Kata sandi sementara baru untuk akun Anda telah diterbitkan pada ${nowStr}.`,
+        description:
+          action === 'approve'
+            ? `Kata sandi sementara baru untuk akun Anda telah diterbitkan pada ${nowStr}.`
+            : note,
         entityType: 'user',
         entityId: targetUserRow.id,
-        status: 'Disetujui',
-        metadata: { actor: actorLabel, userId: targetUserRow.id },
+        status: newStatus,
+        metadata: { actor: actorLabel, userId: targetUserRow.id, requestId: id },
       });
     }
 
