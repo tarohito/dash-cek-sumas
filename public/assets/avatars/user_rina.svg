@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bgGradR" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4338ca"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="60" fill="url(#bgGradR)"/>
+  <!-- Hair back -->
+  <path d="M34 48 C34 76 44 88 44 88 L76 88 C76 88 86 76 86 48 Z" fill="#1e1b4b"/>
+  <!-- Face -->
+  <circle cx="60" cy="48" r="21" fill="#fed7aa"/>
+  <!-- Hair front style -->
+  <path d="M37 42 C40 25 80 25 83 42 C74 34 66 36 60 38 C54 36 46 34 37 42 Z" fill="#1e1b4b"/>
+  <path d="M37 42 C38 56 42 62 42 62 C40 52 40 44 42 42 Z" fill="#1e1b4b"/>
+  <!-- Eyes -->
+  <circle cx="52" cy="48" r="2.5" fill="#1e1b4b"/>
+  <circle cx="68" cy="48" r="2.5" fill="#1e1b4b"/>
+  <!-- Smile -->
+  <path d="M53 58 Q60 63 67 58" fill="none" stroke="#9a3412" stroke-width="2" stroke-linecap="round"/>
+  <!-- Blouse -->
+  <path d="M26 108 C26 84 42 74 60 74 C78 74 94 84 94 108 Z" fill="#6366f1"/>
+  <path d="M52 74 Q60 84 68 74" fill="#fed7aa"/>
+</svg>

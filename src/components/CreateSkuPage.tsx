@@ -1,0 +1,990 @@
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { CustomSelect } from './CustomSelect';
+import { CategorySpecDrawer } from './CategorySpecDrawer';
+import { CategoryPickerModal } from './CategoryPickerModal';
+import { compressAndConvertToWebP } from '../utils/imageOptimizer';
+import { 
+  Trash2, 
+  Check, 
+  Tag, 
+  FileText, 
+  Sliders, 
+  Sparkles,
+  Camera,
+  ChevronRight,
+  X,
+  AlertCircle
+} from 'lucide-react';
+
+interface BrandRef {
+  id: string;
+  name: string;
+  category: string;
+  logo?: string | null;
+}
+
+export interface CategorySpecField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'boolean' | 'textarea';
+  options?: string[];
+  unit?: string;
+  required?: boolean;
+}
+
+export interface ExtendedCategorySpecField extends CategorySpecField {
+  sourceCategoryName?: string;
+  sourceCategoryLevel?: number;
+  sourceCategoryId?: string;
+}
+
+export interface CategoryRef {
+  id: string;
+  name: string;
+  level: number;
+  parentId?: string | null;
+  code?: string | null;
+  specSchema?: string | null;
+}
+
+interface CreateSkuPageProps {
+  mode?: 'create' | 'edit';
+  initialData?: {
+    id: string;
+    brandId: string;
+    brandName: string;
+    sku: string;
+    skuCode?: string;
+    category: string;
+    description?: string;
+    image?: string;
+  } | null;
+  brands: BrandRef[];
+  categories: CategoryRef[];
+  existingProducts?: Array<{ id?: string; sku: string; skuCode?: string; brandName: string; category?: string }>;
+  onBack: () => void;
+  onSave: (product: {
+    brandId: string;
+    brandName: string;
+    sku: string;
+    skuCode: string;
+    category: string;
+    description?: string;
+    image?: string;
+  }) => Promise<void>;
+  onAlert: (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
+  onCategoriesUpdated?: (cats: CategoryRef[]) => void;
+  onDirtyChange?: (isDirty: boolean) => void;
+}
+
+type SectionKey = 'informasi' | 'spesifikasi' | 'deskripsi';
+
+export const CreateSkuPage: React.FC<CreateSkuPageProps> = ({
+  mode = 'create',
+  initialData = null,
+  brands,
+  categories,
+  existingProducts = [],
+  onBack,
+  onSave,
+  onAlert,
+  onDirtyChange,
+  onCategoriesUpdated
+}) => {
+  interface CustomSpecItem {
+    id: string;
+    key: string;
+    value: string;
+  }
+
+  // Parser spesifikasi dari deskripsi awal produk (relasional & format teks)
+  const parseInitialDescription = (rawDesc?: string) => {
+    if (!rawDesc) return {
+      desc: '',
+      rawSpecs: {} as Record<string, string>
+    };
+    const lines = rawDesc.split('\n\n');
+    const remainingLines: string[] = [];
+    const rawSpecs: Record<string, string> = {};
+
+    lines.forEach(line => {
+      if (line.includes(':') && (line.includes(' | ') || line.match(/^[A-Za-z0-9\s\/\-_]+:\s*.+$/))) {
+        const parts = line.split(' | ');
+        let lineHasSpec = false;
+        parts.forEach(part => {
+          const m = part.match(/^([^:]+):\s*(.*)$/);
+          if (m) {
+            lineHasSpec = true;
+            const originalKey = m[1].trim();
+            const val = m[2].trim();
+            rawSpecs[originalKey] = val;
+            rawSpecs[originalKey.toLowerCase()] = val;
+          }
+        });
+        if (!lineHasSpec) remainingLines.push(line);
+      } else {
+        remainingLines.push(line);
+      }
+    });
+
+    return {
+      desc: remainingLines.join('\n\n').trim(),
+      rawSpecs
+    };
+  };
+
+  const parsedInitial = useMemo(() => parseInitialDescription(initialData?.description), [initialData?.description]);
+
+  // Form state (Default kosong tanpa pilihan otomatis)
+  const [brandId, setBrandId] = useState<string>(initialData?.brandId || '');
+  const [brandName, setBrandName] = useState<string>(initialData?.brandName || '');
+  const [skuName, setSkuName] = useState<string>(initialData?.sku || '');
+  const [skuCode, setSkuCode] = useState<string>(initialData?.skuCode || '');
+  const [category, setCategory] = useState<string>(initialData?.category || '');
+  const [productImage, setProductImage] = useState<string>(initialData?.image || '');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [categoryFieldValues, setCategoryFieldValues] = useState<Record<string, string>>(parsedInitial.rawSpecs || {});
+  const [description, setDescription] = useState<string>(parsedInitial.desc || '');
+  const [isSpecDrawerOpen, setIsSpecDrawerOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
+  const [selectedDrawerCatId, setSelectedDrawerCatId] = useState<string | null>(null);
+
+  // Resolusi hierarki kategori secara relasional dari data database SQLite (L1 -> L2 -> L3)
+  const categoryChain = useMemo<CategoryRef[]>(() => {
+    if (!category || !categories.length) return [];
+
+    let parts: string[] = [];
+    for (const sep of ['>', '›', '→', ' / ']) {
+      if (category.includes(sep)) {
+        parts = category.split(sep).map(p => p.trim()).filter(Boolean);
+        break;
+      }
+    }
+    if (parts.length === 0) {
+      parts = [category.trim()];
+    }
+
+    if (parts.length > 1) {
+      const l1 = categories.find(c => c.level === 1 && c.name.toLowerCase() === parts[0].toLowerCase());
+      const l2 = l1 
+        ? categories.find(c => c.level === 2 && c.parentId === l1.id && c.name.toLowerCase() === parts[1].toLowerCase())
+        : categories.find(c => c.level === 2 && c.name.toLowerCase() === parts[1].toLowerCase());
+      const l3 = (parts.length >= 3 && l2)
+        ? categories.find(c => c.level === 3 && c.parentId === l2.id && c.name.toLowerCase() === parts[2].toLowerCase())
+        : (parts.length >= 3 ? categories.find(c => c.level === 3 && c.name.toLowerCase() === parts[2].toLowerCase()) : null);
+
+      return [l1, l2, l3].filter((c): c is CategoryRef => Boolean(c));
+    }
+
+    const singleName = parts[0].toLowerCase();
+    const match = categories.find(c => c.name.toLowerCase() === singleName)
+      || categories.find(c => c.id.toLowerCase() === singleName);
+
+    if (!match) return [];
+
+    if (match.level === 3) {
+      const parent = categories.find(c => c.id === match.parentId);
+      const grandparent = parent ? categories.find(c => c.id === parent.parentId) : null;
+      return [grandparent, parent, match].filter((c): c is CategoryRef => Boolean(c));
+    }
+    if (match.level === 2) {
+      const parent = categories.find(c => c.id === match.parentId);
+      return [parent, match].filter((c): c is CategoryRef => Boolean(c));
+    }
+    return [match];
+  }, [category, categories]);
+
+  // Kategori paling spesifik (leaf) dalam hierarki
+  const leafCategory = useMemo<CategoryRef | null>(() => {
+    if (categoryChain.length === 0) return null;
+    return categoryChain[categoryChain.length - 1];
+  }, [categoryChain]);
+
+  // Target kategori untuk Drawer form konfigurasi spesifikasi
+  const targetCategoryForDrawer = useMemo<CategoryRef | null>(() => {
+    if (selectedDrawerCatId) {
+      const found = categories.find(c => c.id === selectedDrawerCatId);
+      if (found) return found;
+    }
+    // Jika tidak ada pilihan eksplisit, pilih kategori teratas yang memiliki schema atau leafCategory
+    const catWithSchema = [...categoryChain].reverse().find(c => {
+      try {
+        const s = c.specSchema ? JSON.parse(c.specSchema) : [];
+        return Array.isArray(s) && s.length > 0;
+      } catch {
+        return false;
+      }
+    });
+    return catWithSchema || leafCategory || null;
+  }, [selectedDrawerCatId, categories, categoryChain, leafCategory]);
+
+  // Skema atribut spesifikasi gabungan terwariskan dari hierarki database (L1 -> L2 -> L3)
+  const activeCategorySchema = useMemo<ExtendedCategorySpecField[]>(() => {
+    if (categoryChain.length === 0) return [];
+
+    const result: ExtendedCategorySpecField[] = [];
+    const seenLabels = new Set<string>();
+
+    for (const cat of categoryChain) {
+      if (!cat.specSchema) continue;
+      try {
+        const parsed = JSON.parse(cat.specSchema);
+        if (Array.isArray(parsed)) {
+          for (const field of parsed) {
+            const normLabel = (field.label || '').trim().toLowerCase();
+            if (normLabel && !seenLabels.has(normLabel)) {
+              seenLabels.add(normLabel);
+              result.push({
+                ...field,
+                sourceCategoryName: cat.name,
+                sourceCategoryLevel: cat.level,
+                sourceCategoryId: cat.id
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing specSchema for category', cat.id, err);
+      }
+    }
+
+    return result;
+  }, [categoryChain]);
+
+  // Sinkronkan state saat initialData berubah
+  useEffect(() => {
+    if (initialData && mode === 'edit') {
+      const bObj = brands.find(b => b.id === initialData.brandId || b.name === initialData.brandName);
+      setBrandId(initialData.brandId || bObj?.id || '');
+      setBrandName(initialData.brandName || bObj?.name || '');
+      setSkuName(initialData.sku || '');
+      setSkuCode(initialData.skuCode || '');
+      setCategory(initialData.category || bObj?.category || '');
+      setProductImage(initialData.image || '');
+      setDescription(parsedInitial.desc || '');
+      setCategoryFieldValues(parsedInitial.rawSpecs || {});
+    } else if (mode === 'create') {
+      setBrandId('');
+      setBrandName('');
+      setSkuName('');
+      setSkuCode('');
+      setCategory('');
+      setProductImage('');
+      setDescription('');
+      setCategoryFieldValues({});
+    }
+  }, [initialData, mode, brands, parsedInitial.desc, parsedInitial.rawSpecs]);
+
+  // Active anchor tab state
+  const [activeSection, setActiveSection] = useState<SectionKey>('informasi');
+
+  // References for scrolling
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sectionInformasiRef = useRef<HTMLDivElement>(null);
+  const sectionSpesifikasiRef = useRef<HTMLDivElement>(null);
+  const sectionDeskripsiRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cek duplikasi kode SKU terhadap seluruh produk yang telah terdaftar
+  const trimmedSkuCode = skuCode.trim().toUpperCase();
+  const duplicateProduct = useMemo(() => {
+    if (!trimmedSkuCode) return null;
+    return existingProducts.find(
+      p => p.id !== initialData?.id && (
+        (p.skuCode && p.skuCode.trim().toUpperCase() === trimmedSkuCode) ||
+        (p.sku && p.sku.trim().toUpperCase() === trimmedSkuCode)
+      )
+    ) || null;
+  }, [trimmedSkuCode, existingProducts, initialData]);
+
+  const isDuplicateSkuCode = Boolean(duplicateProduct);
+
+  // Helper untuk membuat kode SKU dengan format standar industri terbaik: [BRAND]-[KATEGORI]-[NOMOR URUT]
+  const createBestPracticeSkuCode = (targetBrand: string, targetCategory: string, targetName: string) => {
+    const cleanBrand = (targetBrand || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    let brandPrefix = 'SKU';
+    const brandWords = (targetBrand || '').trim().split(/\s+/).filter(Boolean);
+    if (brandWords.length >= 2) {
+      brandPrefix = brandWords.map(w => w[0]).join('').slice(0, 3).toUpperCase();
+    } else if (cleanBrand.length >= 3) {
+      brandPrefix = cleanBrand.slice(0, 3);
+    } else if (cleanBrand.length > 0) {
+      brandPrefix = cleanBrand.padEnd(3, 'X');
+    }
+
+    let catPrefix = 'PRD';
+    const sourceText = targetCategory || targetName || '';
+    if (sourceText) {
+      const segments = sourceText.split('>').map(s => s.trim()).filter(Boolean);
+      const lastSeg = segments[segments.length - 1] || '';
+      const words = lastSeg.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(Boolean);
+      if (words.length >= 3) {
+        catPrefix = (words[0][0] + words[1][0] + words[2][0]).toUpperCase();
+      } else if (words.length === 2) {
+        catPrefix = (words[0].slice(0, 2) + words[1][0]).toUpperCase();
+      } else if (words.length === 1 && words[0].length >= 3) {
+        catPrefix = words[0].slice(0, 3).toUpperCase();
+      }
+    }
+
+    const sameBrandCount = existingProducts.filter(p => (p as any).brandId === brandId || p.brandName === brandName).length;
+    const nextSeq = String(sameBrandCount + 1).padStart(3, '0');
+
+    return `${brandPrefix}-${catPrefix}-${nextSeq}`;
+  };
+
+  const handleGenerateSkuCode = () => {
+    const generated = createBestPracticeSkuCode(brandName, category, skuName);
+    setSkuCode(generated);
+  };
+
+  // Handler Upload Foto Produk
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      onAlert('Format Tidak Didukung', 'Silakan pilih file gambar (JPG, PNG, WebP).', 'warning');
+      return;
+    }
+
+    try {
+      const optimizedBase64 = await compressAndConvertToWebP(file, { maxWidth: 800, maxHeight: 800, quality: 0.82 });
+      setProductImage(optimizedBase64);
+      onAlert('Foto Dipilih', 'Foto produk berhasil dimuat & dioptimalkan.', 'success');
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProductImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Navigasi scroll ke anchor section tertentu
+  const scrollToSection = (section: SectionKey) => {
+    setActiveSection(section);
+    let targetRef: React.RefObject<HTMLDivElement | null> | null = null;
+    if (section === 'informasi') targetRef = sectionInformasiRef;
+    if (section === 'spesifikasi') targetRef = sectionSpesifikasiRef;
+    if (section === 'deskripsi') targetRef = sectionDeskripsiRef;
+
+    if (targetRef?.current) {
+      targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Deteksi scroll untuk memperbarui active section tab
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const scrollPos = scrollContainerRef.current.scrollTop + 140;
+
+    const infoTop = sectionInformasiRef.current?.offsetTop || 0;
+    const specTop = sectionSpesifikasiRef.current?.offsetTop || 0;
+    const descTop = sectionDeskripsiRef.current?.offsetTop || 0;
+
+    if (descTop && scrollPos >= descTop) {
+      setActiveSection('deskripsi');
+    } else if (specTop && scrollPos >= specTop) {
+      setActiveSection('spesifikasi');
+    } else {
+      setActiveSection('informasi');
+    }
+  };
+
+  // Deteksi perubahan data formulir (di mode edit: apakah ada perubahan dibanding initialData)
+  const isFormDirty = mode === 'edit' && initialData ? Boolean(
+    skuName.trim() !== (initialData.sku || '').trim() ||
+    skuCode.trim() !== (initialData.skuCode || '').trim() ||
+    category.trim() !== (initialData.category || '').trim() ||
+    brandId !== initialData.brandId ||
+    productImage !== (initialData.image || '') ||
+    description.trim() !== (parsedInitial.desc || '').trim() ||
+    Object.keys(categoryFieldValues).some(k => (categoryFieldValues[k] || '').trim() !== (parsedInitial.rawSpecs[k] || '').trim())
+  ) : Boolean(
+    skuName.trim() ||
+    skuCode.trim() ||
+    productImage ||
+    description.trim() ||
+    Object.keys(categoryFieldValues).some(k => (categoryFieldValues[k] || '').trim())
+  );
+
+  // Sinkronkan status dirty form ke induk komponen
+  useEffect(() => {
+    onDirtyChange?.(isFormDirty);
+  }, [isFormDirty, onDirtyChange]);
+
+  // Tangani klik tombol Batal / Keluar
+  const handleCancelClick = () => {
+    onBack();
+  };
+
+  // Peringatan jika pengguna me-refresh atau menutup tab browser
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isFormDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isFormDirty]);
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!brandId || !brandName.trim()) {
+      onAlert('Brand Wajib Dipilih', 'Silakan pilih Brand / Merk pemilik SKU terlebih dahulu.', 'warning');
+      scrollToSection('informasi');
+      return;
+    }
+    if (!skuName.trim()) {
+      onAlert('Nama Produk Wajib Diisi', 'Silakan masukkan nama produk SKU pada formulir informasi produk.', 'warning');
+      scrollToSection('informasi');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Gabungkan spesifikasi terstruktur ke dalam deskripsi produk
+      const specItems: string[] = activeCategorySchema.map(f => {
+        const val = categoryFieldValues[f.label]?.trim();
+        if (!val) return '';
+        return f.unit ? `${f.label}: ${val} ${f.unit}` : `${f.label}: ${val}`;
+      }).filter(Boolean);
+
+      const parts: string[] = [];
+      if (description.trim()) {
+        parts.push(description.trim());
+      }
+      if (specItems.length > 0) {
+        parts.push(specItems.join(' | '));
+      }
+      const combinedDescription = parts.join('\n\n');
+
+      await onSave({
+        brandId,
+        brandName,
+        sku: skuName.trim(),
+        skuCode: skuCode.trim() || createBestPracticeSkuCode(brandName, category, skuName),
+        category: category.trim() || 'Umum',
+        description: combinedDescription || undefined,
+        image: productImage || undefined
+      });
+      onDirtyChange?.(false);
+    } catch (err) {
+      console.error('Gagal menyimpan SKU:', err);
+      onAlert('Gagal Menyimpan SKU', 'Terjadi kesalahan sistem saat menyimpan produk baru.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div 
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto bg-slate-50/60 dark:bg-zinc-950 flex flex-col animate-in fade-in duration-300"
+    >
+      {/* ========================================================================= */}
+      {/* FULL-WIDTH STICKY SUB-HEADER: MENYATU SEPENUHNYA DI BAWAH HEADER SAAT DI-SCROLL */}
+      {/* ========================================================================= */}
+      <div className="sticky top-0 z-30 w-full bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 shadow-xs">
+        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
+          
+          {/* SISI KIRI: 3 MENU ANCHOR NAVIGASI (DENGAN GARIS WARNA DI BAWAH SAAT AKTIF) */}
+          <div className="flex items-center gap-1 sm:gap-3 overflow-x-auto scrollbar-none flex-1 min-w-0 h-full">
+            <button
+              type="button"
+              onClick={() => scrollToSection('informasi')}
+              className={`h-full px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-b-2 ${
+                activeSection === 'informasi'
+                  ? 'border-[#c28e62] text-[#c28e62] font-bold'
+                  : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'
+              }`}
+            >
+              <Tag size={15} />
+              <span>Informasi Produk</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => scrollToSection('spesifikasi')}
+              className={`h-full px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-b-2 ${
+                activeSection === 'spesifikasi'
+                  ? 'border-[#c28e62] text-[#c28e62] font-bold'
+                  : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'
+              }`}
+            >
+              <Sliders size={15} />
+              <span>Spesifikasi</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => scrollToSection('deskripsi')}
+              className={`h-full px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 border-b-2 ${
+                activeSection === 'deskripsi'
+                  ? 'border-[#c28e62] text-[#c28e62] font-bold'
+                  : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'
+              }`}
+            >
+              <FileText size={15} />
+              <span>Deskripsi</span>
+            </button>
+          </div>
+
+          {/* SISI KANAN: TOMBOL BATAL, SIMPAN DRAF, DAN SIMPAN SKU */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleCancelClick}
+              className="h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+            >
+              {isSubmitting ? (
+                <span>Menyimpan...</span>
+              ) : (
+                <span>{mode === 'edit' ? 'Perbarui SKU' : 'Simpan SKU'}</span>
+              )}
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* KONTEN UTAMA FORMULIR SKU (LAYOUT LEBAR KONSISTEN MAX-W-1720PX)          */}
+      {/* ========================================================================= */}
+      <div className="w-full max-w-[1720px] mx-auto p-3.5 sm:p-5 md:p-6 lg:p-8 space-y-6 sm:space-y-7 pb-20 sm:pb-24">
+
+        {/* ========================================================================= */}
+        {/* SECTION 1: INFORMASI PRODUK (2 KOLOM: FOTO 1:1 KIRI | FORM DETAIL KANAN)   */}
+        {/* ========================================================================= */}
+        <section 
+          id="section-informasi-produk" 
+          ref={sectionInformasiRef}
+          className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
+        >
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4">
+            <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-zinc-100 leading-snug flex items-center gap-2">
+              <Tag size={16} className="text-[#c28e62]" />
+              <span>Informasi Produk</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+            
+            {/* KOLOM KIRI: GAMBAR PRODUK (RASIO WAJIB 1:1 SQUARE DENGAN AUTO-CROP) */}
+            <div className="lg:col-span-5 flex flex-col items-center">
+
+              <div className="w-full aspect-square max-w-[360px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/40 relative overflow-hidden group flex flex-col items-center justify-center text-center p-2 transition-all hover:border-[#c28e62]">
+                {productImage ? (
+                  <>
+                    <img 
+                      src={productImage} 
+                      alt="Pratinjau Produk" 
+                      className="w-full h-full object-cover rounded-xl"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3.5 py-1.5 rounded-full bg-white text-slate-800 text-xs font-semibold hover:bg-slate-100 transition-colors cursor-pointer shadow-xs"
+                      >
+                        Ganti Foto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProductImage('')}
+                        className="p-2 rounded-full bg-rose-500 text-white hover:bg-rose-600 transition-colors cursor-pointer shadow-xs"
+                        title="Hapus Foto"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center cursor-pointer p-4 w-full h-full"
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                      <Camera size={26} />
+                    </div>
+                    <span className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-200 mb-1">
+                      Unggah Foto Produk
+                    </span>
+                    <span className="text-[11px] text-slate-400 dark:text-zinc-500 max-w-[200px] leading-relaxed">
+                      Format JPG, PNG, WEBP. Maks 5MB. Rasio kotak 1:1.
+                    </span>
+                  </div>
+                )}
+                
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImageFileChange} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+              </div>
+            </div>
+
+            {/* KOLOM KANAN: NAMA PRODUK, KODE SKU, KATEGORI, SEGMEN PASAR */}
+            <div className="lg:col-span-7 space-y-4 sm:space-y-5">
+              
+              {/* Brand Pemilik */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Brand / Merk Pemilik SKU <span className="text-rose-500">*</span>
+                </label>
+                <CustomSelect
+                  value={brandId}
+                  onChange={(bId) => {
+                    const b = brands.find(item => item.id === bId);
+                    setBrandId(bId);
+                    if (b) {
+                      setBrandName(b.name);
+                    } else {
+                      setBrandName('');
+                    }
+                  }}
+                  options={brands.map(b => ({
+                    value: b.id,
+                    label: b.name,
+                    sublabel: b.category,
+                    avatar: b.logo || null
+                  }))}
+                  placeholder="Pilih Brand..."
+                  searchable={true}
+                  buttonClassName="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 cursor-pointer flex justify-between items-center transition-colors select-none"
+                />
+              </div>
+
+              {/* Nama Produk */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                    Nama Produk SKU <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                    {skuName.length}/120 Karakter
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  maxLength={120}
+                  placeholder="Contoh: Phenolic Board 12mm Standard, Nylon Fitting Set, Boxy Cut Tee"
+                  value={skuName}
+                  onChange={(e) => setSkuName(e.target.value)}
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+                />
+              </div>
+
+              {/* Kode SKU */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                    Kode SKU Produk
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateSkuCode}
+                    className="text-[11px] text-[#c28e62] hover:text-[#b07d53] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Sparkles size={12} />
+                    <span>Generate Otomatis</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Kode identifikasi barang unik (Contoh: SMS-CUB-001, AST-CLD-001)"
+                  value={skuCode}
+                  onChange={(e) => setSkuCode(e.target.value.toUpperCase())}
+                  className={`w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border rounded-full text-xs sm:text-sm font-mono uppercase text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 transition-colors focus:outline-none ${
+                    isDuplicateSkuCode
+                      ? 'border-rose-500 focus:border-rose-500 bg-rose-50/20 dark:bg-rose-950/20 text-rose-900 dark:text-rose-100'
+                      : skuCode.trim().length >= 3
+                      ? 'border-emerald-500/80 focus:border-emerald-500 dark:border-emerald-600/80'
+                      : 'border-slate-200 dark:border-zinc-700 focus:border-[#c28e62]'
+                  }`}
+                />
+
+                {/* Indikator Peringatan Kode Duplikat atau Konfirmasi Unik */}
+                {isDuplicateSkuCode && duplicateProduct && (
+                  <p className="flex items-center gap-1.5 mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle size={13} className="shrink-0 text-rose-500" />
+                    <span>
+                      Kode SKU sudah digunakan oleh produk <strong>"{duplicateProduct.sku}"</strong> ({duplicateProduct.brandName}). Gunakan kode lain.
+                    </span>
+                  </p>
+                )}
+
+                {!isDuplicateSkuCode && skuCode.trim().length >= 3 && (
+                  <p className="flex items-center gap-1.5 mt-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium animate-in fade-in slide-in-from-top-1">
+                    <Check size={13} className="shrink-0" />
+                    <span>Kode SKU unik dan siap digunakan.</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Kategori Produk (Mendukung Struktur 3 Level via Modal) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Kategori Produk
+                </label>
+                <div 
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 cursor-pointer flex justify-between items-center transition-colors group select-none shadow-2xs"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <span className={category ? 'font-medium truncate text-slate-800 dark:text-zinc-100' : 'text-slate-400 dark:text-zinc-500 truncate'}>
+                      {category || 'Pilih Kategori Produk...'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {category && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCategory('');
+                        }}
+                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded-full hover:bg-slate-200/60 dark:hover:bg-zinc-700 transition-colors"
+                        title="Hapus Kategori"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    <span className="text-xs text-[#c28e62] font-semibold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                      <span>Pilih</span>
+                      <ChevronRight size={14} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* SECTION 2: SPESIFIKASI TEKNIS PRODUK (DINAMIS DARI TEMPLATE KATEGORI)     */}
+        {/* ========================================================================= */}
+        <section 
+          id="section-spesifikasi" 
+          ref={sectionSpesifikasiRef}
+          className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
+        >
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4 flex items-center justify-between">
+            <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-zinc-100 leading-snug flex items-center gap-2">
+              <Sliders size={16} className="text-[#c28e62]" />
+              <span>Spesifikasi Produk</span>
+            </h2>
+            {category && targetCategoryForDrawer && (
+              <button
+                type="button"
+                onClick={() => setIsSpecDrawerOpen(true)}
+                className="h-9 px-4 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+              >
+                Atur Atribut Kategori
+              </button>
+            )}
+          </div>
+
+          {activeCategorySchema.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              {activeCategorySchema.map((field) => (
+                <div key={field.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 truncate">
+                      {field.label}
+                      {field.required && <span className="text-rose-500 ml-1">*</span>}
+                    </label>
+                    {field.unit && (
+                      <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 shrink-0">
+                        Satuan: {field.unit}
+                      </span>
+                    )}
+                  </div>
+
+                  {field.type === 'select' ? (
+                    <CustomSelect
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(val) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: val }))}
+                      options={(field.options || []).map(opt => ({ value: opt, label: opt }))}
+                      placeholder={`Pilih ${field.label}...`}
+                      searchable={(field.options || []).length > 5}
+                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 flex items-center justify-between cursor-pointer select-none"
+                    />
+                  ) : field.type === 'boolean' ? (
+                    <CustomSelect
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(val) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: val }))}
+                      options={[
+                        { value: 'Ya', label: 'Ya (Aktif)' },
+                        { value: 'Tidak', label: 'Tidak (Nonaktif)' }
+                      ]}
+                      placeholder={`Pilih ${field.label}...`}
+                      searchable={false}
+                      buttonClassName="w-full h-10 px-5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 flex items-center justify-between cursor-pointer select-none"
+                    />
+                  ) : field.type === 'date' ? (
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={categoryFieldValues[field.label] || ''}
+                        onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                        className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none [color-scheme:light] dark:[color-scheme:dark] transition-colors cursor-pointer"
+                      />
+                    </div>
+                  ) : field.type === 'textarea' ? (
+                    <textarea
+                      rows={2}
+                      placeholder={`Masukkan ${field.label.toLowerCase()}...`}
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                      className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] focus:border-[#c28e62] rounded-2xl text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none transition-colors resize-none"
+                    />
+                  ) : field.type === 'number' ? (
+                    <div className="relative">
+                      <input
+                        type="number"
+                        placeholder={`Masukkan ${field.label.toLowerCase()}...`}
+                        value={categoryFieldValues[field.label] || ''}
+                        onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                        className="w-full pl-5 pr-14 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                      />
+                      {field.unit && (
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400 dark:text-zinc-500">
+                          {field.unit}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder={`Masukkan ${field.label.toLowerCase()}...`}
+                      value={categoryFieldValues[field.label] || ''}
+                      onChange={(e) => setCategoryFieldValues(prev => ({ ...prev, [field.label]: e.target.value }))}
+                      className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62]"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 px-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 bg-transparent flex flex-col items-center justify-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center">
+                <Sliders size={18} />
+              </div>
+              <div className="space-y-1 max-w-md">
+                <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-zinc-100 leading-snug">
+                  Spesifikasi Produk Kosong
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 leading-relaxed">
+                  {categoryChain.length > 0 
+                    ? `Kategori "${leafCategory?.name || category}" dan hierarki induknya belum memiliki atribut spesifikasi di database. Atur form kategori untuk menambahkan parameter seperti bahan, dimensi, garansi, dll.` 
+                    : 'Pilih kategori terlebih dahulu untuk mengatur spesifikasi produk.'}
+                </p>
+              </div>
+              {leafCategory ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDrawerCatId(leafCategory.id);
+                    setIsSpecDrawerOpen(true);
+                  }}
+                  className="mt-1 h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                >
+                  Atur Spesifikasi Kategori
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="mt-1 h-10 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                >
+                  Pilih Kategori Produk
+                </button>
+              )}
+            </div>
+          )}
+
+        </section>
+
+        {/* ========================================================================= */}
+        {/* SECTION 3: DESKRIPSI PRODUK & CATATAN OPERASIONAL                         */}
+        {/* ========================================================================= */}
+        <section 
+          id="section-deskripsi" 
+          ref={sectionDeskripsiRef}
+          className="scroll-mt-20 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs"
+        >
+          <div className="border-b border-slate-100 dark:border-zinc-800 pb-4">
+            <h2 className="text-sm sm:text-base font-bold tracking-tight text-slate-800 dark:text-zinc-100 leading-snug flex items-center gap-2">
+              <FileText size={16} className="text-[#c28e62]" />
+              <span>Deskripsi Produk</span>
+            </h2>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                Deskripsi Produk
+              </label>
+              <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                {description.length} Karakter
+              </span>
+            </div>
+            <textarea
+              rows={4}
+              placeholder="Tuliskan deskripsi lengkap produk, keunggulan material, petunjuk pemasangan, sertifikasi, atau catatan penting saat scan QR..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-5 py-3.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-2xl text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors leading-relaxed resize-y min-h-[110px]"
+            />
+          </div>
+        </section>
+      </div>
+      {/* MODAL PICKER KATEGORI (LAYOUT 3 KOLOM SEPERTI HALAMAN KATEGORI PRODUK) */}
+      <CategoryPickerModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={categories}
+        currentCategory={category}
+        onSelectCategory={(chosenPath) => setCategory(chosenPath)}
+      />
+
+      {/* SLIDE-OVER DRAWER SPESIFIKASI KATEGORI (IDENTIK DENGAN HALAMAN KATEGORI) */}
+      {targetCategoryForDrawer && (
+        <CategorySpecDrawer
+          isOpen={isSpecDrawerOpen}
+          onClose={() => {
+            setIsSpecDrawerOpen(false);
+            setSelectedDrawerCatId(null);
+          }}
+          targetCategory={targetCategoryForDrawer}
+          availableCategories={categoryChain.length > 0 ? categoryChain : undefined}
+          onSaved={(updated) => {
+            const nextCats = categories.map(c => 
+              c.id === updated.id ? { ...c, specSchema: updated.specSchema } : c
+            );
+            onCategoriesUpdated?.(nextCats);
+          }}
+          onAlert={onAlert}
+        />
+      )}
+
+    </div>
+  );
+};
