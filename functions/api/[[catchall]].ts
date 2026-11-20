@@ -197,7 +197,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         .first<any>();
 
       const genericSuccessMessage =
-        'Jika akun terdaftar dan aktif, permohonan reset kata sandi telah diteruskan ke Super Admin.';
+        'Permohonan reset kata sandi telah diterima dan akan segera diproses oleh administrator.';
 
       if (!matchedUser || (matchedUser.status || 'Aktif') === 'Nonaktif') {
         return jsonResponse({ success: true, message: genericSuccessMessage });

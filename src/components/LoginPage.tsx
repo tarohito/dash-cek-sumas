@@ -132,7 +132,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         return;
       }
       setResetSuccessMessage(
-        data?.message || 'Permohonan reset kata sandi telah dikirim ke Super Admin.'
+        data?.message || 'Permohonan reset kata sandi telah diterima dan akan segera diproses oleh administrator.'
       );
       setResetIdentifier('');
       setResetReason('');

@@ -4639,7 +4639,7 @@ app.post('/api/password-resets', passwordResetRateLimiter, (req, res) => {
     ).get(lookupKey, lookupKey) as any;
 
     const genericSuccessMessage =
-      'Jika akun terdaftar dan aktif, permohonan reset kata sandi telah diteruskan ke Super Admin.';
+      'Permohonan reset kata sandi telah diterima dan akan segera diproses oleh administrator.';
 
     if (!matchedUser || (matchedUser.status || 'Aktif') === 'Nonaktif') {
       // Respon seragam untuk mencegah enumerasi akun & kebocoran nama/email pengguna
