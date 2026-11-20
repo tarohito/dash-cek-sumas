@@ -10,12 +10,13 @@ export function hashPassword(password: string): string {
 
 export function seedComprehensiveData(db: any) {
   const defaultPassword = hashPassword('SumasPass2026!');
+  const rinaPassword = hashPassword('rinawijaya01');
 
   // 1. OVERHAUL USERS (3 records: Super Admin, Admin Brand 1 Brand, Admin Brand 3 Brand)
   const users = [
-    { id: 'u1', name: 'Kalingga Jeandy', username: 'kalingga.jeandy', email: 'kalinggajeandy3@gmail.com', phone: '+62 812-8899-1020', role: 'Super Admin', avatar: '/assets/avatars/user_kalingga.svg', status: 'Aktif', createdAt: '28 Okt 2026, 08:30' },
-    { id: 'u2', name: 'Budi Santoso', username: 'budi.santoso', email: 'budi.s@sumas.id', phone: '+62 813-7722-3344', role: 'Admin Brand', avatar: '/assets/avatars/user_budi.svg', status: 'Aktif', createdAt: '28 Okt 2026, 09:15' },
-    { id: 'u3', name: 'Rina Wijaya', username: 'rina.wijaya', email: 'rina.w@sumas.id', phone: '+62 821-4455-6677', role: 'Admin Brand', avatar: '/assets/avatars/user_rina.svg', status: 'Aktif', createdAt: '28 Okt 2026, 10:00' }
+    { id: 'u1', name: 'Kalingga Jeandy', username: 'kalingga.jeandy', email: 'kalinggajeandy3@gmail.com', phone: '+62 812-8899-1020', role: 'Super Admin', avatar: '/assets/avatars/user_kalingga.svg', status: 'Aktif', createdAt: '28 Okt 2026, 08:30', password: defaultPassword },
+    { id: 'u2', name: 'Budi Santoso', username: 'budi.santoso', email: 'budi.s@sumas.id', phone: '+62 813-7722-3344', role: 'Admin Brand', avatar: '/assets/avatars/user_budi.svg', status: 'Aktif', createdAt: '28 Okt 2026, 09:15', password: defaultPassword },
+    { id: 'u3', name: 'Rina Wijaya', username: 'rina.wijaya', email: 'rina.w@sumas.id', phone: '+62 821-4455-6677', role: 'Admin Brand', avatar: '/assets/avatars/user_rina.svg', status: 'Aktif', createdAt: '28 Okt 2026, 10:00', password: rinaPassword }
   ];
 
   db.prepare('DELETE FROM users').run();
@@ -24,7 +25,7 @@ export function seedComprehensiveData(db: any) {
     VALUES (@id, @name, @username, @email, @phone, @role, @avatar, @status, @createdAt, @password)
   `);
   for (const u of users) {
-    insertUser.run({ ...u, password: defaultPassword });
+    insertUser.run(u);
   }
 
   // 2. OVERHAUL CATEGORIES (SUMAS Architectural & Partisi + Skincare & Dermo-Cosmetics)

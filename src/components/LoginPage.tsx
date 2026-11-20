@@ -339,33 +339,39 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-2.5">
                     <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500">
                       <span className="font-semibold text-slate-500 dark:text-zinc-400">Akun Terdaftar</span>
-                      <span className="font-mono">Sandi: SumasPass2026!</span>
+                      <span>Klik untuk isi otomatis</span>
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-zinc-800/80 rounded-xl border border-slate-200/80 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/40 overflow-hidden">
-                      {demoAccounts.map((acc) => (
-                        <button
-                          key={acc.email}
-                          type="button"
-                          onClick={() => {
-                            setIdentifier(acc.email);
-                            setPassword('SumasPass2026!');
-                            setErrorMessage('');
-                          }}
-                          className="w-full px-3.5 py-2.5 text-left hover:bg-white dark:hover:bg-zinc-900 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
-                        >
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold text-slate-700 dark:text-zinc-200">
-                              {acc.role}
+                      {demoAccounts.map((acc) => {
+                        const isRina =
+                          (acc.name || '').toLowerCase().includes('rina') ||
+                          (acc.email || '').toLowerCase().startsWith('rina');
+                        const accountPassword = isRina ? 'rinawijaya01' : 'SumasPass2026!';
+                        return (
+                          <button
+                            key={acc.email}
+                            type="button"
+                            onClick={() => {
+                              setIdentifier(acc.email);
+                              setPassword(accountPassword);
+                              setErrorMessage('');
+                            }}
+                            className="w-full px-3.5 py-2.5 text-left hover:bg-white dark:hover:bg-zinc-900 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                          >
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-slate-700 dark:text-zinc-200">
+                                {acc.role}
+                              </div>
+                              <div className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 truncate">
+                                {acc.email} · Sandi: {accountPassword}
+                              </div>
                             </div>
-                            <div className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 truncate">
-                              {acc.email}
-                            </div>
-                          </div>
-                          <span className="text-[11px] font-medium text-[#b07d53] dark:text-[#d4a379] opacity-80 group-hover:opacity-100 whitespace-nowrap shrink-0">
-                            Gunakan
-                          </span>
-                        </button>
-                      ))}
+                            <span className="text-[11px] font-medium text-[#b07d53] dark:text-[#d4a379] opacity-80 group-hover:opacity-100 whitespace-nowrap shrink-0">
+                              Gunakan
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
