@@ -650,18 +650,22 @@ export function canUserAccessNotificationRow(
     ownedBrandIds: Set<string>;
   }
 ): boolean {
-  if (ctx.isGlobal) return true;
-  if (row.audience === 'user') {
-    return Boolean(ctx.userId && row.targetUserId === ctx.userId);
+  const audience = String(row.audience || 'brand_scope');
+  if (audience === 'user') {
+    return Boolean(ctx.userId && row.targetUserId && row.targetUserId === ctx.userId);
   }
-  if (row.audience === 'super_admin') {
-    return ctx.canManageUsers && row.type === 'password_reset';
+  if (audience === 'super_admin') {
+    return ctx.canManageUsers;
   }
-  const bId = String(row.brandId || '').trim();
-  const bName = String(row.brandName || '').trim().toLowerCase();
-  if (bId && ctx.ownedBrandIds.has(bId)) return true;
-  if (bName && ctx.ownedBrandNames.has(bName)) return true;
-  return false;
+  if (audience === 'brand_scope') {
+    if (ctx.isGlobal) return true;
+    const bId = String(row.brandId || '').trim();
+    const bName = String(row.brandName || '').trim().toLowerCase();
+    if (bId && ctx.ownedBrandIds.has(bId)) return true;
+    if (bName && ctx.ownedBrandNames.has(bName)) return true;
+    return false;
+  }
+  return true;
 }
 
 function formatRelativeTimeId(tsMs: number, nowMs: number): string {
