@@ -13,7 +13,6 @@ export type PermissionKey =
   | 'sku.manage'
   | 'batches.view'
   | 'batches.create'
-  | 'batches.edit'
   | 'batches.delete'
   | 'batches.allocate'
   | 'batches.redirect_url'
@@ -91,7 +90,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: [
       { key: 'batches.view', label: 'Lihat Batch & Serial Tag', description: 'Membuka daftar batch, detail serial tag, dan riwayat audit batch.' },
       { key: 'batches.create', label: 'Buat Batch Tag Baru', description: 'Menerbitkan batch serial tag & kode PIN baru.' },
-      { key: 'batches.edit', label: 'Ubah Detail Batch', description: 'Menyunting informasi batch yang sudah diterbitkan.' },
       { key: 'batches.allocate', label: 'Alokasi Proyek Fisik (B2B)', description: 'Mengalokasikan, menyunting, atau membatalkan alokasi serial tag ke proyek (khusus brand/batch B2B).' },
       { key: 'batches.redirect_url', label: 'Ubah URL & Kebijakan QR', description: 'Mengubah URL tujuan pengalihan QR, PIN wajib, dan pelacakan GPS.' },
       { key: 'batches.suspend', label: 'Suspend / Pulihkan Batch', description: 'Menangguhkan sementara atau mengaktifkan kembali status batch.' },
@@ -103,7 +101,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     title: 'Pengguna, Notifikasi & Pengaturan Sistem',
     permissions: [
       { key: 'users.view', label: 'Lihat Daftar Pengguna', description: 'Membuka halaman daftar akun pengguna dan status akses.' },
-      { key: 'users.manage', label: 'Kelola Pengguna, Reset Sandi & RBAC', description: 'Membuat/edit akun, menyetujui reset sandi, dan mengatur matriks hak akses.' },
+      { key: 'users.manage', label: 'Kelola Pengguna & Reset Sandi', description: 'Membuat/edit akun pengguna non-Super Admin dan menyetujui permohonan reset sandi (matriks hak akses tetap khusus Super Admin).' },
       { key: 'settings.view', label: 'Lihat Pengaturan Sistem', description: 'Membuka halaman pengaturan telemetri, anomali, dan cadangan.' },
       { key: 'settings.manage', label: 'Ubah Pengaturan & Cadangan Data', description: 'Menyimpan konfigurasi sistem, unduh cadangan, dan pulihkan database.' },
       { key: 'notifications.manage', label: 'Kelola Notifikasi Sistem', description: 'Menandai notifikasi dan menindaklanjuti peringatan sistem.' },
@@ -124,6 +122,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RbacMatrix = {
     'batches.view',
     'batches.allocate',
     'scans.view',
+    'notifications.manage',
   ],
 };
 

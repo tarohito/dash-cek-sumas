@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import {
   normalizeUsernameInput,
   USERNAME_MAX_LENGTH,
@@ -211,13 +211,6 @@ export const UsernameField: React.FC<UsernameFieldProps> = ({
   const isErrorState = state.status === 'invalid' || state.status === 'taken';
   const isOkState = state.status === 'available' || state.status === 'unchanged';
 
-  const ruleChips = [
-    { ok: format.checks.length, label: `${USERNAME_MIN_LENGTH}–${USERNAME_MAX_LENGTH} karakter` },
-    { ok: format.checks.allowedChars, label: 'a-z, 0-9, ., _, -' },
-    { ok: format.checks.edgeAlnum, label: 'Awal & akhir huruf/angka' },
-    { ok: format.checks.noConsecutiveSep, label: 'Tanpa simbol ganda' },
-  ];
-
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -291,36 +284,16 @@ export const UsernameField: React.FC<UsernameFieldProps> = ({
         </div>
       </div>
 
-      {/* Live validation & rule checklist */}
+      {/* Live validation & plain-text rules */}
       {isErrorState && state.message && (
         <p className="mt-1.5 text-[11px] font-medium text-rose-600 dark:text-rose-400 leading-relaxed">
           {state.message}
         </p>
       )}
 
-      {!compactRules && (state.status === 'invalid' || state.status === 'empty') && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {ruleChips.map((chip) => (
-            <span
-              key={chip.label}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
-                normalized.length === 0
-                  ? 'bg-slate-50 dark:bg-zinc-800/70 text-slate-500 dark:text-zinc-400 border-slate-200 dark:border-zinc-700'
-                  : chip.ok
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
-                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
-              }`}
-            >
-              {normalized.length > 0 && chip.ok && <Check size={9} strokeWidth={3} />}
-              <span>{chip.label}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {compactRules && state.status === 'empty' && (
-        <p className="mt-1.5 text-[10px] text-slate-400 dark:text-zinc-500">
-          {USERNAME_MIN_LENGTH}–{USERNAME_MAX_LENGTH} karakter (a-z, 0-9, ., _, -), diawali &amp; diakhiri huruf/angka.
+      {(state.status === 'empty' || (!compactRules && state.status === 'invalid')) && (
+        <p className="mt-1.5 text-[11px] text-slate-400 dark:text-zinc-500 leading-relaxed">
+          {USERNAME_MIN_LENGTH}–{USERNAME_MAX_LENGTH} karakter (a-z, 0-9, ., _, -), diawali &amp; diakhiri huruf/angka, tanpa simbol ganda.
         </p>
       )}
     </div>

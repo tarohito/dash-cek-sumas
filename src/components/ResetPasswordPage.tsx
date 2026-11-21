@@ -13,6 +13,7 @@ import {
   AlertCircle,
   MessageSquare,
 } from 'lucide-react';
+import { getInitialsAvatar } from '../utils/avatar';
 
 export interface ResetPasswordUser {
   id: string;
@@ -47,11 +48,6 @@ interface ResetPasswordPageProps {
     type?: 'success' | 'warning' | 'info' | 'error'
   ) => void;
 }
-
-const getInitialsAvatar = (name: string, bg = 'c28e62') => {
-  const initials = (name || 'U').trim().slice(0, 2).toUpperCase() || 'U';
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="%23${bg}"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">${initials}</text></svg>`;
-};
 
 const createSecureRandomPassword = (length = 12): string => {
   const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -235,12 +231,12 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
             <div className="p-5 sm:p-6 space-y-5">
               <div className="flex items-center gap-3.5">
                 <img
-                  src={user.avatar || getInitialsAvatar(user.name)}
+                  src={user.avatar || getInitialsAvatar(user.name, user.id || user.email || user.name)}
                   alt={user.name}
                   onError={(e) => {
                     const el = e.currentTarget;
                     el.onerror = null;
-                    el.src = getInitialsAvatar(user.name);
+                    el.src = getInitialsAvatar(user.name, user.id || user.email || user.name);
                   }}
                   className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-zinc-700 shrink-0"
                 />

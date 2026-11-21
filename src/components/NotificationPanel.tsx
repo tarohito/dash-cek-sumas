@@ -44,6 +44,7 @@ interface NotificationPanelProps {
   isLoading: boolean;
   isLoadingMore: boolean;
   canManageUsers: boolean;
+  canManageNotifications?: boolean;
   roleScope?: NotificationRoleScope | null;
   notifToast?: string | null;
   processingResetId: string | null;
@@ -70,6 +71,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
   isLoading,
   isLoadingMore,
   canManageUsers,
+  canManageNotifications = true,
   roleScope,
   notifToast,
   processingResetId,
@@ -151,7 +153,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-1 shrink-0 -mr-1 -mt-0.5">
-            {unreadCount > 0 && (
+            {canManageNotifications && unreadCount > 0 && (
               <button
                 type="button"
                 onClick={onMarkAllRead}
@@ -344,7 +346,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({
                             <span className="text-[11px] text-slate-400 dark:text-zinc-500 tabular-nums whitespace-nowrap">
                               {item.timeAgo}
                             </span>
-                            {isUnread && (
+                            {canManageNotifications && isUnread && (
                               <button
                                 type="button"
                                 onClick={(e) => {

@@ -1190,7 +1190,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
           (b.specs !== undefined && nextSpecs !== existing.specs);
         const isModifyingStatus = b.status !== undefined && nextStatus !== existing.status;
 
-        if (isModifyingDetails && !can('batches.edit')) {
+        if (isModifyingDetails && !canAny('batches.allocate', 'batches.create')) {
           return deny('Akses ditolak. Anda tidak memiliki izin untuk mengubah detail batch.');
         }
         if (isModifyingStatus && !can('batches.suspend')) {
@@ -1256,7 +1256,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     }
 
     if (pathname === '/api/audit-logs' && method === 'POST') {
-      if (!canAny('batches.create', 'batches.edit', 'batches.allocate', 'batches.suspend', 'batches.redirect_url', 'users.manage')) {
+      if (!canAny('batches.create', 'batches.allocate', 'batches.suspend', 'batches.redirect_url', 'users.manage')) {
         return deny();
       }
       const log = (await request.json().catch(() => ({}))) as any;
@@ -2114,6 +2114,9 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     }
 
     if (pathname === '/api/notifications/mark-read' && method === 'POST') {
+      if (!can('notifications.manage')) {
+        return deny('Akses ditolak. Peran Anda tidak memiliki izin mengelola atau menandai notifikasi.');
+      }
       const body = (await request.json().catch(() => ({}))) as any;
       const canManageUsers = hasPermission(authUser.role, 'users.manage', rbacMatrix);
       const readAtIso = new Date().toISOString();

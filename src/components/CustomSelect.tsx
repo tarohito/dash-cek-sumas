@@ -1,11 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
-
-const getInitialsAvatar = (name: string, bg = 'c28e62') => {
-  const initials = (name || 'U').trim().slice(0, 2).toUpperCase() || 'U';
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="%23${bg}"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">${initials}</text></svg>`;
-};
+import { getAvatarColorCss, getInitials, getInitialsAvatar } from '../utils/avatar';
 
 export interface CustomSelectOption {
   value: string;
@@ -20,6 +16,7 @@ export interface CustomSelectProps {
   onChange: (val: string) => void;
   options: CustomSelectOption[];
   placeholder?: string;
+  searchPlaceholder?: string;
   className?: string;
   buttonClassName?: string;
   searchable?: boolean;
@@ -31,6 +28,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   onChange, 
   options, 
   placeholder = 'Pilih pilihan...',
+  searchPlaceholder: customSearchPlaceholder,
   className = '',
   buttonClassName,
   searchable = true,
@@ -105,8 +103,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
   const cleanPlaceholder = (placeholder || '')
     .replace(/^(Pilih|Semua|Urutkan)\s+/i, '')
+    .replace(/^-+\s*|\s*-+$/g, '')
     .trim();
-  const searchPlaceholder = cleanPlaceholder ? `Cari ${cleanPlaceholder}...` : 'Cari pilihan...';
+  const searchPlaceholder = customSearchPlaceholder || (cleanPlaceholder ? `Cari ${cleanPlaceholder}...` : 'Cari pilihan...');
 
   return (
     <div className={className || 'w-full'}>
@@ -125,13 +124,16 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
               onError={(e) => {
                 const el = e.currentTarget;
                 el.onerror = null;
-                el.src = getInitialsAvatar(selectedOpt.label);
+                el.src = getInitialsAvatar(selectedOpt.label, selectedOpt.value || selectedOpt.label);
               }}
               className="w-5 h-5 rounded-full object-cover flex-shrink-0" 
             />
           ) : selectedOpt?.sublabel ? (
-            <div className="w-5 h-5 rounded-full bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-              {selectedOpt.label.charAt(0).toUpperCase()}
+            <div
+              className="w-5 h-5 rounded-full text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+              style={{ backgroundColor: getAvatarColorCss(selectedOpt.value || selectedOpt.label) }}
+            >
+              {getInitials(selectedOpt.label)}
             </div>
           ) : null}
           <span className={selectedOpt ? 'font-medium truncate' : 'text-slate-400 dark:text-zinc-500 truncate'}>
@@ -230,13 +232,16 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                             onError={(e) => {
                               const el = e.currentTarget;
                               el.onerror = null;
-                              el.src = getInitialsAvatar(opt.label);
+                              el.src = getInitialsAvatar(opt.label, opt.value || opt.label);
                             }}
                             className="w-6 h-6 rounded-full object-cover flex-shrink-0 border border-slate-200 dark:border-zinc-700" 
                           />
                         ) : opt.sublabel ? (
-                          <div className="w-6 h-6 rounded-lg bg-[#c28e62]/15 text-[#c28e62] flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-                            {opt.label.charAt(0).toUpperCase()}
+                          <div
+                            className="w-6 h-6 rounded-full text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+                            style={{ backgroundColor: getAvatarColorCss(opt.value || opt.label) }}
+                          >
+                            {getInitials(opt.label)}
                           </div>
                         ) : null}
                         <div className="min-w-0">

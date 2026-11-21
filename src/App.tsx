@@ -117,19 +117,12 @@ import {
   slugifyUsername as buildUsernameSlug,
   validateUsernameFormat,
 } from './utils/username';
-
-// ==========================================
-// RESILIENT OFFLINE FALLBACK AVATARS & LOGOS
-// ==========================================
-const getInitialsAvatar = (name: string, bg = 'c28e62') => {
-  const initials = (name || 'U').trim().slice(0, 2).toUpperCase() || 'U';
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="%23${bg}"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">${initials}</text></svg>`;
-};
-
-const getBrandInitialsLogo = (name: string, bg = 'c28e62') => {
-  const initials = (name || 'B').trim().slice(0, 2).toUpperCase() || 'B';
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23${bg}"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-weight="bold" font-size="36">${initials}</text></svg>`;
-};
+import {
+  getAvatarColorCss,
+  getBrandInitialsLogo,
+  getInitials,
+  getInitialsAvatar,
+} from './utils/avatar';
 
 // ==========================================
 // HELPER & BADGE UNTUK DATA BARU DIBUAT (NEW BADGE)
@@ -322,6 +315,7 @@ const CustomSelect = ({
   onChange, 
   options, 
   placeholder,
+  searchPlaceholder: customSearchPlaceholder,
   className = '',
   buttonClassName,
   searchable = true,
@@ -331,6 +325,7 @@ const CustomSelect = ({
   onChange: (val: any) => void; 
   options: CustomSelectOption[]; 
   placeholder: string;
+  searchPlaceholder?: string;
   className?: string;
   buttonClassName?: string;
   searchable?: boolean;
@@ -405,8 +400,9 @@ const CustomSelect = ({
 
   const cleanPlaceholder = (placeholder || '')
     .replace(/^(Pilih|Semua|Urutkan)\s+/i, '')
+    .replace(/^-+\s*|\s*-+$/g, '')
     .trim();
-  const searchPlaceholder = cleanPlaceholder ? `Cari ${cleanPlaceholder}...` : 'Cari pilihan...';
+  const searchPlaceholder = customSearchPlaceholder || (cleanPlaceholder ? `Cari ${cleanPlaceholder}...` : 'Cari pilihan...');
 
   return (
     <div className={className || 'w-full'}>
@@ -425,13 +421,16 @@ const CustomSelect = ({
               onError={(e) => {
                 const el = e.currentTarget;
                 el.onerror = null;
-                el.src = getInitialsAvatar(selectedOpt.label);
+                el.src = getInitialsAvatar(selectedOpt.label, selectedOpt.value || selectedOpt.label);
               }}
               className="w-5 h-5 rounded-full object-cover flex-shrink-0" 
             />
           ) : selectedOpt?.sublabel ? (
-            <div className="w-5 h-5 rounded-full bg-[#c28e62]/20 text-[#c28e62] flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-              {selectedOpt.label.charAt(0).toUpperCase()}
+            <div
+              className="w-5 h-5 rounded-full text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+              style={{ backgroundColor: getAvatarColorCss(selectedOpt.value || selectedOpt.label) }}
+            >
+              {getInitials(selectedOpt.label)}
             </div>
           ) : null}
           <span className={selectedOpt ? 'font-medium truncate' : 'text-slate-400 dark:text-zinc-500 truncate'}>
@@ -521,13 +520,16 @@ const CustomSelect = ({
                         onError={(e) => {
                           const el = e.currentTarget;
                           el.onerror = null;
-                          el.src = getInitialsAvatar(opt.label);
+                          el.src = getInitialsAvatar(opt.label, opt.value || opt.label);
                         }}
                         className="w-6 h-6 rounded-full object-cover flex-shrink-0 border border-slate-200 dark:border-zinc-700" 
                       />
                     ) : opt.sublabel ? (
-                      <div className="w-6 h-6 rounded-full bg-[#c28e62]/15 text-[#c28e62] flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-                        {opt.label.charAt(0).toUpperCase()}
+                      <div
+                        className="w-6 h-6 rounded-full text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0"
+                        style={{ backgroundColor: getAvatarColorCss(opt.value || opt.label) }}
+                      >
+                        {getInitials(opt.label)}
                       </div>
                     ) : null}
                     <div className="min-w-0">
@@ -1447,6 +1449,17 @@ export default function App() {
 
     loadNotifications({ category: notifCategoryRef.current, offset: 0, append: false });
 
+    const syncRbacPermissions = () => {
+      apiFetch('/api/rbac/permissions')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (isMounted && data?.matrix) {
+            setRbacMatrix(mergeRbacMatrix(data.matrix));
+          }
+        })
+        .catch(() => {});
+    };
+
     // 1. Real-Time Server-Sent Events (SSE) via apiFetch (mendukung Cookie + Bearer Auth di iframe)
     let sseAbortController: AbortController | null = null;
     let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1485,6 +1498,9 @@ export default function App() {
             if (frame.includes('event: notification') || frame.includes('event: read_sync')) {
               if (isMounted) {
                 loadNotifications({ category: notifCategoryRef.current, offset: 0, append: false, silent: true });
+                if (frame.includes('rbac') || frame.includes('RBAC-POLICY')) {
+                  syncRbacPermissions();
+                }
               }
             }
           }
@@ -1502,20 +1518,28 @@ export default function App() {
 
     void connectNotificationStream();
 
-    // 2. Fallback polling hemat-resource (jeda saat tab tidak aktif) + sinkronisasi statistik dasbor
+    // 2. Fallback polling hemat-resource (jeda saat tab tidak aktif) + sinkronisasi statistik dasbor & RBAC
     const notifInterval = setInterval(() => {
       if (isMounted && typeof document !== 'undefined' && !document.hidden) {
         loadNotifications({ category: notifCategoryRef.current, offset: 0, append: false, silent: true });
         api.getDashboardStats().then(s => { if (isMounted && s) setDashboardStats(s); }).catch(() => {});
+        syncRbacPermissions();
       }
     }, 45000);
 
     const handleVisibilityChange = () => {
       if (isMounted && !document.hidden) {
         loadNotifications({ category: notifCategoryRef.current, offset: 0, append: false, silent: true });
+        syncRbacPermissions();
+      }
+    };
+    const handleWindowFocus = () => {
+      if (isMounted) {
+        syncRbacPermissions();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
 
     return () => {
       isMounted = false;
@@ -1523,6 +1547,7 @@ export default function App() {
       if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
       clearInterval(notifInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
     };
   }, [authUser?.id]);
 
@@ -1913,7 +1938,6 @@ export default function App() {
   const canManageCategories = can('categories.manage');
   const canManageSku = can('sku.manage');
   const canCreateBatch = can('batches.create');
-  const canEditBatch = can('batches.edit');
   const canDeleteBatch = can('batches.delete');
   const canAllocateBatch = can('batches.allocate');
   const canEditRedirectUrl = can('batches.redirect_url');
@@ -1921,6 +1945,7 @@ export default function App() {
   const canViewUsers = can('users.view') || can('users.manage');
   const canManageUsers = can('users.manage');
   const canManageSettings = can('settings.manage');
+  const canManageNotifications = can('notifications.manage');
 
   // Scope tampilan data: Super Admin melihat seluruh brand; Admin Brand terisolasi ke brand yang dipegangnya
   const isSuperAdmin = canViewAllBrands;
@@ -4542,6 +4567,7 @@ export default function App() {
   };
 
   const handleMarkAllNotificationsRead = async () => {
+    if (!canManageNotifications) return;
     try {
       await api.markNotificationsRead({ all: true });
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
@@ -4554,6 +4580,7 @@ export default function App() {
   };
 
   const handleMarkNotificationRead = async (id: string) => {
+    if (!canManageNotifications) return;
     const target = notifications.find(n => n.id === id);
     if (target?.isRead) return;
     try {
@@ -5319,13 +5346,16 @@ export default function App() {
                     onError={(e) => {
                       const el = e.currentTarget;
                       el.onerror = null;
-                      el.src = getInitialsAvatar(currentUser.name);
+                      el.src = getInitialsAvatar(currentUser.name, currentUser.id || currentUser.email || currentUser.name);
                     }}
                     className="w-9 h-9 rounded-full object-cover border border-[#c28e62]/40 transition-opacity duration-150 group-hover/profile:opacity-30" 
                   />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-[#c28e62] flex items-center justify-center text-white font-semibold text-xs aspect-square overflow-hidden transition-opacity duration-150 group-hover/profile:opacity-30">
-                    {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : (isSuperAdmin ? 'SA' : isBrandB2B ? 'SM' : 'RT')}
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-xs aspect-square overflow-hidden transition-opacity duration-150 group-hover/profile:opacity-30"
+                    style={{ backgroundColor: getAvatarColorCss(currentUser?.id || currentUser?.email || currentUser?.name) }}
+                  >
+                    {getInitials(currentUser?.name, isSuperAdmin ? 'SA' : isBrandB2B ? 'SM' : 'RT')}
                   </div>
                 )}
                 <button
@@ -5350,13 +5380,16 @@ export default function App() {
                     onError={(e) => {
                       const el = e.currentTarget;
                       el.onerror = null;
-                      el.src = getInitialsAvatar(currentUser.name);
+                      el.src = getInitialsAvatar(currentUser.name, currentUser.id || currentUser.email || currentUser.name);
                     }}
                     className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-[#c28e62]/40" 
                   />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-[#c28e62] flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 aspect-square overflow-hidden">
-                    {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : (isSuperAdmin ? 'SA' : isBrandB2B ? 'SM' : 'RT')}
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 aspect-square overflow-hidden"
+                    style={{ backgroundColor: getAvatarColorCss(currentUser?.id || currentUser?.email || currentUser?.name) }}
+                  >
+                    {getInitials(currentUser?.name, isSuperAdmin ? 'SA' : isBrandB2B ? 'SM' : 'RT')}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
@@ -5830,13 +5863,16 @@ export default function App() {
                                   onError={(e) => {
                                     const el = e.currentTarget;
                                     el.onerror = null;
-                                    el.src = getInitialsAvatar(ownerDisplayName);
+                                    el.src = getInitialsAvatar(ownerDisplayName, linkedUser?.id || linkedUser?.email || ownerDisplayName);
                                   }}
-                                  className="w-8 h-8 rounded-full object-cover border border-[#c28e62] flex-shrink-0" 
+                                  className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-zinc-700 flex-shrink-0" 
                                 />
                               ) : (
-                                <div className="w-8 h-8 rounded-full bg-[#c28e62]/15 text-[#c28e62] flex items-center justify-center font-bold text-xs flex-shrink-0 border border-[#c28e62]/20">
-                                  {ownerDisplayName ? ownerDisplayName.charAt(0).toUpperCase() : 'U'}
+                                <div
+                                  className="w-8 h-8 rounded-full text-white flex items-center justify-center font-bold text-xs flex-shrink-0"
+                                  style={{ backgroundColor: getAvatarColorCss(linkedUser?.id || linkedUser?.email || ownerDisplayName) }}
+                                >
+                                  {getInitials(ownerDisplayName)}
                                 </div>
                               )}
                               <div>
@@ -6268,13 +6304,16 @@ export default function App() {
                                 onError={(e) => {
                                   const el = e.currentTarget;
                                   el.onerror = null;
-                                  el.src = getInitialsAvatar(user.name);
+                                  el.src = getInitialsAvatar(user.name, user.id || user.email || user.name);
                                 }}
                                 className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-zinc-700 flex-shrink-0" 
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-[#c28e62]/15 text-[#c28e62] flex items-center justify-center font-bold text-sm border border-[#c28e62]/25 flex-shrink-0">
-                                {user.name.charAt(0).toUpperCase()}
+                              <div
+                                className="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0 shadow-xs"
+                                style={{ backgroundColor: getAvatarColorCss(user.id || user.email || user.name) }}
+                              >
+                                {getInitials(user.name)}
                               </div>
                             )}
                             <div className="min-w-0">
@@ -7898,6 +7937,7 @@ export default function App() {
         isLoading={isNotifLoading}
         isLoadingMore={isNotifLoadingMore}
         canManageUsers={canManageUsers}
+        canManageNotifications={canManageNotifications}
         roleScope={notifRoleScope}
         notifToast={notifToast}
         processingResetId={processingResetId}
@@ -10049,6 +10089,7 @@ export default function App() {
                       value={brandForm.ownerId}
                       onChange={(val) => setBrandForm({ ...brandForm, ownerId: val })}
                       placeholder="-- Belum Ditetapkan --"
+                      searchPlaceholder="Cari nama pemilik..."
                       searchable={true}
                       buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium truncate"
                       options={[
@@ -10060,7 +10101,7 @@ export default function App() {
                         ...users.map((u) => ({
                           value: u.id,
                           label: `${u.name} (${u.role})`,
-                          avatar: u.avatar
+                          avatar: u.avatar || getInitialsAvatar(u.name, u.id || u.email || u.name)
                         }))
                       ]}
                     />
@@ -10179,11 +10220,11 @@ export default function App() {
             
             {/* MODAL FORM BODY */}
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
-              {/* TOP ROW: KOLOM KIRI (FOTO PROFIL 1:1) & KOLOM KANAN (NAMA LENGKAP & USERNAME) */}
-              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
-                {/* KOLOM KIRI: UPLOAD FOTO PROFIL (1:1 KOTAK) */}
-                <div className="w-full sm:w-auto flex flex-col items-center flex-shrink-0">
-                  <div className="relative w-32 h-32 sm:w-36 sm:h-36">
+              {/* TOP ROW: KOLOM KIRI (FOTO PROFIL) & KOLOM KANAN (NAMA LENGKAP & USERNAME) */}
+              <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-4 sm:gap-5">
+                {/* KOLOM KIRI: UPLOAD FOTO PROFIL */}
+                <div className="w-full sm:w-44 flex flex-col items-center sm:items-stretch flex-shrink-0">
+                  <div className="relative w-36 h-36 sm:w-full sm:h-full sm:flex-1 sm:min-h-[152px]">
                     <input 
                       type="file" 
                       id="user-avatar-file-input" 
@@ -10193,7 +10234,7 @@ export default function App() {
                     />
                     <label
                       htmlFor="user-avatar-file-input"
-                      className={`w-full h-full aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group ${
+                      className={`w-full h-full aspect-square sm:aspect-auto rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group ${
                         userForm.avatar 
                           ? 'border-[#c28e62] bg-slate-50 dark:bg-zinc-800' 
                           : 'border-slate-300 dark:border-zinc-700 hover:border-[#c28e62] bg-slate-50/50 dark:bg-zinc-800/50 hover:bg-[#fcf7f3] dark:hover:bg-zinc-800'
@@ -10243,9 +10284,6 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                  <span className="mt-1.5 text-[10px] font-medium text-slate-400 dark:text-zinc-500">
-                    Foto Profil 1:1 (Opsional)
-                  </span>
                 </div>
 
                 {/* KOLOM KANAN: NAMA LENGKAP & USERNAME */}
@@ -10337,51 +10375,21 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Hak Akses */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                      Hak Akses <span className="text-rose-500">*</span>
-                    </label>
-                    <CustomSelect
-                      value={userForm.role}
-                      onChange={(val) => setUserForm({ ...userForm, role: val })}
-                      placeholder="Pilih Peran"
-                      buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
-                      options={(isAdminRole ? userRolesList : userRolesList.filter(r => r !== 'Super Admin')).map(r => ({
-                        value: r,
-                        label: r
-                      }))}
-                    />
-                  </div>
-
-                  {/* Brand yang Dikelola */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                      Brand yang Dikelola
-                    </label>
-                    {isEditUserModalOpen ? (
-                      (() => {
-                        const userManagedBrands = brands.filter(b => b.ownerId === userForm.id || (userForm.brandIds || []).includes(b.id));
-                        return (
-                          <div className="w-full bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-700 dark:text-zinc-200 flex items-center justify-between font-medium truncate">
-                            <span className="truncate">
-                              {userManagedBrands.length > 0 
-                                ? userManagedBrands.map(b => b.name).join(', ') 
-                                : 'Belum Ada Brand'}
-                            </span>
-                            <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-normal shrink-0 ml-2">
-                              {userManagedBrands.length > 0 ? `${userManagedBrands.length} Brand` : '-'}
-                            </span>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="w-full bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700 rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-400 dark:text-zinc-500 font-medium truncate">
-                        Dihubungkan via Brand / Merk
-                      </div>
-                    )}
-                  </div>
+                {/* Hak Akses */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+                    Hak Akses <span className="text-rose-500">*</span>
+                  </label>
+                  <CustomSelect
+                    value={userForm.role}
+                    onChange={(val) => setUserForm({ ...userForm, role: val })}
+                    placeholder="Pilih Peran"
+                    buttonClassName="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 hover:border-[#c28e62] dark:hover:border-[#c28e62] rounded-full px-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 cursor-pointer flex justify-between items-center transition-colors select-none font-medium"
+                    options={(isAdminRole ? userRolesList : userRolesList.filter(r => r !== 'Super Admin')).map(r => ({
+                      value: r,
+                      label: r
+                    }))}
+                  />
                 </div>
 
                 {isEditUserModalOpen && (() => {
@@ -10763,13 +10771,16 @@ export default function App() {
                                 onError={(e) => {
                                   const el = e.currentTarget;
                                   el.onerror = null;
-                                  el.src = getInitialsAvatar(userToView.name);
+                                  el.src = getInitialsAvatar(userToView.name, userToView.id || userToView.email || userToView.name);
                                 }}
                                 className="w-full h-full object-cover rounded-xl" 
                               />
                             ) : (
-                              <div className="w-full h-full rounded-xl bg-[#c28e62] text-white flex items-center justify-center font-bold text-3xl">
-                                {userToView.name.slice(0, 2).toUpperCase()}
+                              <div
+                                className="w-28 h-28 sm:w-32 sm:h-32 rounded-full text-white flex items-center justify-center font-bold text-3xl sm:text-4xl shadow-xs"
+                                style={{ backgroundColor: getAvatarColorCss(userToView.id || userToView.email || userToView.name) }}
+                              >
+                                {getInitials(userToView.name)}
                               </div>
                             )}
                           </div>
@@ -11632,13 +11643,16 @@ export default function App() {
                                     onError={(e) => {
                                       const el = e.currentTarget;
                                       el.onerror = null;
-                                      el.src = getInitialsAvatar(ownerDisplayName);
+                                      el.src = getInitialsAvatar(ownerDisplayName, linkedUser?.id || linkedUser?.email || ownerDisplayName);
                                     }}
                                     className="w-11 h-11 rounded-full object-cover border-2 border-white dark:border-zinc-700 shrink-0" 
                                   />
                                 ) : (
-                                  <div className="w-11 h-11 rounded-full bg-[#c28e62] text-white flex items-center justify-center font-bold text-sm shrink-0">
-                                    {ownerDisplayName ? ownerDisplayName.charAt(0).toUpperCase() : 'U'}
+                                  <div
+                                    className="w-11 h-11 rounded-full text-white flex items-center justify-center font-bold text-sm shrink-0"
+                                    style={{ backgroundColor: getAvatarColorCss(linkedUser?.id || linkedUser?.email || ownerDisplayName) }}
+                                  >
+                                    {getInitials(ownerDisplayName)}
                                   </div>
                                 )}
                                 <div>
@@ -12252,7 +12266,7 @@ export default function App() {
                       value: b.id,
                       label: b.name,
                       sublabel: b.category || undefined,
-                      avatar: b.logo || undefined,
+                      avatar: b.logo || getInitialsAvatar(b.name),
                     }))}
                 />
                 <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">

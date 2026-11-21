@@ -1352,7 +1352,7 @@ app.use('/api', (req, res, next) => {
       if (req.body && req.body.status !== undefined && req.body.project === undefined && req.body.specs === undefined) {
         return can('batches.suspend') ? next() : deny();
       }
-      return canAny('batches.edit', 'batches.suspend') ? next() : deny();
+      return canAny('batches.allocate', 'batches.create', 'batches.suspend') ? next() : deny();
     }
     if (method === 'DELETE') return can('batches.delete') ? next() : deny();
   }
@@ -1361,7 +1361,7 @@ app.use('/api', (req, res, next) => {
   if (reqPath === '/audit-logs') {
     if (method === 'GET') return canAny('batches.view', 'dashboard.view') ? next() : deny();
     if (method === 'POST') {
-      return canAny('batches.create', 'batches.edit', 'batches.allocate', 'batches.suspend', 'batches.redirect_url', 'users.manage')
+      return canAny('batches.create', 'batches.allocate', 'batches.suspend', 'batches.redirect_url', 'users.manage')
         ? next()
         : deny();
     }
@@ -1398,6 +1398,11 @@ app.use('/api', (req, res, next) => {
 
   // Notifications
   if (reqPath === '/notifications' || reqPath.startsWith('/notifications/')) {
+    if (reqPath === '/notifications/mark-read' && method === 'POST') {
+      return can('notifications.manage')
+        ? next()
+        : deny('Akses ditolak. Peran Anda tidak memiliki izin mengelola atau menandai notifikasi.');
+    }
     return next();
   }
 
@@ -2971,7 +2976,7 @@ app.put('/api/batches/:id', (req, res) => {
 
     const actor = getActorFromRequest(req);
     const matrix = getRbacMatrix();
-    const hasEditPerm = hasPermission(actor.role, 'batches.edit', matrix);
+    const hasEditPerm = hasPermission(actor.role, 'batches.allocate', matrix) || hasPermission(actor.role, 'batches.create', matrix);
     const hasSuspendPerm = hasPermission(actor.role, 'batches.suspend', matrix);
 
     const nextProject = b.project !== undefined ? (b.project === null ? null : sanitizeStringInput(b.project, 200)) : existing.project;

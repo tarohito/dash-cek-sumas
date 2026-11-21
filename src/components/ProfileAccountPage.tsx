@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { compressAndConvertToWebP } from '../utils/imageOptimizer';
+import { getAvatarColorCss, getInitials } from '../utils/avatar';
 import { normalizeUsernameInput, validateUsernameFormat } from '../utils/username';
 import {
   UsernameField,
@@ -326,10 +327,10 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
-          {/* KOLOM KIRI: FOTO PROFIL (RASIO 1:1 KOTAK IDENTIK DENGAN TAMBAH SKU) */}
-          <div className="lg:col-span-5 flex flex-col items-center">
-            <div className="w-full aspect-square max-w-[320px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/40 relative overflow-hidden group flex flex-col items-center justify-center text-center p-2 transition-all hover:border-[#c28e62]">
+        <div className="flex flex-col md:flex-row items-center md:items-stretch gap-6 sm:gap-7">
+          {/* KOLOM KIRI: FOTO PROFIL (SEJAJAR DENGAN 3 BARIS FORM DI KANAN) */}
+          <div className="w-48 h-48 sm:w-56 sm:h-56 md:w-60 md:h-auto lg:w-64 flex-shrink-0 flex flex-col">
+            <div className="w-full h-full aspect-square md:aspect-auto md:min-h-[244px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/40 relative overflow-hidden group flex flex-col items-center justify-center text-center p-2 transition-all hover:border-[#c28e62]">
               {avatar ? (
                 <>
                   <img
@@ -360,14 +361,18 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className="flex flex-col items-center justify-center cursor-pointer p-4 w-full h-full"
                 >
-                  <div className="w-14 h-14 rounded-2xl bg-[#c28e62]/10 text-[#c28e62] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                    <Camera size={26} />
+                  <div
+                    className="w-16 h-16 rounded-full text-white flex items-center justify-center font-bold text-xl mb-3 shadow-xs group-hover:scale-105 transition-transform"
+                    style={{ backgroundColor: getAvatarColorCss(user.id || user.email || name || user.name) }}
+                  >
+                    {getInitials(name || user.name, 'U')}
                   </div>
-                  <span className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-200 mb-1">
-                    Unggah Foto Profil
+                  <span className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-zinc-200 mb-0.5 inline-flex items-center gap-1.5">
+                    <Camera size={13} className="text-[#c28e62]" />
+                    <span>Unggah Foto Profil</span>
                   </span>
-                  <span className="text-[11px] text-slate-400 dark:text-zinc-500 max-w-[200px] leading-relaxed">
-                    Format JPG, PNG, WEBP. Rasio kotak 1:1.
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500 max-w-[180px] leading-relaxed">
+                    JPG, PNG, WEBP (1:1)
                   </span>
                 </div>
               )}
@@ -382,120 +387,136 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
             </div>
           </div>
 
-          {/* KOLOM KANAN: NAMA LENGKAP, EMAIL, WHATSAPP & PERAN */}
-          <div className="lg:col-span-7 space-y-4 sm:space-y-5">
-            {/* Nama Lengkap */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                  Nama Lengkap <span className="text-rose-500">*</span>
-                </label>
-                <span className="text-[11px] text-slate-400 dark:text-zinc-500">
-                  {name.length}/120 Karakter
-                </span>
+          {/* KOLOM KANAN: 3 BARIS GRID SEIMBANG (NAMA & USERNAME, EMAIL & WA, PERAN & SANDI) */}
+          <div className="flex-1 w-full min-w-0 space-y-4 sm:space-y-5 flex flex-col justify-between">
+            {/* BARIS 1: NAMA LENGKAP & USERNAME */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 items-start">
+              {/* Nama Lengkap */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                    Nama Lengkap <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                    {name.length}/120
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  maxLength={120}
+                  placeholder="Masukkan nama lengkap akun"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+                />
               </div>
-              <input
-                type="text"
-                maxLength={120}
-                placeholder="Masukkan nama lengkap akun"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+
+              {/* Username (Digunakan untuk Login selain Email) */}
+              <UsernameField
+                value={username}
+                onChange={setUsername}
+                currentSavedUsername={user.username}
+                excludeUserId={user.id}
+                onCheckAvailability={onCheckUsername ? (u) => onCheckUsername(u) : undefined}
+                onStatusChange={setUsernameStatus}
+                inputBgClassName="bg-slate-50 dark:bg-zinc-800/80"
+                labelClassName="text-xs font-semibold text-slate-700 dark:text-zinc-300"
               />
             </div>
 
-            {/* Username (Digunakan untuk Login selain Email) */}
-            <UsernameField
-              value={username}
-              onChange={setUsername}
-              currentSavedUsername={user.username}
-              excludeUserId={user.id}
-              onCheckAvailability={onCheckUsername ? (u) => onCheckUsername(u) : undefined}
-              onStatusChange={setUsernameStatus}
-              inputBgClassName="bg-slate-50 dark:bg-zinc-800/80"
-              labelClassName="text-xs font-semibold text-slate-700 dark:text-zinc-300"
-            />
-
-            {/* Alamat Email */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
-                Alamat Email <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="email"
-                placeholder="contoh@perusahaan.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none transition-colors ${
-                  email.trim().length > 0 && !isValidEmailFormat(email)
-                    ? 'border-rose-500 focus:border-rose-500 bg-rose-50/20 dark:bg-rose-950/20'
-                    : 'border-slate-200 dark:border-zinc-700 focus:border-[#c28e62]'
-                }`}
-              />
-              {email.trim().length > 0 && !isValidEmailFormat(email) && (
-                <p className="flex items-center gap-1.5 mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
-                  <AlertCircle size={13} className="shrink-0 text-rose-500" />
-                  <span>Format alamat email tidak valid.</span>
-                </p>
-              )}
-            </div>
-
-            {/* Nomor WhatsApp */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                  Nomor WhatsApp
-                </label>
-                <span className="text-[11px] text-slate-400 dark:text-zinc-500">Opsional</span>
-              </div>
-              <input
-                type="tel"
-                placeholder="Contoh: +62 812-3456-7890"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
-              />
-            </div>
-
-            {/* Peran Akun (Read-only konsisten) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
-                Peran &amp; Hak Akses
-              </label>
-              <div className="w-full px-5 py-2.5 bg-slate-100/70 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-700/70 rounded-full text-xs sm:text-sm text-slate-600 dark:text-zinc-300 flex items-center justify-between gap-2">
-                <span className="font-semibold">{user.role}</span>
-                <span className="text-[11px] text-slate-400 dark:text-zinc-500">Ditetapkan oleh Super Admin</span>
-              </div>
-            </div>
-
-            {/* Kata Sandi (Pemicu tampilnya area ganti sandi) */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
-                Kata Sandi
-              </label>
-              <div className="w-full pl-5 pr-2 py-1.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-600 dark:text-zinc-300 flex items-center justify-between gap-3">
-                <span className="font-mono tracking-widest text-slate-400 dark:text-zinc-500 select-none">
-                  ••••••••••
-                </span>
-                {isChangingPassword ? (
-                  <button
-                    type="button"
-                    onClick={closePasswordChange}
-                    className="h-8 px-3.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                  >
-                    <X size={13} />
-                    <span>Batal Ganti Sandi</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={openPasswordChange}
-                    className="h-8 px-3.5 rounded-full bg-[#c28e62]/10 hover:bg-[#c28e62]/20 text-[#9c6a3e] dark:text-[#e1b792] border border-[#c28e62]/25 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                  >
-                    <KeyRound size={13} />
-                    <span>Ganti Kata Sandi</span>
-                  </button>
+            {/* BARIS 2: ALAMAT EMAIL & NOMOR WHATSAPP */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 items-start">
+              {/* Alamat Email */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                    Alamat Email <span className="text-rose-500">*</span>
+                  </label>
+                  {email.trim().length > 0 && !isValidEmailFormat(email) && (
+                    <span className="text-[11px] text-rose-500 font-medium">Format tidak valid</span>
+                  )}
+                </div>
+                <input
+                  type="email"
+                  placeholder="contoh@perusahaan.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none transition-colors ${
+                    email.trim().length > 0 && !isValidEmailFormat(email)
+                      ? 'border-rose-500 focus:border-rose-500 bg-rose-50/20 dark:bg-rose-950/20'
+                      : 'border-slate-200 dark:border-zinc-700 focus:border-[#c28e62]'
+                  }`}
+                />
+                {email.trim().length > 0 && !isValidEmailFormat(email) && (
+                  <p className="flex items-center gap-1.5 mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    <AlertCircle size={13} className="shrink-0 text-rose-500" />
+                    <span>Format alamat email tidak valid.</span>
+                  </p>
                 )}
+              </div>
+
+              {/* Nomor WhatsApp */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                    Nomor WhatsApp
+                  </label>
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500">Opsional</span>
+                </div>
+                <input
+                  type="tel"
+                  placeholder="Contoh: +62 812-3456-7890"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* BARIS 3: PERAN & KATA SANDI */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 items-start">
+              {/* Peran Akun (Read-only konsisten) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                    Peran &amp; Hak Akses
+                  </label>
+                  <span className="text-[11px] text-slate-400 dark:text-zinc-500">Oleh Super Admin</span>
+                </div>
+                <div className="w-full min-h-[44px] px-5 py-2.5 bg-slate-100/70 dark:bg-zinc-800/40 border border-slate-200/80 dark:border-zinc-700/70 rounded-full text-xs sm:text-sm text-slate-600 dark:text-zinc-300 flex items-center justify-between gap-2">
+                  <span className="font-semibold truncate">{user.role}</span>
+                </div>
+              </div>
+
+              {/* Kata Sandi (Pemicu tampilnya area ganti sandi) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
+                  Kata Sandi
+                </label>
+                <div className="w-full min-h-[44px] pl-5 pr-1.5 py-1.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-600 dark:text-zinc-300 flex items-center justify-between gap-3">
+                  <span className="font-mono tracking-widest text-slate-400 dark:text-zinc-500 select-none">
+                    ••••••••••
+                  </span>
+                  {isChangingPassword ? (
+                    <button
+                      type="button"
+                      onClick={closePasswordChange}
+                      className="h-8 px-3.5 rounded-full border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                    >
+                      <X size={13} />
+                      <span>Batal Ganti</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openPasswordChange}
+                      className="h-8 px-3.5 rounded-full bg-[#c28e62]/10 hover:bg-[#c28e62]/20 text-[#9c6a3e] dark:text-[#e1b792] border border-[#c28e62]/25 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                    >
+                      <KeyRound size={13} />
+                      <span>Ganti Sandi</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
