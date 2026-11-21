@@ -27,6 +27,7 @@ export interface ProfileAccountUser {
 
 export interface ProfileUpdatePayload {
   name: string;
+  username?: string;
   email: string;
   phone: string;
   avatar: string;
@@ -42,12 +43,15 @@ interface ProfileAccountPageProps {
 type SectionKey = 'informasi' | 'keamanan';
 
 const isValidEmailFormat = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+const normalizeUsernameInput = (val: string) => val.toLowerCase().replace(/^@+/, '').replace(/\s+/g, '');
+const isValidUsernameFormat = (val: string) => /^[a-z0-9._-]{3,50}$/.test(normalizeUsernameInput(val));
 
 export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
   user,
   onSave,
 }) => {
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState('');
@@ -72,6 +76,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
   useEffect(() => {
     if (user) {
       setName(user.name || '');
+      setUsername(user.username || '');
       setEmail(user.email || '');
       setPhone(user.phone || '');
       setAvatar(user.avatar || '');
@@ -83,6 +88,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
   const isPasswordFilled = Boolean(isChangingPassword && (currentPassword || newPassword || confirmPassword));
   const isProfileDirty = Boolean(
     name.trim() !== (user.name || '').trim() ||
+    normalizeUsernameInput(username) !== normalizeUsernameInput(user.username || '') ||
     email.trim() !== (user.email || '').trim() ||
     phone.trim() !== (user.phone || '').trim() ||
     avatar.trim() !== (user.avatar || '').trim()
@@ -175,6 +181,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
 
   const handleResetChanges = () => {
     setName(user.name || '');
+    setUsername(user.username || '');
     setEmail(user.email || '');
     setPhone(user.phone || '');
     setAvatar(user.avatar || '');
@@ -197,6 +204,12 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
 
     if (!name.trim()) {
       setErrorMsg('Nama lengkap wajib diisi.');
+      scrollToSection('informasi');
+      return;
+    }
+    const cleanUsername = normalizeUsernameInput(username);
+    if (!cleanUsername || !isValidUsernameFormat(cleanUsername)) {
+      setErrorMsg('Username minimal 3 karakter (hanya huruf kecil, angka, titik, garis bawah, atau tanda hubung).');
       scrollToSection('informasi');
       return;
     }
@@ -228,6 +241,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
     try {
       const payload: ProfileUpdatePayload = {
         name: name.trim(),
+        username: cleanUsername,
         email: email.trim(),
         phone: phone.trim(),
         avatar: avatar.trim(),
@@ -370,6 +384,44 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 rounded-full text-xs sm:text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:border-[#c28e62] transition-colors"
               />
+            </div>
+
+            {/* Username (Digunakan untuk Login selain Email) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                  Username <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[11px] text-slate-400 dark:text-zinc-500">
+                  Bisa dipakai untuk login
+                </span>
+              </div>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-mono font-semibold text-slate-400 dark:text-zinc-500">
+                  @
+                </span>
+                <input
+                  type="text"
+                  maxLength={50}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="username.anda"
+                  value={username}
+                  onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
+                  className={`w-full pl-9 pr-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border rounded-full text-xs sm:text-sm font-mono text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none transition-colors ${
+                    username.length > 0 && !isValidUsernameFormat(username)
+                      ? 'border-rose-500 focus:border-rose-500 bg-rose-50/20 dark:bg-rose-950/20'
+                      : 'border-slate-200 dark:border-zinc-700 focus:border-[#c28e62]'
+                  }`}
+                />
+              </div>
+              {username.length > 0 && !isValidUsernameFormat(username) && (
+                <p className="flex items-center gap-1.5 mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
+                  <AlertCircle size={13} className="shrink-0 text-rose-500" />
+                  <span>Gunakan minimal 3 karakter: huruf kecil, angka, titik, `_`, atau `-`.</span>
+                </p>
+              )}
             </div>
 
             {/* Alamat Email */}

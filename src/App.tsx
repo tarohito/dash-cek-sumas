@@ -10199,13 +10199,35 @@ export default function App() {
                         value={userForm.name}
                         onChange={(e) => {
                           const val = e.target.value;
-                          setUserForm(prev => ({
-                            ...prev,
-                            name: val,
-                            username: slugifyUsername(val)
-                          }));
+                          setUserForm(prev => {
+                            const prevAuto = slugifyUsername(prev.name || '');
+                            const shouldAutoSlug = !prev.id && (!prev.username || prev.username === prevAuto);
+                            return {
+                              ...prev,
+                              name: val,
+                              username: shouldAutoSlug ? slugifyUsername(val) : prev.username
+                            };
+                          });
                         }}
                         className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none transition-all" 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Username (Login Alternatif selain Email) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                      <span>Username</span>
+                      <span className="text-[10px] font-normal text-slate-400 dark:text-zinc-500">Bisa dipakai untuk login</span>
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-mono font-bold text-slate-400 dark:text-zinc-500">@</span>
+                      <input 
+                        type="text" 
+                        placeholder="username.pengguna" 
+                        value={userForm.username}
+                        onChange={(e) => setUserForm(prev => ({ ...prev, username: e.target.value.toLowerCase().replace(/^@+/, '').replace(/\s+/g, '') }))}
+                        className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-9 pr-5 py-2.5 text-xs sm:text-sm font-mono text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none transition-all" 
                       />
                     </div>
                   </div>

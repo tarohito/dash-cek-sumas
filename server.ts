@@ -1039,6 +1039,7 @@ app.get('/api/auth/demo-accounts', (_req, res) => {
 app.post('/api/auth/login', loginRateLimiter, (req, res) => {
   try {
     const identifier = sanitizeStringInput(req.body?.identifier || req.body?.email || '', 150).toLowerCase();
+    const usernameLookup = identifier.startsWith('@') ? identifier.slice(1) : identifier;
     const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
     const rememberMe = req.body?.rememberMe !== false;
     const clientIp = getSafeClientIp(req);
@@ -1059,8 +1060,8 @@ app.post('/api/auth/login', loginRateLimiter, (req, res) => {
     }
 
     const user = db.prepare(
-      'SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1'
-    ).get(identifier, identifier) as any;
+      "SELECT * FROM users WHERE LOWER(email) = ? OR (username IS NOT NULL AND username != '' AND LOWER(username) = ?) LIMIT 1"
+    ).get(identifier, usernameLookup) as any;
 
     // Anti-user-enumeration & timing attack mitigation
     if (!user || !user.password || !String(user.password).trim()) {
@@ -1163,12 +1164,21 @@ app.put('/api/auth/profile', (req, res) => {
 
     const body = req.body || {};
     const cleanName = body.name !== undefined ? sanitizeStringInput(body.name, 120) : existing.name;
+    const rawUsername = body.username !== undefined
+      ? sanitizeStringInput(body.username, 80).replace(/^@+/, '').toLowerCase()
+      : (existing.username || null);
+    const cleanUsername = rawUsername ? rawUsername.trim() : null;
     const cleanEmail = body.email !== undefined ? sanitizeStringInput(body.email, 150).toLowerCase() : existing.email;
     const cleanPhone = body.phone !== undefined ? (sanitizeStringInput(body.phone, 40) || null) : existing.phone;
     const cleanAvatar = body.avatar !== undefined ? (sanitizeStringInput(body.avatar, 2_000_000) || null) : existing.avatar;
 
     if (!cleanName) {
       return res.status(400).json({ success: false, error: 'Nama lengkap wajib diisi.' });
+    }
+    if (body.username !== undefined) {
+      if (!cleanUsername || !/^[a-z0-9._-]{3,50}$/.test(cleanUsername)) {
+        return res.status(400).json({ success: false, error: 'Username minimal 3 karakter dan hanya boleh menggunakan huruf, angka, titik, `_`, atau `-`.' });
+      }
     }
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       return res.status(400).json({ success: false, error: 'Format alamat email tidak valid.' });
@@ -1177,6 +1187,12 @@ app.put('/api/auth/profile', (req, res) => {
     const duplicateEmail = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ? LIMIT 1').get(cleanEmail, existing.id) as any;
     if (duplicateEmail) {
       return res.status(409).json({ success: false, error: 'Alamat email sudah digunakan oleh akun lain.' });
+    }
+    if (cleanUsername) {
+      const duplicateUsername = db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1').get(cleanUsername, existing.id) as any;
+      if (duplicateUsername) {
+        return res.status(409).json({ success: false, error: 'Username tersebut sudah digunakan oleh akun lain.' });
+      }
     }
 
     const rawNewPassword = typeof body.newPassword === 'string' ? body.newPassword : '';
@@ -1198,9 +1214,9 @@ app.put('/api/auth/profile', (req, res) => {
 
     db.prepare(`
       UPDATE users
-      SET name = ?, email = ?, phone = ?, avatar = ?, password = ?
+      SET name = ?, username = ?, email = ?, phone = ?, avatar = ?, password = ?
       WHERE id = ?
-    `).run(cleanName, cleanEmail, cleanPhone, cleanAvatar, nextPasswordHash, existing.id);
+    `).run(cleanName, cleanUsername, cleanEmail, cleanPhone, cleanAvatar, nextPasswordHash, existing.id);
 
     const updated = db.prepare(
       'SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ?'
@@ -3217,7 +3233,7 @@ app.post('/api/users', (req, res) => {
 
     const cleanEmail = sanitizeStringInput(u.email, 160).toLowerCase();
     const cleanName = sanitizeStringInput(u.name, 120);
-    const cleanUsername = u.username ? sanitizeStringInput(u.username, 80) : null;
+    const cleanUsername = u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null;
     const cleanPhone = u.phone ? sanitizeStringInput(u.phone, 40) : null;
     const cleanId = sanitizeStringInput(u.id, 80) || `usr-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -3301,7 +3317,7 @@ app.put('/api/users/:id', (req, res) => {
     }
 
     const nextEmail = u.email !== undefined ? sanitizeStringInput(u.email, 160).toLowerCase() : existing.email;
-    const nextUsername = u.username !== undefined ? (u.username ? sanitizeStringInput(u.username, 80) : null) : existing.username;
+    const nextUsername = u.username !== undefined ? (u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null) : existing.username;
     const nextRole = normalizeRole(u.role !== undefined ? u.role : existing.role);
     const nextStatus = u.status !== undefined ? (u.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : (existing.status || 'Aktif');
 
@@ -3323,6 +3339,12 @@ app.put('/api/users/:id', (req, res) => {
       const dupEmail = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ? LIMIT 1').get(nextEmail, id);
       if (dupEmail) {
         return res.status(409).json({ error: 'Alamat email tersebut sudah digunakan akun lain.' });
+      }
+    }
+    if (nextUsername && nextUsername.toLowerCase() !== String(existing.username || '').toLowerCase()) {
+      const dupUsername = db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1').get(nextUsername, id);
+      if (dupUsername) {
+        return res.status(409).json({ error: 'Username tersebut sudah digunakan akun lain.' });
       }
     }
 
@@ -4630,13 +4652,14 @@ app.post('/api/password-resets', passwordResetRateLimiter, (req, res) => {
   try {
     const { identifier, userEmail, reason } = req.body || {};
     const lookupKey = sanitizeStringInput(identifier || userEmail || '', 160).toLowerCase();
+    const usernameLookup = lookupKey.startsWith('@') ? lookupKey.slice(1) : lookupKey;
     if (!lookupKey) {
       return res.status(400).json({ success: false, error: 'Masukkan alamat email atau username akun Anda.' });
     }
 
     const matchedUser = db.prepare(
-      'SELECT id, name, email, role, avatar, status FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1'
-    ).get(lookupKey, lookupKey) as any;
+      "SELECT id, name, email, role, avatar, status FROM users WHERE LOWER(email) = ? OR (username IS NOT NULL AND username != '' AND LOWER(username) = ?) LIMIT 1"
+    ).get(lookupKey, usernameLookup) as any;
 
     const genericSuccessMessage =
       'Permohonan reset kata sandi telah diterima dan akan segera diproses oleh administrator.';

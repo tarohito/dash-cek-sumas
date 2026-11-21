@@ -250,7 +250,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                           setIdentifier(e.target.value);
                           if (errorMessage) setErrorMessage('');
                         }}
-                        placeholder="nama@perusahaan.com"
+                        placeholder="email@perusahaan.com atau username"
                         className="w-full h-11 pl-10 pr-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-50/50 dark:bg-zinc-950/60 text-xs sm:text-sm text-slate-900 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#c28e62]/20 focus:border-[#c28e62] transition-all"
                       />
                     </div>
@@ -416,7 +416,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         setResetIdentifier(e.target.value);
                         if (resetErrorMessage) setResetErrorMessage('');
                       }}
-                      placeholder="nama@perusahaan.com"
+                      placeholder="email@perusahaan.com atau username"
                       className="w-full h-11 px-5 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-50/50 dark:bg-zinc-950/60 text-xs sm:text-sm text-slate-900 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#c28e62]/20 focus:border-[#c28e62] transition-all"
                     />
                   </div>

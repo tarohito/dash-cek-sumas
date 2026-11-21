@@ -125,6 +125,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     if (pathname === '/api/auth/login' && method === 'POST') {
       const body = (await request.json().catch(() => ({}))) as any;
       const cleanId = sanitizeStringInput(body.identifier || body.email, 160).toLowerCase();
+      const usernameLookup = cleanId.startsWith('@') ? cleanId.slice(1) : cleanId;
       const rawPassword = typeof body.password === 'string' ? body.password : '';
       const rememberMe = Boolean(body.rememberMe);
 
@@ -133,8 +134,8 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
       }
 
       const userRow = await db
-        .prepare('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1')
-        .bind(cleanId, cleanId)
+        .prepare("SELECT * FROM users WHERE LOWER(email) = ? OR (username IS NOT NULL AND username != '' AND LOWER(username) = ?) LIMIT 1")
+        .bind(cleanId, usernameLookup)
         .first<any>();
 
       if (!userRow) {
@@ -187,13 +188,14 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     if (pathname === '/api/password-resets' && method === 'POST') {
       const body = (await request.json().catch(() => ({}))) as any;
       const lookupKey = sanitizeStringInput(body.identifier || body.userEmail || '', 160).toLowerCase();
+      const usernameLookup = lookupKey.startsWith('@') ? lookupKey.slice(1) : lookupKey;
       if (!lookupKey) {
         return jsonResponse({ success: false, error: 'Masukkan alamat email atau username akun Anda.' }, 400);
       }
 
       const matchedUser = await db
-        .prepare('SELECT id, name, email, role, avatar, status FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1')
-        .bind(lookupKey, lookupKey)
+        .prepare("SELECT id, name, email, role, avatar, status FROM users WHERE LOWER(email) = ? OR (username IS NOT NULL AND username != '' AND LOWER(username) = ?) LIMIT 1")
+        .bind(lookupKey, usernameLookup)
         .first<any>();
 
       const genericSuccessMessage =
@@ -453,20 +455,44 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     // Self-service profile update
     if (pathname === '/api/auth/profile' && method === 'PUT') {
       const body = (await request.json().catch(() => ({}))) as any;
-      const cleanName = sanitizeStringInput(body.name, 120);
+      const existingRow = await db.prepare('SELECT * FROM users WHERE id = ?').bind(authUser.id).first<any>();
+      if (!existingRow) {
+        return jsonResponse({ success: false, error: 'Akun pengguna tidak ditemukan.' }, 404);
+      }
+
+      const cleanName = body.name !== undefined ? sanitizeStringInput(body.name, 120) : existingRow.name;
       if (!cleanName) {
         return jsonResponse({ success: false, error: 'Nama lengkap wajib diisi.' }, 400);
       }
 
-      const rawUsername = body.username !== undefined ? sanitizeStringInput(body.username, 80) : authUser.username;
+      const rawUsername = body.username !== undefined
+        ? sanitizeStringInput(body.username, 80).replace(/^@+/, '').toLowerCase()
+        : (existingRow.username || null);
       const cleanUsername = rawUsername ? rawUsername.trim() : null;
-      const cleanPhone = body.phone !== undefined ? sanitizeStringInput(body.phone, 40) : authUser.phone;
+      if (body.username !== undefined) {
+        if (!cleanUsername || !/^[a-z0-9._-]{3,50}$/.test(cleanUsername)) {
+          return jsonResponse(
+            { success: false, error: 'Username minimal 3 karakter dan hanya boleh menggunakan huruf, angka, titik, `_`, atau `-`.' },
+            400
+          );
+        }
+      }
+
+      const cleanEmail = body.email !== undefined ? sanitizeStringInput(body.email, 160).toLowerCase() : existingRow.email;
+      if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+        return jsonResponse({ success: false, error: 'Format alamat email tidak valid.' }, 400);
+      }
+
+      const cleanPhone = body.phone !== undefined ? sanitizeStringInput(body.phone, 40) : existingRow.phone;
       const rawNewPassword = typeof body.newPassword === 'string' ? body.newPassword : '';
       const rawCurrentPassword = typeof body.currentPassword === 'string' ? body.currentPassword : '';
 
-      const existingRow = await db.prepare('SELECT * FROM users WHERE id = ?').bind(authUser.id).first<any>();
-      if (!existingRow) {
-        return jsonResponse({ success: false, error: 'Akun pengguna tidak ditemukan.' }, 404);
+      const dupEmail = await db
+        .prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ? LIMIT 1')
+        .bind(cleanEmail, authUser.id)
+        .first();
+      if (dupEmail) {
+        return jsonResponse({ success: false, error: 'Alamat email sudah digunakan oleh akun lain.' }, 409);
       }
 
       if (cleanUsername) {
@@ -490,8 +516,8 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
 
       let nextPasswordHash = existingRow.password;
       if (rawNewPassword.trim().length > 0) {
-        if (rawNewPassword.trim().length < 8) {
-          return jsonResponse({ success: false, error: 'Kata sandi baru minimal terdiri dari 8 karakter.' }, 400);
+        if (rawNewPassword.trim().length < 6) {
+          return jsonResponse({ success: false, error: 'Kata sandi baru minimal harus 6 karakter.' }, 400);
         }
         if (!rawCurrentPassword) {
           return jsonResponse({ success: false, error: 'Masukkan kata sandi saat ini untuk mengubah kata sandi.' }, 400);
@@ -499,12 +525,12 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         if (!verifyPassword(rawCurrentPassword, existingRow.password || '')) {
           return jsonResponse({ success: false, error: 'Kata sandi saat ini tidak sesuai.' }, 400);
         }
-        nextPasswordHash = hashPassword(rawNewPassword);
+        nextPasswordHash = hashPassword(rawNewPassword.trim());
       }
 
       await db
-        .prepare('UPDATE users SET name = ?, username = ?, phone = ?, avatar = ?, password = ? WHERE id = ?')
-        .bind(cleanName, cleanUsername, cleanPhone || null, nextAvatar, nextPasswordHash, authUser.id)
+        .prepare('UPDATE users SET name = ?, username = ?, email = ?, phone = ?, avatar = ?, password = ? WHERE id = ?')
+        .bind(cleanName, cleanUsername, cleanEmail, cleanPhone || null, nextAvatar, nextPasswordHash, authUser.id)
         .run();
 
       if (rawNewPassword.trim().length > 0) {
@@ -1633,7 +1659,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
 
       const cleanEmail = sanitizeStringInput(u.email, 160).toLowerCase();
       const cleanName = sanitizeStringInput(u.name, 120);
-      const cleanUsername = u.username ? sanitizeStringInput(u.username, 80) : null;
+      const cleanUsername = u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null;
       const cleanPhone = u.phone ? sanitizeStringInput(u.phone, 40) : null;
       const cleanId = sanitizeStringInput(u.id, 80) || `usr-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -1691,7 +1717,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         }
 
         const nextEmail = u.email !== undefined ? sanitizeStringInput(u.email, 160).toLowerCase() : existing.email;
-        const nextUsername = u.username !== undefined ? (u.username ? sanitizeStringInput(u.username, 80) : null) : existing.username;
+        const nextUsername = u.username !== undefined ? (u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null) : existing.username;
         const nextRole = normalizeRole(u.role !== undefined ? u.role : existing.role);
         const nextStatus = u.status !== undefined ? (u.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : (existing.status || 'Aktif');
 
@@ -1712,6 +1738,11 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         if (nextEmail.toLowerCase() !== String(existing.email || '').toLowerCase()) {
           if (await db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ? LIMIT 1').bind(nextEmail, id).first()) {
             return jsonResponse({ error: 'Alamat email tersebut sudah digunakan akun lain.' }, 409);
+          }
+        }
+        if (nextUsername && nextUsername.toLowerCase() !== String(existing.username || '').toLowerCase()) {
+          if (await db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1').bind(nextUsername, id).first()) {
+            return jsonResponse({ error: 'Username tersebut sudah digunakan akun lain.' }, 409);
           }
         }
 
