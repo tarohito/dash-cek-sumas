@@ -11,6 +11,10 @@ import {
   type PermissionKey,
 } from '../../src/utils/rbac.ts';
 import {
+  normalizeUsernameInput,
+  validateUsernameFormat,
+} from '../../src/utils/username.ts';
+import {
   aggregateScanActivityFromPoints,
   DEFAULT_SYSTEM_SETTINGS,
   evaluateScanAgainstPolicy,
@@ -452,6 +456,43 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     const scope = await getD1UserBrandScope(db, authUser, rbacMatrix);
     const actorLabel = getNotificationActorLabel(authUser);
 
+    // Check username format & availability
+    if (pathname === '/api/auth/check-username' && method === 'GET') {
+      const rawUsername = url.searchParams.get('username') || '';
+      const format = validateUsernameFormat(rawUsername);
+      if (!format.valid) {
+        return jsonResponse({
+          valid: false,
+          available: false,
+          normalized: format.normalized,
+          reason: format.error,
+          checks: format.checks,
+        });
+      }
+
+      const requestedExcludeId = sanitizeStringInput(url.searchParams.get('excludeUserId') || '', 80);
+      const isSuperAdmin = normalizeRole(authUser.role) === 'Super Admin';
+      const effectiveExcludeId = isSuperAdmin || can('users.manage') ? requestedExcludeId : authUser.id;
+
+      const dup = effectiveExcludeId
+        ? await db
+            .prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1')
+            .bind(format.normalized, effectiveExcludeId)
+            .first()
+        : await db
+            .prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1')
+            .bind(format.normalized)
+            .first();
+
+      return jsonResponse({
+        valid: true,
+        available: !dup,
+        normalized: format.normalized,
+        reason: dup ? 'Username tersebut sudah digunakan oleh akun lain.' : null,
+        checks: format.checks,
+      });
+    }
+
     // Self-service profile update
     if (pathname === '/api/auth/profile' && method === 'PUT') {
       const body = (await request.json().catch(() => ({}))) as any;
@@ -465,17 +506,16 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         return jsonResponse({ success: false, error: 'Nama lengkap wajib diisi.' }, 400);
       }
 
-      const rawUsername = body.username !== undefined
-        ? sanitizeStringInput(body.username, 80).replace(/^@+/, '').toLowerCase()
-        : (existingRow.username || null);
-      const cleanUsername = rawUsername ? rawUsername.trim() : null;
+      let cleanUsername: string | null = existingRow.username ? normalizeUsernameInput(existingRow.username) : null;
       if (body.username !== undefined) {
-        if (!cleanUsername || !/^[a-z0-9._-]{3,50}$/.test(cleanUsername)) {
+        const usernameCheck = validateUsernameFormat(sanitizeStringInput(body.username, 80));
+        if (!usernameCheck.valid) {
           return jsonResponse(
-            { success: false, error: 'Username minimal 3 karakter dan hanya boleh menggunakan huruf, angka, titik, `_`, atau `-`.' },
+            { success: false, error: usernameCheck.error || 'Format username tidak valid.' },
             400
           );
         }
+        cleanUsername = usernameCheck.normalized;
       }
 
       const cleanEmail = body.email !== undefined ? sanitizeStringInput(body.email, 160).toLowerCase() : existingRow.email;
@@ -1659,7 +1699,14 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
 
       const cleanEmail = sanitizeStringInput(u.email, 160).toLowerCase();
       const cleanName = sanitizeStringInput(u.name, 120);
-      const cleanUsername = u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null;
+      let cleanUsername: string | null = null;
+      if (u.username !== undefined && u.username !== null) {
+        const usernameCheck = validateUsernameFormat(sanitizeStringInput(u.username, 80));
+        if (!usernameCheck.valid) {
+          return jsonResponse({ error: usernameCheck.error || 'Format username tidak valid.' }, 400);
+        }
+        cleanUsername = usernameCheck.normalized;
+      }
       const cleanPhone = u.phone ? sanitizeStringInput(u.phone, 40) : null;
       const cleanId = sanitizeStringInput(u.id, 80) || `usr-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -1717,7 +1764,18 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         }
 
         const nextEmail = u.email !== undefined ? sanitizeStringInput(u.email, 160).toLowerCase() : existing.email;
-        const nextUsername = u.username !== undefined ? (u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null) : existing.username;
+        let nextUsername: string | null = existing.username ? normalizeUsernameInput(existing.username) : null;
+        if (u.username !== undefined) {
+          if (u.username === null) {
+            nextUsername = null;
+          } else {
+            const usernameCheck = validateUsernameFormat(sanitizeStringInput(u.username, 80));
+            if (!usernameCheck.valid) {
+              return jsonResponse({ error: usernameCheck.error || 'Format username tidak valid.' }, 400);
+            }
+            nextUsername = usernameCheck.normalized;
+          }
+        }
         const nextRole = normalizeRole(u.role !== undefined ? u.role : existing.role);
         const nextStatus = u.status !== undefined ? (u.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : (existing.status || 'Aktif');
 

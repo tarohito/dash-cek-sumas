@@ -30,6 +30,10 @@ import {
   type PermissionKey,
   type RbacMatrix,
 } from './src/utils/rbac.ts';
+import {
+  normalizeUsernameInput,
+  validateUsernameFormat,
+} from './src/utils/username.ts';
 
 import {
   escapeHtml,
@@ -1149,6 +1153,48 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/auth/check-username - Validasi standar & cek ketersediaan username secara real-time
+app.get('/api/auth/check-username', (req, res) => {
+  try {
+    const authUser = resolveSessionUser(req);
+    if (!authUser) {
+      return res.status(401).json({ valid: false, available: false, error: 'Sesi login tidak valid atau telah berakhir.' });
+    }
+
+    const rawUsername = typeof req.query.username === 'string' ? req.query.username : '';
+    const format = validateUsernameFormat(rawUsername);
+    if (!format.valid) {
+      return res.json({
+        valid: false,
+        available: false,
+        normalized: format.normalized,
+        reason: format.error,
+        checks: format.checks,
+      });
+    }
+
+    const requestedExcludeId = typeof req.query.excludeUserId === 'string' ? sanitizeStringInput(req.query.excludeUserId, 80) : '';
+    const canManageUsers =
+      normalizeRole(authUser.role) === 'Super Admin' ||
+      hasPermission(authUser.role, 'users.manage', getRbacMatrix());
+    const effectiveExcludeId = canManageUsers ? requestedExcludeId : authUser.id;
+
+    const dup = effectiveExcludeId
+      ? db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1').get(format.normalized, effectiveExcludeId)
+      : db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1').get(format.normalized);
+
+    return res.json({
+      valid: true,
+      available: !dup,
+      normalized: format.normalized,
+      reason: dup ? 'Username tersebut sudah digunakan oleh akun lain.' : null,
+      checks: format.checks,
+    });
+  } catch (error) {
+    return sendInternalError(res, 'GET /api/auth/check-username', error);
+  }
+});
+
 // PUT /api/auth/profile - Memperbarui profil & kata sandi milik akun yang sedang login
 app.put('/api/auth/profile', (req, res) => {
   try {
@@ -1164,21 +1210,20 @@ app.put('/api/auth/profile', (req, res) => {
 
     const body = req.body || {};
     const cleanName = body.name !== undefined ? sanitizeStringInput(body.name, 120) : existing.name;
-    const rawUsername = body.username !== undefined
-      ? sanitizeStringInput(body.username, 80).replace(/^@+/, '').toLowerCase()
-      : (existing.username || null);
-    const cleanUsername = rawUsername ? rawUsername.trim() : null;
+    let cleanUsername: string | null = existing.username ? normalizeUsernameInput(existing.username) : null;
+    if (body.username !== undefined) {
+      const usernameCheck = validateUsernameFormat(sanitizeStringInput(body.username, 80));
+      if (!usernameCheck.valid) {
+        return res.status(400).json({ success: false, error: usernameCheck.error || 'Format username tidak valid.' });
+      }
+      cleanUsername = usernameCheck.normalized;
+    }
     const cleanEmail = body.email !== undefined ? sanitizeStringInput(body.email, 150).toLowerCase() : existing.email;
     const cleanPhone = body.phone !== undefined ? (sanitizeStringInput(body.phone, 40) || null) : existing.phone;
     const cleanAvatar = body.avatar !== undefined ? (sanitizeStringInput(body.avatar, 2_000_000) || null) : existing.avatar;
 
     if (!cleanName) {
       return res.status(400).json({ success: false, error: 'Nama lengkap wajib diisi.' });
-    }
-    if (body.username !== undefined) {
-      if (!cleanUsername || !/^[a-z0-9._-]{3,50}$/.test(cleanUsername)) {
-        return res.status(400).json({ success: false, error: 'Username minimal 3 karakter dan hanya boleh menggunakan huruf, angka, titik, `_`, atau `-`.' });
-      }
     }
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       return res.status(400).json({ success: false, error: 'Format alamat email tidak valid.' });
@@ -3233,7 +3278,14 @@ app.post('/api/users', (req, res) => {
 
     const cleanEmail = sanitizeStringInput(u.email, 160).toLowerCase();
     const cleanName = sanitizeStringInput(u.name, 120);
-    const cleanUsername = u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null;
+    let cleanUsername: string | null = null;
+    if (u.username !== undefined && u.username !== null) {
+      const usernameCheck = validateUsernameFormat(sanitizeStringInput(u.username, 80));
+      if (!usernameCheck.valid) {
+        return res.status(400).json({ error: usernameCheck.error || 'Format username tidak valid.' });
+      }
+      cleanUsername = usernameCheck.normalized;
+    }
     const cleanPhone = u.phone ? sanitizeStringInput(u.phone, 40) : null;
     const cleanId = sanitizeStringInput(u.id, 80) || `usr-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -3317,7 +3369,18 @@ app.put('/api/users/:id', (req, res) => {
     }
 
     const nextEmail = u.email !== undefined ? sanitizeStringInput(u.email, 160).toLowerCase() : existing.email;
-    const nextUsername = u.username !== undefined ? (u.username ? sanitizeStringInput(u.username, 80).replace(/^@+/, '').toLowerCase() : null) : existing.username;
+    let nextUsername: string | null = existing.username ? normalizeUsernameInput(existing.username) : null;
+    if (u.username !== undefined) {
+      if (u.username === null) {
+        nextUsername = null;
+      } else {
+        const usernameCheck = validateUsernameFormat(sanitizeStringInput(u.username, 80));
+        if (!usernameCheck.valid) {
+          return res.status(400).json({ error: usernameCheck.error || 'Format username tidak valid.' });
+        }
+        nextUsername = usernameCheck.normalized;
+      }
+    }
     const nextRole = normalizeRole(u.role !== undefined ? u.role : existing.role);
     const nextStatus = u.status !== undefined ? (u.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : (existing.status || 'Aktif');
 

@@ -112,6 +112,11 @@ import {
 import { generateA3PlusStickersPdf, generateTagsCsv, saveFileWithNativePicker } from './utils/pdfGenerator';
 import { compressAndConvertToWebP } from './utils/imageOptimizer';
 import { apiFetch, setStoredSessionToken, clearStoredSessionToken } from './utils/authSession';
+import { UsernameField, type UsernameFieldStatus } from './components/UsernameField';
+import {
+  slugifyUsername as buildUsernameSlug,
+  validateUsernameFormat,
+} from './utils/username';
 
 // ==========================================
 // RESILIENT OFFLINE FALLBACK AVATARS & LOGOS
@@ -1069,6 +1074,12 @@ export default function App() {
       });
       return parseApiResponse(res, 'Gagal menghapus user');
     },
+    async checkUsername(username: string, excludeUserId?: string) {
+      const q = new URLSearchParams({ username });
+      if (excludeUserId) q.set('excludeUserId', excludeUserId);
+      const res = await apiFetch(`/api/auth/check-username?${q.toString()}`);
+      return parseApiResponse(res, 'Gagal memeriksa ketersediaan username');
+    },
     async updateOwnProfile(payload: ProfileUpdatePayload) {
       const res = await apiFetch('/api/auth/profile', {
         method: 'PUT',
@@ -1981,6 +1992,7 @@ export default function App() {
   };
 
   const [userForm, setUserForm] = useState(defaultUserForm);
+  const [userFormUsernameStatus, setUserFormUsernameStatus] = useState<UsernameFieldStatus | null>(null);
 
   const handleSaveOwnProfile = async (
     payload: ProfileUpdatePayload
@@ -2019,14 +2031,12 @@ export default function App() {
   } | null>(null);
   const [processingResetId, setProcessingResetId] = useState<string | null>(null);
 
-  const slugifyUsername = (val: string) => {
-    return val
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]/g, '.')
-      .replace(/\.+/g, '.')
-      .replace(/^\.|\.$/g, '');
-  };
+  const slugifyUsername = buildUsernameSlug;
+
+  const otherTakenUsernames = React.useMemo(
+    () => users.filter((u) => u.id !== userForm.id && u.username).map((u) => u.username as string),
+    [users, userForm.id]
+  );
 
   const isValidEmail = (email: string): boolean => {
     return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email.trim());
@@ -2944,6 +2954,19 @@ export default function App() {
       triggerAlert('Validasi Formulir', 'Nama lengkap pengguna wajib diisi.', 'warning');
       return;
     }
+    const usernameCheck = validateUsernameFormat(userForm.username.trim() || slugifyUsername(userForm.name));
+    if (!usernameCheck.valid) {
+      triggerAlert('Format Username Tidak Valid', usernameCheck.error || 'Format username tidak memenuhi standar.', 'warning');
+      return;
+    }
+    if (userFormUsernameStatus?.status === 'checking') {
+      triggerAlert('Mohon Tunggu', 'Sedang memeriksa ketersediaan username di server.', 'warning');
+      return;
+    }
+    if (userFormUsernameStatus?.status === 'taken') {
+      triggerAlert('Username Sudah Dipakai', userFormUsernameStatus.message || 'Gunakan username lain yang masih tersedia.', 'warning');
+      return;
+    }
     if (!userForm.email.trim()) {
       triggerAlert('Validasi Formulir', 'Alamat email pengguna wajib diisi.', 'warning');
       return;
@@ -2955,6 +2978,7 @@ export default function App() {
     const newUser: UserItem = {
       id: `u${Date.now()}`,
       name: userForm.name.trim(),
+      username: usernameCheck.normalized,
       email: userForm.email.trim(),
       phone: userForm.phone.trim() || undefined,
       role: userForm.role || 'Admin Brand',
@@ -3086,6 +3110,19 @@ export default function App() {
       triggerAlert('Validasi Formulir', 'Nama lengkap pengguna wajib diisi.', 'warning');
       return;
     }
+    const usernameCheck = validateUsernameFormat(userForm.username.trim() || slugifyUsername(userForm.name));
+    if (!usernameCheck.valid) {
+      triggerAlert('Format Username Tidak Valid', usernameCheck.error || 'Format username tidak memenuhi standar.', 'warning');
+      return;
+    }
+    if (userFormUsernameStatus?.status === 'checking') {
+      triggerAlert('Mohon Tunggu', 'Sedang memeriksa ketersediaan username di server.', 'warning');
+      return;
+    }
+    if (userFormUsernameStatus?.status === 'taken') {
+      triggerAlert('Username Sudah Dipakai', userFormUsernameStatus.message || 'Gunakan username lain yang masih tersedia.', 'warning');
+      return;
+    }
     if (!userForm.email.trim()) {
       triggerAlert('Validasi Formulir', 'Alamat email pengguna wajib diisi.', 'warning');
       return;
@@ -3098,7 +3135,7 @@ export default function App() {
       triggerAlert('Validasi Formulir', 'Konfirmasi kata sandi tidak cocok!', 'warning');
       return;
     }
-    const cleanUsername = userForm.username.trim() || slugifyUsername(userForm.name);
+    const cleanUsername = usernameCheck.normalized;
     const newUserId = `u${Date.now()}`;
     const newUser: UserItem = {
       id: newUserId,
@@ -3174,6 +3211,19 @@ export default function App() {
       triggerAlert('Validasi Formulir', 'Nama lengkap pengguna wajib diisi.', 'warning');
       return;
     }
+    const usernameCheck = validateUsernameFormat(userForm.username.trim() || slugifyUsername(userForm.name));
+    if (!usernameCheck.valid) {
+      triggerAlert('Format Username Tidak Valid', usernameCheck.error || 'Format username tidak memenuhi standar.', 'warning');
+      return;
+    }
+    if (userFormUsernameStatus?.status === 'checking') {
+      triggerAlert('Mohon Tunggu', 'Sedang memeriksa ketersediaan username di server.', 'warning');
+      return;
+    }
+    if (userFormUsernameStatus?.status === 'taken') {
+      triggerAlert('Username Sudah Dipakai', userFormUsernameStatus.message || 'Gunakan username lain yang masih tersedia.', 'warning');
+      return;
+    }
     if (!userForm.email.trim()) {
       triggerAlert('Validasi Formulir', 'Alamat email pengguna wajib diisi.', 'warning');
       return;
@@ -3200,7 +3250,7 @@ export default function App() {
       );
       return;
     }
-    const cleanUsername = userForm.username.trim() || slugifyUsername(userForm.name);
+    const cleanUsername = usernameCheck.normalized;
     const updatedUser: UserItem & { password?: string } = {
       id: userForm.id,
       name: userForm.name.trim(),
@@ -4909,9 +4959,11 @@ export default function App() {
   // Memoized calculations for Users Table (Top level to adhere to React Hook rules)
   const filteredUsers = React.useMemo(() => {
     const q = userSearch.toLowerCase().trim();
+    const qUsername = q.replace(/^@+/, '');
     const matched = users.filter(u => {
       const matchSearch = !q || 
         u.name.toLowerCase().includes(q) ||
+        (u.username && u.username.toLowerCase().includes(qUsername)) ||
         u.email.toLowerCase().includes(q) ||
         u.role.toLowerCase().includes(q);
       
@@ -5941,6 +5993,7 @@ export default function App() {
         <ProfileAccountPage
           user={currentUser}
           onSave={handleSaveOwnProfile}
+          onCheckUsername={(username) => api.checkUsername(username, currentUser?.id)}
         />
       );
     }
@@ -6100,7 +6153,7 @@ export default function App() {
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                 <input
                   type="text"
-                  placeholder="Cari nama, email, atau peran pengguna..."
+                  placeholder="Cari nama, username, email, atau peran..."
                   value={userSearch}
                   onChange={(e) => {
                     setUserSearch(e.target.value);
@@ -6241,9 +6294,17 @@ export default function App() {
                                   <NewBadge date={user.createdAt} id={user.id} />
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400 font-medium text-[11px] sm:text-xs mt-0.5 truncate">
-                                <Mail size={12} className="text-slate-400 flex-shrink-0" />
-                                <span className="truncate">{user.email}</span>
+                              <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-400 font-medium text-[11px] sm:text-xs mt-0.5 flex-wrap">
+                                {user.username && (
+                                  <span className="inline-flex items-center font-mono text-[#a67346] dark:text-[#d4a379] font-semibold truncate">
+                                    @{user.username}
+                                  </span>
+                                )}
+                                {user.username && <span className="text-slate-300 dark:text-zinc-600">•</span>}
+                                <span className="inline-flex items-center gap-1 truncate">
+                                  <Mail size={12} className="text-slate-400 flex-shrink-0" />
+                                  <span className="truncate">{user.email}</span>
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -10096,7 +10157,7 @@ export default function App() {
           }}
           className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden border border-slate-200/90 dark:border-zinc-700/80 animate-in zoom-in-95 duration-200">
             {/* MODAL HEADER */}
             <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2.5">
@@ -10117,11 +10178,11 @@ export default function App() {
             </div>
             
             {/* MODAL FORM BODY */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-3.5 sm:space-y-4 flex-1">
-              {/* TOP ROW: KOLOM KIRI (FOTO PROFIL 1:1) & KOLOM KANAN (NAMA PENGGUNA & EMAIL) */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              {/* TOP ROW: KOLOM KIRI (FOTO PROFIL 1:1) & KOLOM KANAN (NAMA LENGKAP & USERNAME) */}
               <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
                 {/* KOLOM KIRI: UPLOAD FOTO PROFIL (1:1 KOTAK) */}
-                <div className="w-full sm:w-auto flex flex-col items-center sm:items-start flex-shrink-0">
+                <div className="w-full sm:w-auto flex flex-col items-center flex-shrink-0">
                   <div className="relative w-32 h-32 sm:w-36 sm:h-36">
                     <input 
                       type="file" 
@@ -10182,20 +10243,23 @@ export default function App() {
                       </button>
                     )}
                   </div>
+                  <span className="mt-1.5 text-[10px] font-medium text-slate-400 dark:text-zinc-500">
+                    Foto Profil 1:1 (Opsional)
+                  </span>
                 </div>
 
-                {/* KOLOM KANAN: NAMA PENGGUNA & EMAIL */}
-                <div className="flex-1 w-full space-y-3.5">
-                  {/* Nama Pengguna */}
+                {/* KOLOM KANAN: NAMA LENGKAP & USERNAME */}
+                <div className="flex-1 w-full space-y-3.5 min-w-0">
+                  {/* Nama Lengkap */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                      Nama Pengguna <span className="text-rose-500">*</span>
+                      Nama Lengkap <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
                       <input 
                         type="text" 
-                        placeholder="Nama pengguna" 
+                        placeholder="Cth: Rina Wijaya" 
                         value={userForm.name}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -10214,24 +10278,22 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Username (Login Alternatif selain Email) */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
-                      <span>Username</span>
-                      <span className="text-[10px] font-normal text-slate-400 dark:text-zinc-500">Bisa dipakai untuk login</span>
-                    </label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-mono font-bold text-slate-400 dark:text-zinc-500">@</span>
-                      <input 
-                        type="text" 
-                        placeholder="username.pengguna" 
-                        value={userForm.username}
-                        onChange={(e) => setUserForm(prev => ({ ...prev, username: e.target.value.toLowerCase().replace(/^@+/, '').replace(/\s+/g, '') }))}
-                        className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-9 pr-5 py-2.5 text-xs sm:text-sm font-mono text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none transition-all" 
-                      />
-                    </div>
-                  </div>
+                  {/* Username (ID Unik Login selain Email) */}
+                  <UsernameField
+                    value={userForm.username}
+                    onChange={(nextUsername) => setUserForm(prev => ({ ...prev, username: nextUsername }))}
+                    currentSavedUsername={isEditUserModalOpen ? users.find(u => u.id === userForm.id)?.username : undefined}
+                    excludeUserId={isEditUserModalOpen ? userForm.id : undefined}
+                    onCheckAvailability={(u, exclId) => api.checkUsername(u, exclId)}
+                    localTakenUsernames={otherTakenUsernames}
+                    onStatusChange={setUserFormUsernameStatus}
+                  />
+                </div>
+              </div>
 
+              {/* BARIS BAWAH: EMAIL & WHATSAPP, HAK AKSES & BRAND YANG DIKELOLA */}
+              <div className="space-y-3.5 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* Email */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
@@ -10255,26 +10317,23 @@ export default function App() {
                       />
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* BARIS BAWAH: WHATSAPP, HAK AKSES & BRAND YANG DIKELOLA */}
-              <div className="space-y-3.5 pt-1">
-                {/* Nomor WhatsApp */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
-                    <span>WhatsApp</span>
-                    <span className="text-[10px] font-normal text-slate-400 dark:text-zinc-500">Opsional</span>
-                  </label>
-                  <div className="relative">
-                    <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
-                    <input 
-                      type="tel" 
-                      placeholder="Cth: +62 812-3456-7890" 
-                      value={userForm.phone}
-                      onChange={(e) => setUserForm(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none transition-all" 
-                    />
+                  {/* Nomor WhatsApp */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                      <span>WhatsApp</span>
+                      <span className="text-[10px] font-normal text-slate-400 dark:text-zinc-500">Opsional</span>
+                    </label>
+                    <div className="relative">
+                      <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+                      <input 
+                        type="tel" 
+                        placeholder="Cth: +62 812-3456-7890" 
+                        value={userForm.phone}
+                        onChange={(e) => setUserForm(prev => ({ ...prev, phone: e.target.value }))}
+                        className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none transition-all" 
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -10496,7 +10555,7 @@ export default function App() {
                   )
                 ) : (
                   /* MODE TAMBAH PENGGUNA BARU: SANDI & KONFIRMASI */
-                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {/* Sandi Baru */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
@@ -10567,7 +10626,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -10586,6 +10645,7 @@ export default function App() {
                 onClick={isEditUserModalOpen ? handleUpdateUser : handleCreateUser}
                 disabled={
                   !userForm.name.trim() || 
+                  (userFormUsernameStatus !== null && !userFormUsernameStatus.canSubmit) ||
                   !userForm.email.trim() || 
                   !isValidEmail(userForm.email) ||
                   (!isEditUserModalOpen && (!userForm.password.trim() || userForm.password !== userForm.confirmPassword)) ||
@@ -10741,11 +10801,20 @@ export default function App() {
                               </span>
                             </div>
 
-                            {/* ID PENGGUNA BADGE */}
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-zinc-800/70 rounded-xl border border-slate-200/80 dark:border-zinc-700/70 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
-                              <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">ID Pengguna</span>
-                              <span className="text-slate-300 dark:text-zinc-600 font-sans">•</span>
-                              <span>{userToView.id}</span>
+                            {/* USERNAME & ID PENGGUNA BADGE */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {userToView.username && (
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#c28e62]/10 dark:bg-[#c28e62]/15 rounded-xl border border-[#c28e62]/25 text-xs font-mono font-semibold text-[#a67346] dark:text-[#d4a379]">
+                                  <span className="text-[10px] font-sans font-bold uppercase tracking-wider opacity-75">Username</span>
+                                  <span className="font-sans opacity-50">•</span>
+                                  <span>@{userToView.username}</span>
+                                </div>
+                              )}
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 dark:bg-zinc-800/70 rounded-xl border border-slate-200/80 dark:border-zinc-700/70 text-xs font-mono font-semibold text-slate-700 dark:text-zinc-300">
+                                <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">ID Pengguna</span>
+                                <span className="text-slate-300 dark:text-zinc-600 font-sans">•</span>
+                                <span>{userToView.id}</span>
+                              </div>
                             </div>
                           </div>
 
@@ -10793,7 +10862,17 @@ export default function App() {
                           <UserCheck size={14} className="text-[#c28e62]" />
                           <span>Kontak &amp; Informasi Akun</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-200/70 dark:border-zinc-700/70">
+                            <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
+                              <User size={13} className="text-[#c28e62]" />
+                              <span>Username Login</span>
+                            </div>
+                            <div className="text-sm font-semibold text-slate-800 dark:text-zinc-100 truncate font-mono">
+                              {userToView.username ? `@${userToView.username}` : '-'}
+                            </div>
+                          </div>
+
                           <div className="p-3 bg-white dark:bg-zinc-800 rounded-xl border border-slate-200/70 dark:border-zinc-700/70">
                             <div className="flex items-center gap-1.5 text-slate-400 dark:text-zinc-500 text-xs mb-1">
                               <Mail size={13} className="text-[#c28e62]" />
@@ -11143,7 +11222,7 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) setIsAddUserModalOpen(false); }}
           className="fixed inset-0 bg-black/60 z-[10010] flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/90 dark:border-zinc-700/80 w-full max-w-xl max-h-[92vh] sm:max-h-[88vh] overflow-hidden mx-4 animate-in zoom-in-95 duration-200 flex flex-col">
             {/* MODAL HEADER */}
             <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-800/80 flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -11234,11 +11313,11 @@ export default function App() {
                 </div>
               </div>
 
-              {/* NAMA LENGKAP & EMAIL */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* NAMA LENGKAP & USERNAME */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-start">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                    Nama Lengkap Pengguna <span className="text-rose-500">*</span>
+                    Nama Lengkap <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
@@ -11246,12 +11325,35 @@ export default function App() {
                       type="text" 
                       placeholder="Cth: Kalingga Jeandy" 
                       value={userForm.name}
-                      onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setUserForm(prev => {
+                          const prevAuto = slugifyUsername(prev.name || '');
+                          const shouldAutoSlug = !prev.id && (!prev.username || prev.username === prevAuto);
+                          return {
+                            ...prev,
+                            name: val,
+                            username: shouldAutoSlug ? slugifyUsername(val) : prev.username
+                          };
+                        });
+                      }}
                       className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none font-medium transition-all" 
                     />
                   </div>
                 </div>
 
+                <UsernameField
+                  value={userForm.username}
+                  onChange={(nextUsername) => setUserForm(prev => ({ ...prev, username: nextUsername }))}
+                  onCheckAvailability={(u) => api.checkUsername(u)}
+                  localTakenUsernames={otherTakenUsernames}
+                  onStatusChange={setUserFormUsernameStatus}
+                  compactRules
+                />
+              </div>
+
+              {/* EMAIL & WHATSAPP */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
                     <span>Alamat Email <span className="text-rose-500">*</span></span>
@@ -11274,23 +11376,22 @@ export default function App() {
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* NOMOR WHATSAPP */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
-                  <span>WhatsApp</span>
-                  <span className="text-[10px] font-normal text-slate-400 dark:text-zinc-500">Opsional</span>
-                </label>
-                <div className="relative">
-                  <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
-                  <input 
-                    type="tel" 
-                    placeholder="Cth: +62 812-3456-7890" 
-                    value={userForm.phone}
-                    onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                    className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none font-medium transition-all" 
-                  />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                    <span>WhatsApp</span>
+                    <span className="text-[10px] font-normal text-slate-400 dark:text-zinc-500">Opsional</span>
+                  </label>
+                  <div className="relative">
+                    <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500" />
+                    <input 
+                      type="tel" 
+                      placeholder="Cth: +62 812-3456-7890" 
+                      value={userForm.phone}
+                      onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                      className="w-full bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-full pl-10 pr-5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500 focus:border-[#c28e62] focus:ring-2 focus:ring-[#c28e62]/20 outline-none font-medium transition-all" 
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -11333,7 +11434,12 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={handleQuickCreateUser}
-                  disabled={!userForm.name.trim() || !userForm.email.trim() || !isValidEmail(userForm.email)}
+                  disabled={
+                    !userForm.name.trim() ||
+                    (userFormUsernameStatus !== null && !userFormUsernameStatus.canSubmit) ||
+                    !userForm.email.trim() ||
+                    !isValidEmail(userForm.email)
+                  }
                   className="w-full sm:w-auto h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
                 >
                   Simpan &amp; Pilih Pemilik

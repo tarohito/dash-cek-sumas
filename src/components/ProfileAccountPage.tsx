@@ -13,6 +13,12 @@ import {
   X,
 } from 'lucide-react';
 import { compressAndConvertToWebP } from '../utils/imageOptimizer';
+import { normalizeUsernameInput, validateUsernameFormat } from '../utils/username';
+import {
+  UsernameField,
+  type UsernameAvailabilityResponse,
+  type UsernameFieldStatus,
+} from './UsernameField';
 
 export interface ProfileAccountUser {
   id: string;
@@ -38,20 +44,21 @@ export interface ProfileUpdatePayload {
 interface ProfileAccountPageProps {
   user: ProfileAccountUser | null;
   onSave: (payload: ProfileUpdatePayload) => Promise<{ ok: boolean; error?: string; passwordUpdated?: boolean }>;
+  onCheckUsername?: (username: string) => Promise<UsernameAvailabilityResponse>;
 }
 
 type SectionKey = 'informasi' | 'keamanan';
 
 const isValidEmailFormat = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
-const normalizeUsernameInput = (val: string) => val.toLowerCase().replace(/^@+/, '').replace(/\s+/g, '');
-const isValidUsernameFormat = (val: string) => /^[a-z0-9._-]{3,50}$/.test(normalizeUsernameInput(val));
 
 export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
   user,
   onSave,
+  onCheckUsername,
 }) => {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<UsernameFieldStatus | null>(null);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState('');
@@ -207,12 +214,23 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
       scrollToSection('informasi');
       return;
     }
-    const cleanUsername = normalizeUsernameInput(username);
-    if (!cleanUsername || !isValidUsernameFormat(cleanUsername)) {
-      setErrorMsg('Username minimal 3 karakter (hanya huruf kecil, angka, titik, garis bawah, atau tanda hubung).');
+    const usernameFormat = validateUsernameFormat(username);
+    if (!usernameFormat.valid) {
+      setErrorMsg(usernameFormat.error || 'Format username tidak valid.');
       scrollToSection('informasi');
       return;
     }
+    if (usernameStatus?.status === 'checking') {
+      setErrorMsg('Sedang memeriksa ketersediaan username. Tunggu sebentar.');
+      scrollToSection('informasi');
+      return;
+    }
+    if (usernameStatus?.status === 'taken') {
+      setErrorMsg(usernameStatus.message || 'Username tersebut sudah digunakan oleh akun lain.');
+      scrollToSection('informasi');
+      return;
+    }
+    const cleanUsername = usernameFormat.normalized;
     if (!email.trim() || !isValidEmailFormat(email)) {
       setErrorMsg('Format alamat email tidak valid.');
       scrollToSection('informasi');
@@ -387,42 +405,16 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
             </div>
 
             {/* Username (Digunakan untuk Login selain Email) */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                  Username <span className="text-rose-500">*</span>
-                </label>
-                <span className="text-[11px] text-slate-400 dark:text-zinc-500">
-                  Bisa dipakai untuk login
-                </span>
-              </div>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-mono font-semibold text-slate-400 dark:text-zinc-500">
-                  @
-                </span>
-                <input
-                  type="text"
-                  maxLength={50}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="username.anda"
-                  value={username}
-                  onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
-                  className={`w-full pl-9 pr-5 py-2.5 bg-slate-50 dark:bg-zinc-800/80 border rounded-full text-xs sm:text-sm font-mono text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none transition-colors ${
-                    username.length > 0 && !isValidUsernameFormat(username)
-                      ? 'border-rose-500 focus:border-rose-500 bg-rose-50/20 dark:bg-rose-950/20'
-                      : 'border-slate-200 dark:border-zinc-700 focus:border-[#c28e62]'
-                  }`}
-                />
-              </div>
-              {username.length > 0 && !isValidUsernameFormat(username) && (
-                <p className="flex items-center gap-1.5 mt-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
-                  <AlertCircle size={13} className="shrink-0 text-rose-500" />
-                  <span>Gunakan minimal 3 karakter: huruf kecil, angka, titik, `_`, atau `-`.</span>
-                </p>
-              )}
-            </div>
+            <UsernameField
+              value={username}
+              onChange={setUsername}
+              currentSavedUsername={user.username}
+              excludeUserId={user.id}
+              onCheckAvailability={onCheckUsername ? (u) => onCheckUsername(u) : undefined}
+              onStatusChange={setUsernameStatus}
+              inputBgClassName="bg-slate-50 dark:bg-zinc-800/80"
+              labelClassName="text-xs font-semibold text-slate-700 dark:text-zinc-300"
+            />
 
             {/* Alamat Email */}
             <div>
@@ -700,7 +692,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={!hasChanges || isSubmitting}
+                disabled={!hasChanges || isSubmitting || (usernameStatus !== null && !usernameStatus.canSubmit)}
                 className="h-10 px-5 rounded-full bg-[#c28e62] hover:bg-[#b07d53] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center transition-all cursor-pointer whitespace-nowrap active:scale-95"
               >
                 {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}

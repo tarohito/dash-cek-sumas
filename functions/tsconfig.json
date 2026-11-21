@@ -11,5 +11,5 @@
     "noEmit": true,
     "strict": false
   },
-  "include": ["./**/*.ts", "../src/utils/rbac.ts", "../src/utils/securityPolicy.ts"]
+  "include": ["./**/*.ts", "../src/utils/rbac.ts", "../src/utils/securityPolicy.ts", "../src/utils/username.ts"]
 }
