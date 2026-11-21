@@ -9,7 +9,6 @@ import {
   Sparkles,
   ShieldCheck,
   Check,
-  CheckCircle2,
   AlertCircle,
   X,
 } from 'lucide-react';
@@ -63,7 +62,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
 
   const [activeSection, setActiveSection] = useState<SectionKey>('informasi');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sectionInformasiRef = useRef<HTMLElement>(null);
@@ -92,7 +91,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
 
   const openPasswordChange = () => {
     setIsChangingPassword(true);
-    setFeedback(null);
+    setErrorMsg(null);
     setTimeout(() => {
       setActiveSection('keamanan');
       sectionKeamananRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -107,7 +106,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
     setShowCurrentPassword(false);
     setShowNewPassword(false);
     setShowConfirmPassword(false);
-    setFeedback(null);
+    setErrorMsg(null);
     if (activeSection === 'keamanan') {
       setActiveSection('informasi');
     }
@@ -140,15 +139,15 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setFeedback({ type: 'error', text: 'Silakan pilih file gambar (JPG, PNG, WebP).' });
+      setErrorMsg('Silakan pilih file gambar (JPG, PNG, WebP).');
       return;
     }
     try {
-      setFeedback(null);
+      setErrorMsg(null);
       const optimized = await compressAndConvertToWebP(file, { maxWidth: 400, maxHeight: 400, quality: 0.85 });
       setAvatar(optimized);
     } catch {
-      setFeedback({ type: 'error', text: 'Gagal memproses foto profil.' });
+      setErrorMsg('Gagal memproses foto profil.');
     }
     e.target.value = '';
   };
@@ -186,7 +185,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
     setShowCurrentPassword(false);
     setShowNewPassword(false);
     setShowConfirmPassword(false);
-    setFeedback(null);
+    setErrorMsg(null);
     if (activeSection === 'keamanan') {
       setActiveSection('informasi');
     }
@@ -194,32 +193,32 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    setFeedback(null);
+    setErrorMsg(null);
 
     if (!name.trim()) {
-      setFeedback({ type: 'error', text: 'Nama lengkap wajib diisi.' });
+      setErrorMsg('Nama lengkap wajib diisi.');
       scrollToSection('informasi');
       return;
     }
     if (!email.trim() || !isValidEmailFormat(email)) {
-      setFeedback({ type: 'error', text: 'Format alamat email tidak valid.' });
+      setErrorMsg('Format alamat email tidak valid.');
       scrollToSection('informasi');
       return;
     }
 
     if (isPasswordFilled) {
       if (!currentPassword) {
-        setFeedback({ type: 'error', text: 'Kata sandi saat ini wajib diisi untuk mengubah kata sandi.' });
+        setErrorMsg('Kata sandi saat ini wajib diisi untuk mengubah kata sandi.');
         scrollToSection('keamanan');
         return;
       }
       if (newPassword.trim().length < 6) {
-        setFeedback({ type: 'error', text: 'Kata sandi baru minimal harus 6 karakter.' });
+        setErrorMsg('Kata sandi baru minimal harus 6 karakter.');
         scrollToSection('keamanan');
         return;
       }
       if (newPassword !== confirmPassword) {
-        setFeedback({ type: 'error', text: 'Konfirmasi kata sandi baru tidak cocok.' });
+        setErrorMsg('Konfirmasi kata sandi baru tidak cocok.');
         scrollToSection('keamanan');
         return;
       }
@@ -240,7 +239,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
 
       const result = await onSave(payload);
       if (!result.ok) {
-        setFeedback({ type: 'error', text: result.error || 'Gagal menyimpan perubahan akun.' });
+        setErrorMsg(result.error || 'Gagal menyimpan perubahan akun.');
       } else {
         if (isPasswordFilled) {
           setIsChangingPassword(false);
@@ -254,12 +253,7 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
             setActiveSection('informasi');
           }
         }
-        setFeedback({
-          type: 'success',
-          text: result.passwordUpdated
-            ? 'Profil akun dan kata sandi berhasil diperbarui.'
-            : 'Perubahan profil akun berhasil disimpan.',
-        });
+        setErrorMsg(null);
       }
     } finally {
       setIsSubmitting(false);
@@ -268,20 +262,10 @@ export const ProfileAccountPage: React.FC<ProfileAccountPageProps> = ({
 
   const sectionsBody = (
     <>
-      {feedback && (
-        <div
-          className={`p-3.5 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-2.5 border ${
-            feedback.type === 'error'
-              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300'
-              : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300'
-          }`}
-        >
-          {feedback.type === 'error' ? (
-            <AlertCircle size={16} className="shrink-0" />
-          ) : (
-            <CheckCircle2 size={16} className="shrink-0" />
-          )}
-          <span>{feedback.text}</span>
+      {errorMsg && (
+        <div className="p-3.5 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-2.5 border bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300">
+          <AlertCircle size={16} className="shrink-0" />
+          <span>{errorMsg}</span>
         </div>
       )}
 

@@ -31,41 +31,41 @@ export function seedComprehensiveData(db: any) {
   // 2. OVERHAUL CATEGORIES (SUMAS Architectural & Partisi + Skincare & Dermo-Cosmetics)
   db.prepare('DELETE FROM categories').run();
   const insertCategory = db.prepare(`
-    INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO categories (id, name, parentId, level, createdAt, specSchema)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
 
   const initialCategories = [
     // === LEVEL 1: KATEGORI UTAMA ===
-    { id: 'cat-sumas', name: 'SUMAS Architectural & Partisi', parentId: null, level: 1, code: 'SMS-B2B', description: 'Sistem partisi toilet komersial, phenolic board tahan air, dan hardware arsitektural SUMAS', status: 'Aktif', itemCount: 3, orderIndex: 1, createdAt: '2026-10-01', specSchema: null },
-    { id: 'cat-skincare', name: 'Skincare & Dermo-Cosmetics', parentId: null, level: 1, code: 'SKN-RET', description: 'Produk perawatan kulit wajah & tubuh, serum aktif, dermo-cosmetics bersertifikasi BPOM', status: 'Aktif', itemCount: 12, orderIndex: 2, createdAt: '2026-10-02', specSchema: null },
+    { id: 'cat-sumas', name: 'SUMAS Architectural & Partisi', parentId: null, level: 1, createdAt: '2026-10-01', specSchema: null },
+    { id: 'cat-skincare', name: 'Skincare & Dermo-Cosmetics', parentId: null, level: 1, createdAt: '2026-10-02', specSchema: null },
 
     // === LEVEL 2: SUB-KATEGORI SUMAS ===
-    { id: 'cat-sumas-cubicle', name: 'Partisi Cubicle Toilet', parentId: 'cat-sumas', level: 2, code: 'SMS-CUB', description: 'Sistem partisi kubikal toilet modern fasilitas publik, bandara, mall, dan rumah sakit', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-05', specSchema: null },
-    { id: 'cat-sumas-hardware', name: 'Aksesoris & Hardware SUS 304', parentId: 'cat-sumas', level: 2, code: 'SMS-HDW', description: 'Engsel gravity, kunci indikator keterisian, handle, dan bracket stainless steel SUS 304', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-06', specSchema: null },
-    { id: 'cat-sumas-cladding', name: 'Wall Cladding & Panel Phenolic', parentId: 'cat-sumas', level: 2, code: 'SMS-CLD', description: 'Panel phenolic tahan air, tahan api, dan pelapis estetika arsitektur gedung', status: 'Aktif', itemCount: 0, orderIndex: 3, createdAt: '2026-10-07', specSchema: null },
+    { id: 'cat-sumas-cubicle', name: 'Partisi Cubicle Toilet', parentId: 'cat-sumas', level: 2, createdAt: '2026-10-05', specSchema: null },
+    { id: 'cat-sumas-hardware', name: 'Aksesoris & Hardware SUS 304', parentId: 'cat-sumas', level: 2, createdAt: '2026-10-06', specSchema: null },
+    { id: 'cat-sumas-cladding', name: 'Wall Cladding & Panel Phenolic', parentId: 'cat-sumas', level: 2, createdAt: '2026-10-07', specSchema: null },
 
     // === LEVEL 2: SUB-KATEGORI SKINCARE ===
-    { id: 'cat-skin-serum', name: 'Serum & Ampoule', parentId: 'cat-skincare', level: 2, code: 'SKN-SRM', description: 'Serum wajah konsentrat tinggi, pencerah noda hitam, retinol anti-aging, dan barrier booster', status: 'Aktif', itemCount: 4, orderIndex: 1, createdAt: '2026-10-08', specSchema: null },
-    { id: 'cat-skin-cleanser', name: 'Facial Cleanser & Micellar', parentId: 'cat-skincare', level: 2, code: 'SKN-CLN', description: 'Pembersih wajah low-pH gentle cleanser, cleansing foam, dan micellar water pembersih pori', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-09', specSchema: null },
-    { id: 'cat-skin-moist', name: 'Moisturizer & Barrier Cream', parentId: 'cat-skincare', level: 2, code: 'SKN-MST', description: 'Pelembap wajah gel ceramide, hidrasi mendalam hyaluronic acid, dan soothing moisture cream', status: 'Aktif', itemCount: 3, orderIndex: 3, createdAt: '2026-10-10', specSchema: null },
-    { id: 'cat-skin-sun', name: 'Sunscreen & UV Defense', parentId: 'cat-skincare', level: 2, code: 'SKN-SUN', description: 'Tabir surya harian broad-spectrum SPF 50+ PA++++ tekstur seringan air tanpa whitecast', status: 'Aktif', itemCount: 2, orderIndex: 4, createdAt: '2026-10-11', specSchema: null },
-    { id: 'cat-skin-toner', name: 'Toner & Essence', parentId: 'cat-skincare', level: 2, code: 'SKN-TNR', description: 'Hydrating toner, clarifying exfoliation toner BHA/AHA, dan skin essence penyeimbang pH', status: 'Aktif', itemCount: 3, orderIndex: 5, createdAt: '2026-10-12', specSchema: null },
-    { id: 'cat-skin-body', name: 'Body Care & Body Lotion', parentId: 'cat-skincare', level: 2, code: 'SKN-BDY', description: 'Body lotion pencerah dengan UV filter, nourishing body serum, dan brightening body scrub', status: 'Aktif', itemCount: 0, orderIndex: 6, createdAt: '2026-10-13', specSchema: null },
+    { id: 'cat-skin-serum', name: 'Serum & Ampoule', parentId: 'cat-skincare', level: 2, createdAt: '2026-10-08', specSchema: null },
+    { id: 'cat-skin-cleanser', name: 'Facial Cleanser & Micellar', parentId: 'cat-skincare', level: 2, createdAt: '2026-10-09', specSchema: null },
+    { id: 'cat-skin-moist', name: 'Moisturizer & Barrier Cream', parentId: 'cat-skincare', level: 2, createdAt: '2026-10-10', specSchema: null },
+    { id: 'cat-skin-sun', name: 'Sunscreen & UV Defense', parentId: 'cat-skincare', level: 2, createdAt: '2026-10-11', specSchema: null },
+    { id: 'cat-skin-toner', name: 'Toner & Essence', parentId: 'cat-skincare', level: 2, createdAt: '2026-10-12', specSchema: null },
+    { id: 'cat-skin-body', name: 'Body Care & Body Lotion', parentId: 'cat-skincare', level: 2, createdAt: '2026-10-13', specSchema: null },
 
     // === LEVEL 3: SUB-SUB KATEGORI SUMAS ===
-    { id: 'cat-sumas-phn12', name: 'Phenolic Board 12mm Standard', parentId: 'cat-sumas-cubicle', level: 3, code: 'SMS-PHN12', description: 'Papan phenolic kompak 12mm solid core densitas 1450 kg/m³ tahan air 100% dan benturan', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-14', specSchema: null },
-    { id: 'cat-sumas-glass', name: 'Glass Cubicle System 10mm', parentId: 'cat-sumas-cubicle', level: 3, code: 'SMS-GLS10', description: 'Partisi cubicle kaca tempered premium 10mm untuk fasilitas eksekutif dan hotel bintang lima', status: 'Aktif', itemCount: 0, orderIndex: 2, createdAt: '2026-10-15', specSchema: null },
+    { id: 'cat-sumas-phn12', name: 'Phenolic Board 12mm Standard', parentId: 'cat-sumas-cubicle', level: 3, createdAt: '2026-10-14', specSchema: null },
+    { id: 'cat-sumas-glass', name: 'Glass Cubicle System 10mm', parentId: 'cat-sumas-cubicle', level: 3, createdAt: '2026-10-15', specSchema: null },
 
     // === LEVEL 3: SUB-SUB KATEGORI SKINCARE ===
-    { id: 'cat-skin-niac', name: 'Niacinamide & Brightening Serum', parentId: 'cat-skin-serum', level: 3, code: 'SKN-NIA', description: 'Serum pencerah kulit dengan Niacinamide konsentrasi 5%-10% dan ekstrak alami pemudar flek', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-16', specSchema: null },
-    { id: 'cat-skin-ret', name: 'Retinol & Anti-Aging Serum', parentId: 'cat-skin-serum', level: 3, code: 'SKN-RET', description: 'Serum regenerasi sel, peremajaan tekstur kulit dan pendorong kolagen alami', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-17', specSchema: null },
-    { id: 'cat-skin-crm', name: 'Ceramide Barrier Cream', parentId: 'cat-skin-moist', level: 3, code: 'SKN-CRM', description: 'Formula penguat skin barrier dengan 5 tipe Ceramide esensial dan Centella Asiatica', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-18', specSchema: null },
-    { id: 'cat-skin-spf50', name: 'Broad Spectrum SPF 50+ PA++++', parentId: 'cat-skin-sun', level: 3, code: 'SKN-SPF', description: 'Perlindungan maksimal terhadap sinar UVA & UVB dengan formulasi ringan cepat meresap', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-19', specSchema: null }
+    { id: 'cat-skin-niac', name: 'Niacinamide & Brightening Serum', parentId: 'cat-skin-serum', level: 3, createdAt: '2026-10-16', specSchema: null },
+    { id: 'cat-skin-ret', name: 'Retinol & Anti-Aging Serum', parentId: 'cat-skin-serum', level: 3, createdAt: '2026-10-17', specSchema: null },
+    { id: 'cat-skin-crm', name: 'Ceramide Barrier Cream', parentId: 'cat-skin-moist', level: 3, createdAt: '2026-10-18', specSchema: null },
+    { id: 'cat-skin-spf50', name: 'Broad Spectrum SPF 50+ PA++++', parentId: 'cat-skin-sun', level: 3, createdAt: '2026-10-19', specSchema: null }
   ];
 
   for (const c of initialCategories) {
-    insertCategory.run(c.id, c.name, c.parentId, c.level, c.code, c.description, c.status, c.itemCount, c.orderIndex, c.createdAt, c.specSchema);
+    insertCategory.run(c.id, c.name, c.parentId, c.level, c.createdAt, c.specSchema);
   }
 
   // 3. OVERHAUL BRANDS (15 records: SUMAS + 14 Skincare Brands)
@@ -269,8 +269,8 @@ export function seedComprehensiveData(db: any) {
 
   db.prepare('DELETE FROM brands').run();
   const insertBrand = db.prepare(`
-    INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, status, createdAt)
-    VALUES (@id, @name, @logo, @ownerId, @ownerName, @ownerEmail, @ownerRole, @description, @category, @status, @createdAt)
+    INSERT INTO brands (id, name, logo, ownerId, description, category, status, createdAt)
+    VALUES (@id, @name, @logo, @ownerId, @description, @category, @status, @createdAt)
   `);
   for (const b of brands) {
     insertBrand.run(b);
@@ -733,8 +733,8 @@ Isi: 100 ml | Tekstur: Rich Essence | BPOM: NA18200108341 | Sertifikasi Resmi: V
 
   db.prepare('DELETE FROM password_reset_requests').run();
   const insertResetReq = db.prepare(`
-    INSERT INTO password_reset_requests (id, userId, userName, userEmail, userRole, avatar, requestedAt, status, actionNote, isRead)
-    VALUES (@id, @userId, @userName, @userEmail, @userRole, @avatar, @requestedAt, @status, @actionNote, @isRead)
+    INSERT INTO password_reset_requests (id, userId, requestedAt, status, actionNote, createdAtTs)
+    VALUES (@id, @userId, @requestedAt, @status, @actionNote, @createdAtTs)
   `);
   for (const pr of resetRequests) {
     insertResetReq.run(pr);

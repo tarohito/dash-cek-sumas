@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS batches (
     pinLength INTEGER NOT NULL,
     status TEXT NOT NULL,
     isB2B INTEGER NOT NULL,
-    tags TEXT,
     redirectUrl TEXT DEFAULT 'https://cek.sumas.id/',
     qrType TEXT DEFAULT 'dynamic',
     requirePin INTEGER DEFAULT 1,
@@ -57,7 +56,7 @@ CREATE TABLE IF NOT EXISTS scan_points (
     deviceInfo TEXT,
     scanHistory TEXT,
     createdAt TEXT
-  , updatedAt INTEGER);
+  );
 
 CREATE TABLE IF NOT EXISTS scan_activities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,9 +95,6 @@ CREATE TABLE IF NOT EXISTS brands (
     name TEXT NOT NULL,
     logo TEXT,
     ownerId TEXT NOT NULL,
-    ownerName TEXT NOT NULL,
-    ownerEmail TEXT,
-    ownerRole TEXT,
     description TEXT,
     category TEXT,
     businessType TEXT DEFAULT 'Retail',
@@ -122,14 +118,9 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS password_reset_requests (
     id TEXT PRIMARY KEY,
     userId TEXT,
-    userName TEXT NOT NULL,
-    userEmail TEXT NOT NULL,
-    userRole TEXT NOT NULL,
-    avatar TEXT,
     requestedAt TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Menunggu',
     actionNote TEXT,
-    isRead INTEGER DEFAULT 0,
     createdAtTs INTEGER
   );
 
@@ -164,11 +155,6 @@ CREATE TABLE IF NOT EXISTS categories (
     name TEXT NOT NULL,
     parentId TEXT,
     level INTEGER NOT NULL,
-    code TEXT,
-    description TEXT,
-    status TEXT DEFAULT 'Aktif',
-    itemCount INTEGER DEFAULT 0,
-    orderIndex INTEGER DEFAULT 0,
     createdAt TEXT NOT NULL,
     specSchema TEXT
   );
@@ -213,3 +199,8 @@ CREATE INDEX IF NOT EXISTS idx_categories_level ON categories(level);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_userId ON user_sessions(userId);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expiresAt ON user_sessions(expiresAt);
 CREATE INDEX IF NOT EXISTS idx_read_notifications_user ON read_notifications(userId);
+CREATE INDEX IF NOT EXISTS idx_batches_batchId ON batches(batchId);
+CREATE INDEX IF NOT EXISTS idx_batches_brand ON batches(brand);
+CREATE INDEX IF NOT EXISTS idx_tags_tagNumber ON tags(tagNumber);
+CREATE INDEX IF NOT EXISTS idx_brands_ownerId ON brands(ownerId);
+CREATE INDEX IF NOT EXISTS idx_products_brandId ON products(brandId);

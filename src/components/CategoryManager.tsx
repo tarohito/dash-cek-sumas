@@ -27,11 +27,6 @@ export interface CategoryItem {
   name: string;
   parentId: string | null;
   level: number; // 1 = Kategori Utama, 2 = Sub Kategori, 3 = Varian / Jenis
-  code?: string | null;
-  description?: string | null;
-  status: 'Aktif' | 'Nonaktif';
-  itemCount: number;
-  orderIndex: number;
   createdAt: string;
   specSchema?: string | null;
 }
@@ -257,11 +252,8 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
       setIsSubmitting(true);
       const payload = {
         name: trimmed,
-        description: null,
         parentId,
-        level,
-        code: null,
-        status: 'Aktif'
+        level
       };
       const res = await apiFetch('/api/categories', {
         method: 'POST',
@@ -336,9 +328,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ currentRole = 
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: trimmed,
-          code: null,
-          description: currentCat?.description || null
+          name: trimmed
         })
       });
       if (res.ok) {

@@ -250,8 +250,8 @@ const brands = [
 
 db.prepare('DELETE FROM brands').run();
 const insertBrand = db.prepare(`
-  INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, status, createdAt)
-  VALUES (@id, @name, @logo, @ownerId, @ownerName, @ownerEmail, @ownerRole, @description, @category, @status, @createdAt)
+  INSERT INTO brands (id, name, logo, ownerId, description, category, status, createdAt)
+  VALUES (@id, @name, @logo, @ownerId, @description, @category, @status, @createdAt)
 `);
 for (const b of brands) {
   insertBrand.run(b);
@@ -1032,18 +1032,15 @@ const resetRequests = [
 
 db.prepare('DELETE FROM password_reset_requests').run();
 const insertResetReq = db.prepare(`
-  INSERT INTO password_reset_requests (id, userId, userName, userEmail, userRole, avatar, requestedAt, status, actionNote, isRead)
-  VALUES (@id, @userId, @userName, @userEmail, @userRole, @avatar, @requestedAt, @status, @actionNote, @isRead)
+  INSERT INTO password_reset_requests (id, userId, requestedAt, status, actionNote)
+  VALUES (@id, @userId, @requestedAt, @status, @actionNote)
 `);
 for (const pr of resetRequests) {
   insertResetReq.run(pr);
 }
 console.log(`Password Reset Requests seeded: ${resetRequests.length}`);
 
-// 9. ENSURE CATEGORIES ARE COMPLETE AND UP TO DATE
-db.prepare("UPDATE categories SET description = 'Material partisi toilet, phenolic board tahan air, dan perlengkapan arsitektural komersial Sumas', status = 'Aktif' WHERE id = 'cat-mat'").run();
-db.prepare("UPDATE categories SET description = 'Koleksi fashion retail, streetwear, dan apparel kasual berseri tag keaslian', status = 'Aktif' WHERE id = 'cat-app'").run();
-db.prepare("UPDATE categories SET description = 'Aksesoris pelengkap, tas, topi, dan barang merchandise resmi brand', status = 'Aktif' WHERE id = 'cat-acc'").run();
-console.log('Categories verified and updated.');
+// 9. Categories already seeded via server startup / seedComprehensiveData
+console.log('Categories verified.');
 
 console.log('--- Overhaul Finished Successfully! ---');

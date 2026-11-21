@@ -211,16 +211,12 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
 
       await db
         .prepare(
-          `INSERT INTO password_reset_requests (id, userId, userName, userEmail, userRole, avatar, requestedAt, status, actionNote, isRead, createdAtTs)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'Menunggu', ?, 0, ?)`
+          `INSERT INTO password_reset_requests (id, userId, requestedAt, status, actionNote, createdAtTs)
+           VALUES (?, ?, ?, 'Menunggu', ?, ?)`
         )
         .bind(
           newId,
           matchedUser.id,
-          matchedUser.name,
-          matchedUser.email,
-          normalizeRole(matchedUser.role),
-          matchedUser.avatar || null,
           requestedAt,
           sanitizedReason,
           nowTs
@@ -511,8 +507,6 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         .bind(cleanName, cleanUsername, cleanPhone || null, nextAvatar, nextPasswordHash, authUser.id)
         .run();
 
-      await db.prepare('UPDATE brands SET ownerName = ? WHERE ownerId = ?').bind(cleanName, authUser.id).run();
-
       if (rawNewPassword.trim().length > 0) {
         const currentRawToken = extractSessionToken(request);
         const currentTokenHash = currentRawToken ? crypto.createHmac('sha256', sessionSecret).update(currentRawToken).digest('hex') : '';
@@ -764,8 +758,8 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
 
       await db
         .prepare(
-          `INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, tags, redirectUrl, qrType, requirePin, enableGps)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`
+          `INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, redirectUrl, qrType, requirePin, enableGps)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(batchPk, batchCode, safeDate, safeProject, batchSku, batchBrand, rawQty, safeSpecs, pinLength, safeStatus, isB2B, redirectUrl, qrType, requirePin, enableGps)
         .run();
@@ -1246,15 +1240,24 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     // 6. BRANDS
     // -------------------------------------------------------------
     if (pathname === '/api/brands' && method === 'GET') {
-      const rows = (await db.prepare('SELECT * FROM brands ORDER BY rowid DESC').all()).results as any[];
+      const rows = (
+        await db
+          .prepare(
+            `SELECT b.*, u.name AS userOwnerName, u.email AS userOwnerEmail, u.role AS userOwnerRole
+             FROM brands b
+             LEFT JOIN users u ON u.id = b.ownerId
+             ORDER BY b.rowid DESC`
+          )
+          .all()
+      ).results as any[];
       const scopedRows = scope.isGlobal ? rows : rows.filter((b) => canScopeAccessBrand(scope, b.name, b.id));
-      const usersRows = (await db.prepare('SELECT id, name, email, role FROM users').all()).results as any[];
-      const userMap = new Map(usersRows.map((u) => [u.id, u]));
       return jsonResponse(
-        scopedRows.map((b) => {
-          const u = userMap.get(b.ownerId);
-          return u ? { ...b, ownerName: u.name, ownerEmail: u.email, ownerRole: u.role } : b;
-        })
+        scopedRows.map(({ userOwnerName, userOwnerEmail, userOwnerRole, ...b }) => ({
+          ...b,
+          ownerName: userOwnerName || 'Belum Ditentukan',
+          ownerEmail: userOwnerEmail || null,
+          ownerRole: userOwnerRole ? normalizeRole(userOwnerRole) : null,
+        }))
       );
     }
 
@@ -1291,10 +1294,10 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
 
       await db
         .prepare(
-          `INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, businessType, status, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO brands (id, name, logo, ownerId, description, category, businessType, status, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .bind(cleanId, cleanName, logoCheck.value, finalOwnerId, ownerName, ownerEmail, ownerRole, safeDesc, safeCat, businessType, safeStatus, safeCreatedAt)
+        .bind(cleanId, cleanName, logoCheck.value, finalOwnerId, safeDesc, safeCat, businessType, safeStatus, safeCreatedAt)
         .run();
 
       return jsonResponse({ id: cleanId, name: cleanName, logo: logoCheck.value, ownerId: finalOwnerId, ownerName, ownerEmail, ownerRole, description: safeDesc, category: safeCat, businessType, status: safeStatus, createdAt: safeCreatedAt });
@@ -1341,9 +1344,6 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
           name: b.name !== undefined ? sanitizeStringInput(b.name, 120) : existing.name,
           logo: nextLogo,
           ownerId: targetOwnerId,
-          ownerName,
-          ownerEmail,
-          ownerRole,
           description: b.description !== undefined ? sanitizeStringInput(b.description, 1000) : existing.description,
           category: b.category !== undefined ? sanitizeStringInput(b.category, 120) : existing.category,
           businessType: b.businessType !== undefined ? (b.businessType === 'B2B' ? 'B2B' : 'Retail') : (existing.businessType || 'Retail'),
@@ -1351,12 +1351,12 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         };
 
         await db
-          .prepare('UPDATE brands SET name = ?, logo = ?, ownerId = ?, ownerName = ?, ownerEmail = ?, ownerRole = ?, description = ?, category = ?, businessType = ?, status = ? WHERE id = ?')
-          .bind(updated.name, updated.logo, updated.ownerId, updated.ownerName, updated.ownerEmail, updated.ownerRole, updated.description, updated.category, updated.businessType, updated.status, id)
+          .prepare('UPDATE brands SET name = ?, logo = ?, ownerId = ?, description = ?, category = ?, businessType = ?, status = ? WHERE id = ?')
+          .bind(updated.name, updated.logo, updated.ownerId, updated.description, updated.category, updated.businessType, updated.status, id)
           .run();
 
         const result = await db.prepare('SELECT * FROM brands WHERE id = ?').bind(id).first<any>();
-        return jsonResponse(result);
+        return jsonResponse({ ...result, ownerName, ownerEmail, ownerRole });
       }
 
       if (method === 'DELETE') {
@@ -1369,7 +1369,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     // 7. CATEGORIES
     // -------------------------------------------------------------
     if (pathname === '/api/categories' && method === 'GET') {
-      const rows = (await db.prepare('SELECT * FROM categories ORDER BY level ASC, orderIndex ASC, name ASC').all()).results;
+      const rows = (await db.prepare('SELECT * FROM categories ORDER BY level ASC, rowid ASC, name ASC').all()).results;
       return jsonResponse(rows);
     }
 
@@ -1381,17 +1381,15 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
       const id = sanitizeStringInput(c.id, 80) || `cat-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`;
       const level = Math.min(3, Math.max(1, Number(c.level) || 1));
       const parentId = c.parentId ? sanitizeStringInput(c.parentId, 80) : null;
-      const code = c.code ? sanitizeStringInput(c.code, 60) : null;
-      const desc = c.description ? sanitizeStringInput(c.description, 500) : null;
       const specSchema = typeof c.specSchema === 'string' ? c.specSchema : c.specSchema ? JSON.stringify(c.specSchema) : null;
       const createdAt = new Date().toISOString().split('T')[0];
 
       await db
         .prepare(
-          `INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema)
-           VALUES (?, ?, ?, ?, ?, ?, 'Aktif', 0, ?, ?, ?)`
+          `INSERT INTO categories (id, name, parentId, level, createdAt, specSchema)
+           VALUES (?, ?, ?, ?, ?, ?)`
         )
-        .bind(id, cleanName, parentId, level, code, desc, Number(c.orderIndex) || 0, createdAt, specSchema)
+        .bind(id, cleanName, parentId, level, createdAt, specSchema)
         .run();
       const created = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<any>();
       return jsonResponse(created);
@@ -1420,10 +1418,7 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
       if (method === 'PUT') {
         const c = (await request.json().catch(() => ({}))) as any;
         const name = c.name !== undefined ? sanitizeStringInput(c.name, 120) : existing.name;
-        const code = c.code !== undefined ? sanitizeStringInput(c.code, 60) : existing.code;
-        const desc = c.description !== undefined ? sanitizeStringInput(c.description, 500) : existing.description;
-        const status = c.status !== undefined ? (c.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : existing.status;
-        await db.prepare('UPDATE categories SET name = ?, code = ?, description = ?, status = ? WHERE id = ?').bind(name, code, desc, status, id).run();
+        await db.prepare('UPDATE categories SET name = ? WHERE id = ?').bind(name, id).run();
         const updated = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(id).first<any>();
         return jsonResponse(updated);
       }
@@ -1466,14 +1461,22 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
       const denied = assertD1BrandAccess(scope, prod.brandName, prod.brandId);
       if (denied) return denied;
 
-      const brand = await db
-        .prepare('SELECT id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, category, status, description FROM brands WHERE id = ? OR LOWER(name) = LOWER(?)')
+      const brandRow = await db
+        .prepare('SELECT id, name, logo, ownerId, category, status, description FROM brands WHERE id = ? OR LOWER(name) = LOWER(?)')
         .bind(prod.brandId, prod.brandName)
         .first<any>();
       let user: any = null;
-      if (brand?.ownerId) {
-        user = await db.prepare('SELECT id, name, username, email, phone, role, avatar, status FROM users WHERE id = ?').bind(brand.ownerId).first<any>();
+      if (brandRow?.ownerId) {
+        user = await db.prepare('SELECT id, name, username, email, phone, role, avatar, status FROM users WHERE id = ?').bind(brandRow.ownerId).first<any>();
       }
+      const brand = brandRow
+        ? {
+            ...brandRow,
+            ownerName: user?.name || 'Belum Ditentukan',
+            ownerEmail: user?.email || null,
+            ownerRole: user?.role ? normalizeRole(user.role) : null,
+          }
+        : null;
 
       const batches = (
         await db
@@ -1746,11 +1749,6 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
           await revokeAllD1UserSessions(db, id);
         }
 
-        await db
-          .prepare('UPDATE brands SET ownerName = ?, ownerEmail = ?, ownerRole = ? WHERE ownerId = ?')
-          .bind(updated.name, updated.email, updated.role, id)
-          .run();
-
         if (
           authUser.id &&
           authUser.id !== id &&
@@ -1795,11 +1793,11 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         }
         await revokeAllD1UserSessions(db, id);
         await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
-        const fallbackUser = await db.prepare('SELECT * FROM users ORDER BY rowid ASC LIMIT 1').first<any>();
+        const fallbackUser = await db.prepare('SELECT id FROM users ORDER BY rowid ASC LIMIT 1').first<{ id: string }>();
         if (fallbackUser) {
           await db
-            .prepare('UPDATE brands SET ownerId = ?, ownerName = ?, ownerEmail = ?, ownerRole = ? WHERE ownerId = ?')
-            .bind(fallbackUser.id, fallbackUser.name, fallbackUser.email, fallbackUser.role, id)
+            .prepare('UPDATE brands SET ownerId = ? WHERE ownerId = ?')
+            .bind(fallbackUser.id, id)
             .run();
         }
         return jsonResponse({ success: true });
@@ -1811,7 +1809,17 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
     // -------------------------------------------------------------
     if (pathname === '/api/password-resets' && method === 'GET') {
       if (!can('users.manage')) return deny();
-      const rows = (await db.prepare('SELECT * FROM password_reset_requests ORDER BY rowid DESC').all()).results;
+      const rows = (
+        await db
+          .prepare(
+            `SELECT pr.id, pr.userId, u.name AS userName, u.email AS userEmail, u.role AS userRole, u.avatar AS avatar,
+                    pr.requestedAt, pr.status, pr.actionNote, pr.createdAtTs
+             FROM password_reset_requests pr
+             LEFT JOIN users u ON u.id = pr.userId
+             ORDER BY pr.rowid DESC`
+          )
+          .all()
+      ).results;
       return jsonResponse(rows);
     }
 
@@ -1825,12 +1833,20 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         return jsonResponse({ success: false, error: 'Aksi persetujuan tidak valid.' }, 400);
       }
 
-      const resetReq = await db.prepare('SELECT * FROM password_reset_requests WHERE id = ?').bind(id).first<any>();
+      const resetReq = await db
+        .prepare(
+          `SELECT pr.*, u.name AS userName, u.email AS userEmail, u.role AS userRole, u.avatar AS avatar
+           FROM password_reset_requests pr
+           LEFT JOIN users u ON u.id = pr.userId
+           WHERE pr.id = ?`
+        )
+        .bind(id)
+        .first<any>();
       if (!resetReq) return jsonResponse({ success: false, error: 'Permintaan reset sandi tidak ditemukan.' }, 404);
 
       const targetUserRow = await db
-        .prepare('SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ? OR LOWER(email) = LOWER(?) LIMIT 1')
-        .bind(resetReq.userId || '', resetReq.userEmail || '')
+        .prepare('SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ? LIMIT 1')
+        .bind(resetReq.userId || '')
         .first<any>();
       const formattedTargetUser = targetUserRow ? { ...targetUserRow, role: normalizeRole(targetUserRow.role) } : null;
 
@@ -1846,6 +1862,8 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
       let tempPassword: string | null = null;
       let emailSent = false;
       let note = sanitizeStringInput(body?.actionNote, 500);
+      const targetName = resetReq.userName || targetUserRow?.name || 'Pengguna';
+      const targetEmail = resetReq.userEmail || targetUserRow?.email || '';
 
       if (action === 'approve') {
         const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -1858,30 +1876,30 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
           await revokeAllD1UserSessions(db, targetUserRow.id);
         }
 
-        if (resetReq.userEmail && resetReq.userEmail.includes('@')) {
+        if (targetEmail && targetEmail.includes('@')) {
           const activeSettings = await loadActiveSettingsD1(db);
-          const emailCfg: NotificationConfig = { ...activeSettings.notifications, emailRecipients: resetReq.userEmail };
+          const emailCfg: NotificationConfig = { ...activeSettings.notifications, emailRecipients: targetEmail };
           const mailRes = await sendEdgeAlertChannel(
             env,
             'email',
             emailCfg,
             'Kata Sandi Sementara Akun Anda Telah Diterbitkan',
-            `Halo ${resetReq.userName},\n\nPermintaan reset kata sandi Anda telah disetujui oleh ${actorLabel} pada ${nowStr}.\nKata sandi sementara baru Anda: ${tempPassword}\n\nSegera ubah kata sandi Anda setelah masuk.`,
-            `Halo <b>${escapeHtml(resetReq.userName)}</b>,\nPermintaan reset kata sandi Anda telah disetujui oleh <b>${escapeHtml(actorLabel)}</b> pada ${escapeHtml(nowStr)}.\nKata sandi sementara baru Anda: <code>${escapeHtml(tempPassword)}</code>\nSegera ubah kata sandi setelah masuk.`
+            `Halo ${targetName},\n\nPermintaan reset kata sandi Anda telah disetujui oleh ${actorLabel} pada ${nowStr}.\nKata sandi sementara baru Anda: ${tempPassword}\n\nSegera ubah kata sandi Anda setelah masuk.`,
+            `Halo <b>${escapeHtml(targetName)}</b>,\nPermintaan reset kata sandi Anda telah disetujui oleh <b>${escapeHtml(actorLabel)}</b> pada ${escapeHtml(nowStr)}.\nKata sandi sementara baru Anda: <code>${escapeHtml(tempPassword)}</code>\nSegera ubah kata sandi setelah masuk.`
           );
           emailSent = mailRes.success;
         }
 
         if (!note) {
           note = emailSent
-            ? `Kata sandi akun telah diperbarui dan dikirim ke email ${resetReq.userEmail} oleh ${actorLabel} (${nowStr}).`
+            ? `Kata sandi akun telah diperbarui dan dikirim ke email ${targetEmail} oleh ${actorLabel} (${nowStr}).`
             : `Kata sandi sementara baru telah diterapkan ke database oleh ${actorLabel} (${nowStr}). Bagikan sandi sementara kepada pengguna karena layanan email belum aktif.`;
         }
       } else if (!note) {
         note = `Permintaan reset ditolak oleh ${actorLabel} (${nowStr}).`;
       }
 
-      await db.prepare('UPDATE password_reset_requests SET status = ?, actionNote = ?, isRead = 1 WHERE id = ?').bind(newStatus, note, id).run();
+      await db.prepare('UPDATE password_reset_requests SET status = ?, actionNote = ? WHERE id = ?').bind(newStatus, note, id).run();
       await updateD1NotificationByEntity(db, 'password_reset', id, {
         status: newStatus,
         severity: action === 'approve' ? 'info' : 'warning',
@@ -2186,17 +2204,17 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
           `-- Dibuat pada: ${backupDate}`,
           `SET NAMES utf8mb4;`,
           `SET FOREIGN_KEY_CHECKS = 0;`,
-          insertBlocks('batches', ['id', 'batchId', 'date', 'project', 'sku', 'brand', 'qty', 'specs', 'pinLength', 'status', 'isB2B', 'tags', 'redirectUrl', 'qrType', 'requirePin', 'enableGps'], batches),
+          insertBlocks('batches', ['id', 'batchId', 'date', 'project', 'sku', 'brand', 'qty', 'specs', 'pinLength', 'status', 'isB2B', 'redirectUrl', 'qrType', 'requirePin', 'enableGps'], batches),
           insertBlocks('tags', ['id', 'batchId', 'tagNumber', 'pin', 'status', 'project', 'specs', 'codeType', 'warranty', 'prodCode', 'note', 'allocatedAt'], tags),
           insertBlocks('scan_points', ['id', 'city', 'province', 'venue', 'lat', 'lng', 'totalScans', 'todayScans', 'brand', 'productType', 'batchId', 'latestTagId', 'pin', 'latestTime', 'isB2B', 'status', 'anomalyReason', 'deviceInfo', 'scanHistory', 'createdAt'], scanPoints),
           insertBlocks('scan_activities', ['id', 'rangeType', 'label', 'fullDate', 'scans', 'valid', 'topBrand', 'sortOrder'], scanActivities),
           insertBlocks('audit_logs', ['id', 'batchId', 'timestamp', 'user', 'reason', 'changes'], auditLogs),
           insertBlocks('users', ['id', 'name', 'username', 'email', 'phone', 'role', 'avatar', 'status', 'createdAt', 'password'], usersFull),
-          insertBlocks('brands', ['id', 'name', 'logo', 'ownerId', 'ownerName', 'ownerEmail', 'ownerRole', 'description', 'category', 'businessType', 'status', 'createdAt'], brands),
+          insertBlocks('brands', ['id', 'name', 'logo', 'ownerId', 'description', 'category', 'businessType', 'status', 'createdAt'], brands),
           insertBlocks('products', ['id', 'brandId', 'brandName', 'sku', 'category', 'isB2B', 'description', 'createdAt', 'skuCode', 'image'], products),
-          insertBlocks('password_reset_requests', ['id', 'userId', 'userName', 'userEmail', 'userRole', 'avatar', 'requestedAt', 'status', 'actionNote', 'isRead', 'createdAtTs'], passwordResetRequests),
+          insertBlocks('password_reset_requests', ['id', 'userId', 'requestedAt', 'status', 'actionNote', 'createdAtTs'], passwordResetRequests),
           insertBlocks('read_notifications', ['userId', 'notificationId', 'readAt'], readNotifications),
-          insertBlocks('categories', ['id', 'name', 'parentId', 'level', 'code', 'description', 'status', 'itemCount', 'orderIndex', 'createdAt', 'specSchema'], categories),
+          insertBlocks('categories', ['id', 'name', 'parentId', 'level', 'createdAt', 'specSchema'], categories),
           insertBlocks('system_settings', ['key', 'value', 'updatedAt'], systemSettings),
           `SET FOREIGN_KEY_CHECKS = 1;`,
         ].filter(Boolean).join('\n\n');
@@ -2266,8 +2284,8 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         stmts.push(db.prepare('DELETE FROM batches'));
         for (const b of batches) {
           stmts.push(
-            db.prepare('INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, tags, redirectUrl, qrType, requirePin, enableGps) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-              .bind(b.id, b.batchId, b.date || '', b.project ?? null, b.sku || '', b.brand || '', Number(b.qty) || 0, b.specs ?? null, Number(b.pinLength) || 8, b.status || 'Aktif', b.isB2B ? 1 : 0, b.tags ?? null, b.redirectUrl || 'https://cek.sumas.id/', b.qrType || 'dynamic', b.requirePin === 0 || b.requirePin === false ? 0 : 1, b.enableGps === 0 || b.enableGps === false ? 0 : 1)
+            db.prepare('INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, redirectUrl, qrType, requirePin, enableGps) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+              .bind(b.id, b.batchId, b.date || '', b.project ?? null, b.sku || '', b.brand || '', Number(b.qty) || 0, b.specs ?? null, Number(b.pinLength) || 8, b.status || 'Aktif', b.isB2B ? 1 : 0, b.redirectUrl || 'https://cek.sumas.id/', b.qrType || 'dynamic', b.requirePin === 0 || b.requirePin === false ? 0 : 1, b.enableGps === 0 || b.enableGps === false ? 0 : 1)
           );
           stats.batches++;
         }
@@ -2305,8 +2323,8 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         stmts.push(db.prepare('DELETE FROM categories'));
         for (const c of categories) {
           stmts.push(
-            db.prepare('INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-              .bind(c.id, c.name, c.parentId ?? null, Number(c.level) || 1, c.code ?? null, c.description ?? null, c.status || 'Aktif', Number(c.itemCount) || 0, Number(c.orderIndex) || 0, c.createdAt || new Date().toISOString().split('T')[0], c.specSchema ?? null)
+            db.prepare('INSERT INTO categories (id, name, parentId, level, createdAt, specSchema) VALUES (?, ?, ?, ?, ?, ?)')
+              .bind(c.id, c.name, c.parentId ?? null, Number(c.level) || 1, c.createdAt || new Date().toISOString().split('T')[0], c.specSchema ?? null)
           );
           stats.categories++;
         }
@@ -2315,8 +2333,8 @@ export const onRequest: PagesFunction<EdgeEnv> = async (context) => {
         stmts.push(db.prepare('DELETE FROM brands'));
         for (const br of brands) {
           stmts.push(
-            db.prepare('INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, businessType, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-              .bind(br.id, br.name, br.logo ?? null, br.ownerId || '', br.ownerName || '', br.ownerEmail ?? null, br.ownerRole ?? null, br.description ?? null, br.category ?? null, br.businessType || 'Retail', br.status || 'Aktif', br.createdAt || new Date().toISOString().split('T')[0])
+            db.prepare('INSERT INTO brands (id, name, logo, ownerId, description, category, businessType, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+              .bind(br.id, br.name, br.logo ?? null, br.ownerId || '', br.description ?? null, br.category ?? null, br.businessType || 'Retail', br.status || 'Aktif', br.createdAt || new Date().toISOString().split('T')[0])
           );
           stats.brands++;
         }

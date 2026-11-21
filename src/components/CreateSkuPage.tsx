@@ -44,7 +44,6 @@ export interface CategoryRef {
   name: string;
   level: number;
   parentId?: string | null;
-  code?: string | null;
   specSchema?: string | null;
 }
 

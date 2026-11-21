@@ -177,12 +177,14 @@ db.exec(`
     pinLength INTEGER NOT NULL,
     status TEXT NOT NULL,
     isB2B INTEGER NOT NULL,
-    tags TEXT,
     redirectUrl TEXT DEFAULT 'https://cek.sumas.id/',
     qrType TEXT DEFAULT 'dynamic',
     requirePin INTEGER DEFAULT 1,
     enableGps INTEGER DEFAULT 1
   );
+
+  CREATE INDEX IF NOT EXISTS idx_batches_batchId ON batches(batchId);
+  CREATE INDEX IF NOT EXISTS idx_batches_brand ON batches(brand);
 
   CREATE TABLE IF NOT EXISTS tags (
     id TEXT PRIMARY KEY,
@@ -202,6 +204,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tags_batchId ON tags(batchId);
   CREATE INDEX IF NOT EXISTS idx_tags_status ON tags(status);
   CREATE INDEX IF NOT EXISTS idx_tags_search ON tags(batchId, status, tagNumber);
+  CREATE INDEX IF NOT EXISTS idx_tags_tagNumber ON tags(tagNumber);
   CREATE INDEX IF NOT EXISTS idx_tags_pin ON tags(pin);
 
   CREATE TABLE IF NOT EXISTS scan_points (
@@ -279,15 +282,14 @@ db.exec(`
     name TEXT NOT NULL,
     logo TEXT,
     ownerId TEXT NOT NULL,
-    ownerName TEXT NOT NULL,
-    ownerEmail TEXT,
-    ownerRole TEXT,
     description TEXT,
     category TEXT,
     businessType TEXT DEFAULT 'Retail',
     status TEXT NOT NULL,
     createdAt TEXT NOT NULL
   );
+
+  CREATE INDEX IF NOT EXISTS idx_brands_ownerId ON brands(ownerId);
 
   CREATE TABLE IF NOT EXISTS products (
     id TEXT PRIMARY KEY,
@@ -302,17 +304,14 @@ db.exec(`
     image TEXT
   );
 
+  CREATE INDEX IF NOT EXISTS idx_products_brandId ON products(brandId);
+
   CREATE TABLE IF NOT EXISTS password_reset_requests (
     id TEXT PRIMARY KEY,
     userId TEXT,
-    userName TEXT NOT NULL,
-    userEmail TEXT NOT NULL,
-    userRole TEXT NOT NULL,
-    avatar TEXT,
     requestedAt TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Menunggu',
     actionNote TEXT,
-    isRead INTEGER DEFAULT 0,
     createdAtTs INTEGER
   );
 
@@ -352,11 +351,6 @@ db.exec(`
     name TEXT NOT NULL,
     parentId TEXT,
     level INTEGER NOT NULL,
-    code TEXT,
-    description TEXT,
-    status TEXT DEFAULT 'Aktif',
-    itemCount INTEGER DEFAULT 0,
-    orderIndex INTEGER DEFAULT 0,
     createdAt TEXT NOT NULL,
     specSchema TEXT
   );
@@ -393,10 +387,6 @@ db.exec(`
 try {
   db.prepare("UPDATE users SET role = 'Admin Brand' WHERE role IS NULL OR LOWER(TRIM(role)) NOT IN ('super admin', 'administrator', 'admin')").run();
   db.prepare("UPDATE users SET role = 'Super Admin' WHERE LOWER(TRIM(role)) IN ('super admin', 'administrator', 'admin')").run();
-  db.prepare("UPDATE brands SET ownerRole = 'Admin Brand' WHERE ownerRole IS NULL OR LOWER(TRIM(ownerRole)) NOT IN ('super admin', 'administrator', 'admin')").run();
-  db.prepare("UPDATE brands SET ownerRole = 'Super Admin' WHERE LOWER(TRIM(ownerRole)) IN ('super admin', 'administrator', 'admin')").run();
-  db.prepare("UPDATE password_reset_requests SET userRole = 'Admin Brand' WHERE userRole IS NULL OR LOWER(TRIM(userRole)) NOT IN ('super admin', 'administrator', 'admin')").run();
-  db.prepare("UPDATE password_reset_requests SET userRole = 'Super Admin' WHERE LOWER(TRIM(userRole)) IN ('super admin', 'administrator', 'admin')").run();
   const storedRbacRow = db.prepare("SELECT value FROM system_settings WHERE key = 'rbac_permissions'").get() as any;
   if (storedRbacRow?.value) {
     const cleanedMatrix = mergeRbacMatrix(JSON.parse(storedRbacRow.value));
@@ -439,10 +429,7 @@ try {
     WHERE anomalyReason LIKE '%Pemindaian berulang 3x%' OR anomalyReason LIKE '%item yang sama%' OR anomalyReason LIKE '%Aktivitas pemindaian berulang%'`).run();
 } catch (_) {}
 
-// Migration: Tambah timestamp numerik untuk pengurutan kronologis notifikasi scan & reset sandi
-try {
-  db.prepare('ALTER TABLE scan_points ADD COLUMN updatedAt INTEGER').run();
-} catch (_) {}
+// Migration: Tambah timestamp numerik untuk pengurutan kronologis reset sandi
 try {
   db.prepare('ALTER TABLE password_reset_requests ADD COLUMN createdAtTs INTEGER').run();
 } catch (_) {}
@@ -553,62 +540,62 @@ try {
 const categoryCountRow = db.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number };
 if (categoryCountRow && categoryCountRow.count === 0) {
   const insertCategory = db.prepare(`
-    INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO categories (id, name, parentId, level, createdAt)
+    VALUES (?, ?, ?, ?, ?)
   `);
 
   const initialCategories = [
     // === LEVEL 1: KATEGORI UTAMA ===
-    { id: 'cat-mat', name: 'Material & Konstruksi', parentId: null, level: 1, code: 'MAT-B2B', description: 'Material partisi toilet, phenolic board tahan air, dan perlengkapan arsitektural komersial Sumas', status: 'Aktif', itemCount: 12, orderIndex: 1, createdAt: '2026-10-01' },
-    { id: 'cat-app', name: 'Pakaian & Fashion', parentId: null, level: 1, code: 'APP-RET', description: 'Koleksi fashion retail, streetwear, dan apparel kasual berseri tag keaslian', status: 'Aktif', itemCount: 8, orderIndex: 2, createdAt: '2026-10-02' },
-    { id: 'cat-acc', name: 'Aksesoris & Merchandise', parentId: null, level: 1, code: 'ACC-GDS', description: 'Aksesoris pelengkap, tas, topi, dan barang merchandise resmi brand', status: 'Aktif', itemCount: 6, orderIndex: 3, createdAt: '2026-10-03' },
+    { id: 'cat-mat', name: 'Material & Konstruksi', parentId: null, level: 1, createdAt: '2026-10-01' },
+    { id: 'cat-app', name: 'Pakaian & Fashion', parentId: null, level: 1, createdAt: '2026-10-02' },
+    { id: 'cat-acc', name: 'Aksesoris & Merchandise', parentId: null, level: 1, createdAt: '2026-10-03' },
 
     // === LEVEL 2: SUB-KATEGORI (Parent: Material & Konstruksi) ===
-    { id: 'cat-cub', name: 'Partisi Cubicle Toilet', parentId: 'cat-mat', level: 2, code: 'CUB-01', description: 'Sistem partisi kubikal toilet modern untuk fasilitas publik dan rumah sakit', status: 'Aktif', itemCount: 4, orderIndex: 1, createdAt: '2026-10-05' },
-    { id: 'cat-hdwr', name: 'Aksesoris & Hardware Cubicle', parentId: 'cat-mat', level: 2, code: 'HDW-02', description: 'Perangkat keras penopang, engsel, handle, dan kunci partisi', status: 'Aktif', itemCount: 3, orderIndex: 2, createdAt: '2026-10-06' },
-    { id: 'cat-clad', name: 'Wall Cladding & Plafon', parentId: 'cat-mat', level: 2, code: 'CLD-03', description: 'Panel dinding tahan lembab dan pelapis estetika arsitektur', status: 'Aktif', itemCount: 2, orderIndex: 3, createdAt: '2026-10-07' },
+    { id: 'cat-cub', name: 'Partisi Cubicle Toilet', parentId: 'cat-mat', level: 2, createdAt: '2026-10-05' },
+    { id: 'cat-hdwr', name: 'Aksesoris & Hardware Cubicle', parentId: 'cat-mat', level: 2, createdAt: '2026-10-06' },
+    { id: 'cat-clad', name: 'Wall Cladding & Plafon', parentId: 'cat-mat', level: 2, createdAt: '2026-10-07' },
 
     // === LEVEL 2: SUB-KATEGORI (Parent: Pakaian & Fashion) ===
-    { id: 'cat-top', name: 'Atasan & T-Shirt', parentId: 'cat-app', level: 2, code: 'TOP-01', description: 'Kaos grafis oversized, t-shirt kasual katun premium', status: 'Aktif', itemCount: 3, orderIndex: 1, createdAt: '2026-10-08' },
-    { id: 'cat-out', name: 'Outerwear & Jaket', parentId: 'cat-app', level: 2, code: 'OUT-02', description: 'Hoodie fleece tebal, jaket denim, dan overshirt', status: 'Aktif', itemCount: 2, orderIndex: 2, createdAt: '2026-10-09' },
+    { id: 'cat-top', name: 'Atasan & T-Shirt', parentId: 'cat-app', level: 2, createdAt: '2026-10-08' },
+    { id: 'cat-out', name: 'Outerwear & Jaket', parentId: 'cat-app', level: 2, createdAt: '2026-10-09' },
 
     // === LEVEL 2: SUB-KATEGORI (Parent: Aksesoris & Merchandise) ===
-    { id: 'cat-hat', name: 'Topi & Headwear', parentId: 'cat-acc', level: 2, code: 'HAT-01', description: 'Topi lengkung bordir dan kupluk rajut', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-10' },
-    { id: 'cat-bag', name: 'Tas & Pouch', parentId: 'cat-acc', level: 2, code: 'BAG-02', description: 'Tas selempang utility dan tote bag tahan air', status: 'Aktif', itemCount: 2, orderIndex: 2, createdAt: '2026-10-11' },
+    { id: 'cat-hat', name: 'Topi & Headwear', parentId: 'cat-acc', level: 2, createdAt: '2026-10-10' },
+    { id: 'cat-bag', name: 'Tas & Pouch', parentId: 'cat-acc', level: 2, createdAt: '2026-10-11' },
 
     // === LEVEL 3: SUB-SUB KATEGORI (Parent: Partisi Cubicle Toilet) ===
-    { id: 'cat-phn12', name: 'Phenolic Board 12mm Standard', parentId: 'cat-cub', level: 3, code: 'PHN-12', description: 'Papan phenolic kompak 12mm densitas tinggi tahan air & benturan', status: 'Aktif', itemCount: 5, orderIndex: 1, createdAt: '2026-10-12' },
-    { id: 'cat-phn15', name: 'Phenolic Board 15mm Heavy Duty', parentId: 'cat-cub', level: 3, code: 'PHN-15', description: 'Panel ketebalan 15mm untuk area dengan lalu lintas pengguna padat', status: 'Aktif', itemCount: 3, orderIndex: 2, createdAt: '2026-10-13' },
-    { id: 'cat-anti', name: 'Antibacterial Board (Medis/RS)', parentId: 'cat-cub', level: 3, code: 'AB-MED', description: 'Lapisan higienis antibakteri khusus ruangan medis dan rumah sakit', status: 'Aktif', itemCount: 2, orderIndex: 3, createdAt: '2026-10-14' },
-    { id: 'cat-wood', name: 'Woodgrain Texture Finish', parentId: 'cat-cub', level: 3, code: 'WG-FIN', description: 'Motif serat kayu elegan tahan kelembapan tinggi', status: 'Aktif', itemCount: 2, orderIndex: 4, createdAt: '2026-10-15' },
+    { id: 'cat-phn12', name: 'Phenolic Board 12mm Standard', parentId: 'cat-cub', level: 3, createdAt: '2026-10-12' },
+    { id: 'cat-phn15', name: 'Phenolic Board 15mm Heavy Duty', parentId: 'cat-cub', level: 3, createdAt: '2026-10-13' },
+    { id: 'cat-anti', name: 'Antibacterial Board (Medis/RS)', parentId: 'cat-cub', level: 3, createdAt: '2026-10-14' },
+    { id: 'cat-wood', name: 'Woodgrain Texture Finish', parentId: 'cat-cub', level: 3, createdAt: '2026-10-15' },
 
     // === LEVEL 3: SUB-SUB KATEGORI (Parent: Aksesoris & Hardware Cubicle) ===
-    { id: 'cat-nyl', name: 'Nylon Fitting Set Hitam', parentId: 'cat-hdwr', level: 3, code: 'NYL-SET', description: 'Engsel, kaki penopang, dan kunci berbahan nylon tahan karat', status: 'Aktif', itemCount: 4, orderIndex: 1, createdAt: '2026-10-16' },
-    { id: 'cat-ss304', name: 'Stainless Steel 304 Luxury', parentId: 'cat-hdwr', level: 3, code: 'SS-304', description: 'Fitting stainless steel SUS 304 anti-korosi premium', status: 'Aktif', itemCount: 3, orderIndex: 2, createdAt: '2026-10-17' },
-    { id: 'cat-leg', name: 'Adjustable Leg 10-15cm', parentId: 'cat-hdwr', level: 3, code: 'LEG-ADJ', description: 'Kaki cubicle pengatur ketinggian lantai partisi', status: 'Aktif', itemCount: 2, orderIndex: 3, createdAt: '2026-10-18' },
+    { id: 'cat-nyl', name: 'Nylon Fitting Set Hitam', parentId: 'cat-hdwr', level: 3, createdAt: '2026-10-16' },
+    { id: 'cat-ss304', name: 'Stainless Steel 304 Luxury', parentId: 'cat-hdwr', level: 3, createdAt: '2026-10-17' },
+    { id: 'cat-leg', name: 'Adjustable Leg 10-15cm', parentId: 'cat-hdwr', level: 3, createdAt: '2026-10-18' },
 
     // === LEVEL 3: SUB-SUB KATEGORI (Parent: Wall Cladding) ===
-    { id: 'cat-ext', name: 'Exterior Architectural Cladding', parentId: 'cat-clad', level: 3, code: 'EXT-CLD', description: 'Panel eksterior tahan cuaca ekstrem dan sinar UV', status: 'Aktif', itemCount: 1, orderIndex: 1, createdAt: '2026-10-19' },
-    { id: 'cat-int', name: 'Interior Decorative Panel', parentId: 'cat-clad', level: 3, code: 'INT-DEC', description: 'Panel dinding dekoratif tahan rayap dan air', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-20' },
+    { id: 'cat-ext', name: 'Exterior Architectural Cladding', parentId: 'cat-clad', level: 3, createdAt: '2026-10-19' },
+    { id: 'cat-int', name: 'Interior Decorative Panel', parentId: 'cat-clad', level: 3, createdAt: '2026-10-20' },
 
     // === LEVEL 3: SUB-SUB KATEGORI (Parent: Atasan & T-Shirt) ===
-    { id: 'cat-ovr', name: 'Oversized Boxy Cut Tee', parentId: 'cat-top', level: 3, code: 'TSH-OVR', description: 'Kaos potongan boxy katun combed 20s gramasi berat', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-21' },
-    { id: 'cat-reg', name: 'Regular Fit Graphic Tee', parentId: 'cat-top', level: 3, code: 'TSH-REG', description: 'T-shirt standar dengan sablon plastisol tahan cuci', status: 'Aktif', itemCount: 2, orderIndex: 2, createdAt: '2026-10-22' },
+    { id: 'cat-ovr', name: 'Oversized Boxy Cut Tee', parentId: 'cat-top', level: 3, createdAt: '2026-10-21' },
+    { id: 'cat-reg', name: 'Regular Fit Graphic Tee', parentId: 'cat-top', level: 3, createdAt: '2026-10-22' },
 
     // === LEVEL 3: SUB-SUB KATEGORI (Parent: Outerwear & Jaket) ===
-    { id: 'cat-hood', name: 'Heavyweight Fleece Hoodie', parentId: 'cat-out', level: 3, code: 'HD-FLC', description: 'Hoodie katun fleece 330gsm dengan saku kangguru', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-23' },
-    { id: 'cat-dnm', name: 'Denim Trucker Jacket', parentId: 'cat-out', level: 3, code: 'JKT-DNM', description: 'Jaket denim 14oz raw selvedge', status: 'Aktif', itemCount: 1, orderIndex: 2, createdAt: '2026-10-24' },
+    { id: 'cat-hood', name: 'Heavyweight Fleece Hoodie', parentId: 'cat-out', level: 3, createdAt: '2026-10-23' },
+    { id: 'cat-dnm', name: 'Denim Trucker Jacket', parentId: 'cat-out', level: 3, createdAt: '2026-10-24' },
 
     // === LEVEL 3: SUB-SUB KATEGORI (Parent: Topi & Headwear) ===
-    { id: 'cat-cap', name: '6-Panel Curved Dad Cap', parentId: 'cat-hat', level: 3, code: 'CAP-06', description: 'Topi katun twill dengan pengait gesper kuningan', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-25' },
+    { id: 'cat-cap', name: '6-Panel Curved Dad Cap', parentId: 'cat-hat', level: 3, createdAt: '2026-10-25' },
 
     // === LEVEL 3: SUB-SUB KATEGORI (Parent: Tas & Pouch) ===
-    { id: 'cat-slng', name: 'Utility Cordura Sling Bag', parentId: 'cat-bag', level: 3, code: 'BAG-SLN', description: 'Tas selempang multifungsi bahan cordura tahan percikan air', status: 'Aktif', itemCount: 2, orderIndex: 1, createdAt: '2026-10-26' }
+    { id: 'cat-slng', name: 'Utility Cordura Sling Bag', parentId: 'cat-bag', level: 3, createdAt: '2026-10-26' }
   ];
 
   const insertAllCats = db.transaction((cats) => {
     for (const c of cats) {
-      insertCategory.run(c.id, c.name, c.parentId, c.level, c.code, c.description, c.status, c.itemCount, c.orderIndex, c.createdAt);
+      insertCategory.run(c.id, c.name, c.parentId, c.level, c.createdAt);
     }
   });
   insertAllCats(initialCategories);
@@ -693,12 +680,18 @@ const batchCountRow = db.prepare('SELECT COUNT(*) as count FROM batches').get() 
 if (!batchCountRow || batchCountRow.count < 15 || (firstSp && (!tagCheck || tagCheck.count === 0))) {
   seedComprehensiveData(db);
 } else {
-  // Ensure tags table has rows for any existing batches that may have tags in batches.tags column
-  const existingBatches = db.prepare('SELECT id, batchId, brand, qty, pinLength, isB2B, project, specs, tags FROM batches').all() as any[];
+  // Ensure tags table has rows for any existing batches (including legacy batches.tags column if present)
+  const batchCols = db.prepare('PRAGMA table_info(batches)').all() as Array<{ name: string }>;
+  const hasLegacyTagsCol = batchCols.some((c) => c.name === 'tags');
+  const existingBatches = db.prepare(
+    hasLegacyTagsCol
+      ? 'SELECT id, batchId, brand, qty, pinLength, isB2B, project, specs, tags FROM batches'
+      : 'SELECT id, batchId, brand, qty, pinLength, isB2B, project, specs FROM batches'
+  ).all() as any[];
   for (const b of existingBatches) {
     const tagCount = db.prepare('SELECT COUNT(*) as count FROM tags WHERE batchId = ?').get(b.id) as { count: number };
     if (!tagCount || tagCount.count === 0) {
-      if (b.tags) {
+      if (hasLegacyTagsCol && b.tags) {
         try {
           const parsed = JSON.parse(b.tags);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -716,6 +709,33 @@ if (!batchCountRow || batchCountRow.count < 15 || (firstSp && (!tagCheck || tagC
       insertBatchTags(generated);
     }
   }
+}
+
+// Migration: Hapus kolom tabel yang tidak perlu / redundan untuk optimasi skema SQLite
+{
+  const dropColumnIfExists = (table: string, col: string) => {
+    try {
+      const cols = db.prepare(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>;
+      if (cols.some((c) => c.name === col)) {
+        db.exec(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
+      }
+    } catch (_) {}
+  };
+  dropColumnIfExists('batches', 'tags');
+  dropColumnIfExists('scan_points', 'updatedAt');
+  dropColumnIfExists('categories', 'itemCount');
+  dropColumnIfExists('categories', 'orderIndex');
+  dropColumnIfExists('categories', 'description');
+  dropColumnIfExists('categories', 'code');
+  dropColumnIfExists('categories', 'status');
+  dropColumnIfExists('brands', 'ownerName');
+  dropColumnIfExists('brands', 'ownerEmail');
+  dropColumnIfExists('brands', 'ownerRole');
+  dropColumnIfExists('password_reset_requests', 'userName');
+  dropColumnIfExists('password_reset_requests', 'userEmail');
+  dropColumnIfExists('password_reset_requests', 'userRole');
+  dropColumnIfExists('password_reset_requests', 'avatar');
+  dropColumnIfExists('password_reset_requests', 'isRead');
 }
 
 
@@ -1181,13 +1201,6 @@ app.put('/api/auth/profile', (req, res) => {
       SET name = ?, email = ?, phone = ?, avatar = ?, password = ?
       WHERE id = ?
     `).run(cleanName, cleanEmail, cleanPhone, cleanAvatar, nextPasswordHash, existing.id);
-
-    // Sinkronkan nama & email pengelola pada tabel brand jika berubah
-    db.prepare(`
-      UPDATE brands
-      SET ownerName = ?, ownerEmail = ?
-      WHERE ownerId = ?
-    `).run(cleanName, cleanEmail, existing.id);
 
     const updated = db.prepare(
       'SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ?'
@@ -2037,7 +2050,7 @@ async function evaluateAndPersistScan(params: {
       SET city = ?, province = ?, venue = ?, lat = ?, lng = ?,
           totalScans = ?, todayScans = ?, latestTime = ?,
           status = ?, anomalyReason = ?, deviceInfo = ?, scanHistory = ?,
-          createdAt = ?, updatedAt = ?
+          createdAt = ?
       WHERE id = ?
     `).run(
       evaluation.city,
@@ -2053,7 +2066,6 @@ async function evaluateAndPersistScan(params: {
       evaluation.historyEntry.device,
       JSON.stringify(updatedHistory),
       todayIsoDate,
-      nowEpochMs,
       scanId
     );
     // Jika terjadi scan baru di luar cooldown, tandai notifikasi tag ini belum dibaca lagi
@@ -2066,9 +2078,9 @@ async function evaluateAndPersistScan(params: {
       INSERT INTO scan_points (
         id, city, province, venue, lat, lng, totalScans, todayScans,
         brand, productType, batchId, latestTagId, pin, latestTime,
-        isB2B, status, anomalyReason, deviceInfo, scanHistory, createdAt, updatedAt
+        isB2B, status, anomalyReason, deviceInfo, scanHistory, createdAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       scanId,
       evaluation.city,
@@ -2089,8 +2101,7 @@ async function evaluateAndPersistScan(params: {
       finalAnomalyReason,
       evaluation.historyEntry.device,
       JSON.stringify(updatedHistory),
-      todayIsoDate,
-      nowEpochMs
+      todayIsoDate
     );
   }
 
@@ -2468,8 +2479,8 @@ app.post('/api/batches', heavyOpsRateLimiter, (req, res) => {
     const safeProject = b.project ? sanitizeStringInput(b.project, 200) : null;
 
     const stmt = db.prepare(`
-      INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, tags, redirectUrl, qrType, requirePin, enableGps)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
+      INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, redirectUrl, qrType, requirePin, enableGps)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -3364,10 +3375,6 @@ app.put('/api/users/:id', (req, res) => {
       revokeAllUserSessions(id);
     }
 
-    db.prepare(`
-      UPDATE brands SET ownerName = ?, ownerEmail = ?, ownerRole = ? WHERE ownerId = ?
-    `).run(updated.name, updated.email, updated.role, id);
-
     const result = db.prepare('SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ?').get(id);
 
     // Emit notifikasi pribadi ke pengguna yang akunnya diubah oleh Super Admin (perubahan sandi/peran/status)
@@ -3428,13 +3435,9 @@ app.delete('/api/users/:id', (req, res) => {
     revokeAllUserSessions(id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
 
-    const fallbackUser = db.prepare('SELECT * FROM users ORDER BY rowid ASC LIMIT 1').get() as any;
+    const fallbackUser = db.prepare('SELECT id FROM users ORDER BY rowid ASC LIMIT 1').get() as { id: string } | undefined;
     if (fallbackUser) {
-      db.prepare(`
-        UPDATE brands 
-        SET ownerId = ?, ownerName = ?, ownerEmail = ?, ownerRole = ? 
-        WHERE ownerId = ?
-      `).run(fallbackUser.id, fallbackUser.name, fallbackUser.email, fallbackUser.role, id);
+      db.prepare('UPDATE brands SET ownerId = ? WHERE ownerId = ?').run(fallbackUser.id, id);
     }
 
     res.json({ success: true });
@@ -3447,25 +3450,22 @@ app.delete('/api/users/:id', (req, res) => {
 app.get('/api/brands', (req, res) => {
   try {
     const scope = getUserBrandScope(req);
-    const rows = db.prepare('SELECT * FROM brands ORDER BY rowid DESC').all() as any[];
+    const rows = db.prepare(`
+      SELECT b.*, u.name AS userOwnerName, u.email AS userOwnerEmail, u.role AS userOwnerRole
+      FROM brands b
+      LEFT JOIN users u ON u.id = b.ownerId
+      ORDER BY b.rowid DESC
+    `).all() as any[];
     const scopedRows = scope.isGlobal
       ? rows
       : rows.filter((b) => canScopeAccessBrand(scope, b.name, b.id));
-    const usersRows = db.prepare('SELECT id, name, email, role FROM users').all() as any[];
-    const userMap = new Map(usersRows.map(u => [u.id, u]));
 
-    const syncedBrands = scopedRows.map(b => {
-      const u = userMap.get(b.ownerId);
-      if (u) {
-        return {
-          ...b,
-          ownerName: u.name,
-          ownerEmail: u.email,
-          ownerRole: u.role
-        };
-      }
-      return b;
-    });
+    const syncedBrands = scopedRows.map(({ userOwnerName, userOwnerEmail, userOwnerRole, ...b }) => ({
+      ...b,
+      ownerName: userOwnerName || 'Belum Ditentukan',
+      ownerEmail: userOwnerEmail || null,
+      ownerRole: userOwnerRole ? normalizeRole(userOwnerRole) : null,
+    }));
 
     res.json(syncedBrands);
   } catch (error) {
@@ -3488,24 +3488,20 @@ app.post('/api/brands', (req, res) => {
       return res.status(400).json({ error: logoCheck.error || 'Format logo brand tidak valid.' });
     }
 
-    let ownerName = sanitizeStringInput(b.ownerName, 120) || 'Belum Ditentukan';
-    let ownerEmail: string | null = b.ownerEmail ? sanitizeStringInput(b.ownerEmail, 160) : null;
-    let ownerRole: string | null = b.ownerRole ? normalizeRole(b.ownerRole) : null;
+    let ownerName = 'Belum Ditentukan';
+    let ownerEmail: string | null = null;
+    let ownerRole: string | null = null;
     const scope = getUserBrandScope(req);
     const requestedOwnerId = b.ownerId && typeof b.ownerId === 'string' && b.ownerId.trim() !== '' ? sanitizeStringInput(b.ownerId, 80) : '';
     const finalOwnerId = scope.isGlobal ? requestedOwnerId : (scope.user?.id || '');
 
     if (finalOwnerId) {
-      const u = db.prepare('SELECT * FROM users WHERE id = ?').get(finalOwnerId) as any;
+      const u = db.prepare('SELECT name, email, role FROM users WHERE id = ?').get(finalOwnerId) as any;
       if (u) {
         ownerName = u.name;
         ownerEmail = u.email;
         ownerRole = normalizeRole(u.role);
       }
-    } else {
-      ownerName = 'Belum Ditentukan';
-      ownerEmail = null;
-      ownerRole = null;
     }
 
     const businessType = b.businessType === 'B2B' ? 'B2B' : 'Retail';
@@ -3515,17 +3511,14 @@ app.post('/api/brands', (req, res) => {
     const safeCreatedAt = sanitizeStringInput(b.createdAt, 80) || new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 
     const stmt = db.prepare(`
-      INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, businessType, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO brands (id, name, logo, ownerId, description, category, businessType, status, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       cleanId,
       cleanName,
       logoCheck.value,
       finalOwnerId,
-      ownerName,
-      ownerEmail,
-      ownerRole,
       safeDesc,
       safeCat,
       businessType,
@@ -3579,30 +3572,23 @@ app.put('/api/brands/:id', (req, res) => {
       return res.status(403).json({ error: 'Hanya Super Admin atau pemilik akses lintas brand yang berwenang memindahkan kepemilikan brand.' });
     }
     const targetOwnerId = scope.isGlobal ? requestedOwnerId : String(existing.ownerId || '');
-    let ownerName = b.ownerName !== undefined ? sanitizeStringInput(b.ownerName, 120) : existing.ownerName;
-    let ownerEmail = b.ownerEmail !== undefined ? sanitizeStringInput(b.ownerEmail, 160) : existing.ownerEmail;
-    let ownerRole = b.ownerRole !== undefined ? normalizeRole(b.ownerRole) : existing.ownerRole;
+    let ownerName = 'Belum Ditentukan';
+    let ownerEmail: string | null = null;
+    let ownerRole: string | null = null;
 
     if (targetOwnerId) {
-      const u = db.prepare('SELECT * FROM users WHERE id = ?').get(targetOwnerId) as any;
+      const u = db.prepare('SELECT name, email, role FROM users WHERE id = ?').get(targetOwnerId) as any;
       if (u) {
         ownerName = u.name;
         ownerEmail = u.email;
         ownerRole = normalizeRole(u.role);
       }
-    } else {
-      ownerName = 'Belum Ditentukan';
-      ownerEmail = null;
-      ownerRole = null;
     }
 
     const updated = {
       name: b.name !== undefined ? sanitizeStringInput(b.name, 120) : existing.name,
       logo: nextLogo,
       ownerId: targetOwnerId,
-      ownerName,
-      ownerEmail,
-      ownerRole,
       description: b.description !== undefined ? sanitizeStringInput(b.description, 1000) : existing.description,
       category: b.category !== undefined ? sanitizeStringInput(b.category, 120) : existing.category,
       businessType: b.businessType !== undefined ? (b.businessType === 'B2B' ? 'B2B' : 'Retail') : (existing.businessType || 'Retail'),
@@ -3611,15 +3597,12 @@ app.put('/api/brands/:id', (req, res) => {
 
     db.prepare(`
       UPDATE brands 
-      SET name = ?, logo = ?, ownerId = ?, ownerName = ?, ownerEmail = ?, ownerRole = ?, description = ?, category = ?, businessType = ?, status = ?
+      SET name = ?, logo = ?, ownerId = ?, description = ?, category = ?, businessType = ?, status = ?
       WHERE id = ?
     `).run(
       updated.name,
       updated.logo,
       updated.ownerId,
-      updated.ownerName,
-      updated.ownerEmail,
-      updated.ownerRole,
       updated.description,
       updated.category,
       updated.businessType,
@@ -3627,8 +3610,8 @@ app.put('/api/brands/:id', (req, res) => {
       id
     );
 
-    const result = db.prepare('SELECT * FROM brands WHERE id = ?').get(id);
-    res.json(result);
+    const result = db.prepare('SELECT * FROM brands WHERE id = ?').get(id) as any;
+    res.json({ ...result, ownerName, ownerEmail, ownerRole });
   } catch (error) {
     return sendInternalError(res, 'PUT /api/brands/:id', error);
   }
@@ -3683,14 +3666,19 @@ app.get('/api/products/:id/relational', (req, res) => {
     }
     if (!assertBrandAccess(req, res, prod.brandName, prod.brandId)) return;
 
-    const brand = db.prepare('SELECT id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, category, status, description FROM brands WHERE id = ? OR LOWER(name) = LOWER(?)').get(prod.brandId, prod.brandName) as any || null;
+    const brandRow = db.prepare('SELECT id, name, logo, ownerId, category, status, description FROM brands WHERE id = ? OR LOWER(name) = LOWER(?)').get(prod.brandId, prod.brandName) as any || null;
     let user: any = null;
-    if (brand?.ownerId) {
-      user = db.prepare('SELECT id, name, username, email, phone, role, avatar, status FROM users WHERE id = ?').get(brand.ownerId);
+    if (brandRow?.ownerId) {
+      user = db.prepare('SELECT id, name, username, email, phone, role, avatar, status FROM users WHERE id = ?').get(brandRow.ownerId);
     }
-    if (!user && brand?.ownerName) {
-      user = db.prepare('SELECT id, name, username, email, phone, role, avatar, status FROM users WHERE LOWER(name) = LOWER(?)').get(brand.ownerName);
-    }
+    const brand = brandRow
+      ? {
+          ...brandRow,
+          ownerName: user?.name || 'Belum Ditentukan',
+          ownerEmail: user?.email || null,
+          ownerRole: user?.role ? normalizeRole(user.role) : null,
+        }
+      : null;
 
     const batches = db.prepare('SELECT id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, redirectUrl, qrType, requirePin, enableGps FROM batches WHERE LOWER(sku) = LOWER(?) AND (LOWER(brand) = LOWER(?) OR LOWER(brand) = LOWER(?)) ORDER BY date DESC').all(prod.sku, prod.brandName, brand?.name || prod.brandName) as any[];
     const activeBatchesCount = batches.filter(b => b.status !== 'Disuspend').length;
@@ -4290,12 +4278,19 @@ function ensureNotificationsBackfilled() {
 
     const backfillTx = db.transaction(() => {
       // 1. Backfill password_reset_requests -> audience: 'super_admin'
-      const resetRows = db.prepare('SELECT * FROM password_reset_requests').all() as any[];
+      const resetRows = db.prepare(`
+        SELECT pr.*, u.name AS userName, u.email AS userEmail, u.role AS userRole, u.avatar AS avatar
+        FROM password_reset_requests pr
+        LEFT JOIN users u ON u.id = pr.userId
+      `).all() as any[];
       for (const r of resetRows) {
         const ts =
           parseFlexibleTimeMs(r.createdAtTs, nowMs) ??
           parseFlexibleTimeMs(r.requestedAt, nowMs) ??
           nowMs;
+        const rName = r.userName || 'Pengguna';
+        const rEmail = r.userEmail || '-';
+        const rRole = normalizeRole(r.userRole || 'Admin Brand');
         insertStmt.run(
           `notif-reset-${r.id}`,
           'password_reset',
@@ -4304,8 +4299,8 @@ function ensureNotificationsBackfilled() {
           null,
           null,
           null,
-          `Permintaan Reset Password: ${r.userName}`,
-          `${r.userEmail} · ${r.userRole}`,
+          `Permintaan Reset Password: ${rName}`,
+          `${rEmail} · ${rRole}`,
           r.actionNote || 'Pengguna mengajukan permohonan pemulihan/reset kata sandi akun',
           'password_reset',
           r.id,
@@ -4313,10 +4308,10 @@ function ensureNotificationsBackfilled() {
           JSON.stringify({
             user: {
               id: r.userId,
-              name: r.userName,
-              email: r.userEmail,
-              role: r.userRole,
-              avatar: r.avatar,
+              name: rName,
+              email: rEmail,
+              role: rRole,
+              avatar: r.avatar || null,
             },
           }),
           null,
@@ -4337,7 +4332,6 @@ function ensureNotificationsBackfilled() {
           } catch (_) {}
         }
         const ts =
-          parseFlexibleTimeMs(s.updatedAt, nowMs) ??
           parseFlexibleTimeMs(s.latestTime, nowMs) ??
           parseFlexibleTimeMs(latestHistoryTime, nowMs) ??
           parseFlexibleTimeMs(s.createdAt, nowMs) ??
@@ -4618,7 +4612,13 @@ app.post('/api/notifications/mark-read', (req, res) => {
 // Get password reset requests
 app.get('/api/password-resets', (_req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM password_reset_requests ORDER BY rowid DESC').all();
+    const rows = db.prepare(`
+      SELECT pr.id, pr.userId, u.name AS userName, u.email AS userEmail, u.role AS userRole, u.avatar AS avatar,
+             pr.requestedAt, pr.status, pr.actionNote, pr.createdAtTs
+      FROM password_reset_requests pr
+      LEFT JOIN users u ON u.id = pr.userId
+      ORDER BY pr.rowid DESC
+    `).all();
     res.json(rows);
   } catch (error) {
     return sendInternalError(res, 'GET /api/password-resets', error);
@@ -4655,15 +4655,11 @@ app.post('/api/password-resets', passwordResetRateLimiter, (req, res) => {
     const sanitizedReason =
       sanitizeStringInput(reason, 300) || 'Permohonan lupa kata sandi melalui halaman login';
     db.prepare(`
-      INSERT INTO password_reset_requests (id, userId, userName, userEmail, userRole, avatar, requestedAt, status, actionNote, isRead, createdAtTs)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'Menunggu', ?, 0, ?)
+      INSERT INTO password_reset_requests (id, userId, requestedAt, status, actionNote, createdAtTs)
+      VALUES (?, ?, ?, 'Menunggu', ?, ?)
     `).run(
       newId,
       matchedUser.id,
-      matchedUser.name,
-      matchedUser.email,
-      normalizeRole(matchedUser.role),
-      matchedUser.avatar || null,
       requestedAt,
       sanitizedReason,
       nowTs
@@ -4712,14 +4708,19 @@ app.post('/api/password-resets/:id/respond', async (req, res) => {
     }
 
     const actor = getActorFromRequest(req);
-    const resetReq = db.prepare('SELECT * FROM password_reset_requests WHERE id = ?').get(id) as any;
+    const resetReq = db.prepare(`
+      SELECT pr.*, u.name AS userName, u.email AS userEmail, u.role AS userRole, u.avatar AS avatar
+      FROM password_reset_requests pr
+      LEFT JOIN users u ON u.id = pr.userId
+      WHERE pr.id = ?
+    `).get(id) as any;
     if (!resetReq) {
       return res.status(404).json({ success: false, error: 'Permintaan reset sandi tidak ditemukan.' });
     }
 
     const targetUserRow = db.prepare(
-      'SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ? OR LOWER(email) = LOWER(?) LIMIT 1'
-    ).get(resetReq.userId || '', resetReq.userEmail || '') as any;
+      'SELECT id, name, username, email, phone, role, avatar, status, createdAt FROM users WHERE id = ? LIMIT 1'
+    ).get(resetReq.userId || '') as any;
 
     const formattedTargetUser = targetUserRow
       ? { ...targetUserRow, role: normalizeRole(targetUserRow.role) }
@@ -4741,6 +4742,8 @@ app.post('/api/password-resets/:id/respond', async (req, res) => {
     let tempPassword: string | null = null;
     let emailSent = false;
     let note = sanitizeStringInput(actionNote, 500);
+    const targetName = resetReq.userName || targetUserRow?.name || 'Pengguna';
+    const targetEmail = resetReq.userEmail || targetUserRow?.email || '';
 
     if (action === 'approve') {
       // Generate sandi sementara acak 12 karakter yang aman secara kriptografis (crypto.randomInt)
@@ -4758,18 +4761,18 @@ app.post('/api/password-resets/:id/respond', async (req, res) => {
         revokeAllUserSessions(targetUserRow.id);
       }
 
-      if (resetReq.userEmail && resetReq.userEmail.includes('@')) {
+      if (targetEmail && targetEmail.includes('@')) {
         const settings = getActiveSystemSettings();
         const emailCfg: NotificationConfig = {
           ...settings.notifications,
-          emailRecipients: resetReq.userEmail,
+          emailRecipients: targetEmail,
         };
         const mailRes = await sendRealAlertChannel(
           'email',
           emailCfg,
           'Kata Sandi Sementara Akun Anda Telah Diterbitkan',
-          `Halo ${resetReq.userName},\n\nPermintaan reset kata sandi Anda telah disetujui oleh ${getNotificationActorLabel(actor)} pada ${nowStr}.\nKata sandi sementara baru Anda: ${tempPassword}\n\nSegera ubah kata sandi Anda setelah masuk.`,
-          `Halo <b>${escapeHtml(resetReq.userName)}</b>,\nPermintaan reset kata sandi Anda telah disetujui oleh <b>${escapeHtml(getNotificationActorLabel(actor))}</b> pada ${escapeHtml(nowStr)}.\nKata sandi sementara baru Anda: <code>${escapeHtml(tempPassword)}</code>\nSegera ubah kata sandi setelah masuk.`
+          `Halo ${targetName},\n\nPermintaan reset kata sandi Anda telah disetujui oleh ${getNotificationActorLabel(actor)} pada ${nowStr}.\nKata sandi sementara baru Anda: ${tempPassword}\n\nSegera ubah kata sandi Anda setelah masuk.`,
+          `Halo <b>${escapeHtml(targetName)}</b>,\nPermintaan reset kata sandi Anda telah disetujui oleh <b>${escapeHtml(getNotificationActorLabel(actor))}</b> pada ${escapeHtml(nowStr)}.\nKata sandi sementara baru Anda: <code>${escapeHtml(tempPassword)}</code>\nSegera ubah kata sandi setelah masuk.`
         );
         emailSent = mailRes.success;
       }
@@ -4777,7 +4780,7 @@ app.post('/api/password-resets/:id/respond', async (req, res) => {
       if (!note) {
         const actorLabel = getNotificationActorLabel(actor);
         note = emailSent
-          ? `Kata sandi akun telah diperbarui dan dikirim ke email ${resetReq.userEmail} oleh ${actorLabel} (${nowStr}).`
+          ? `Kata sandi akun telah diperbarui dan dikirim ke email ${targetEmail} oleh ${actorLabel} (${nowStr}).`
           : `Kata sandi sementara baru telah diterapkan ke database oleh ${actorLabel} (${nowStr}). Bagikan sandi sementara kepada pengguna karena SMTP server belum aktif.`;
       }
     } else {
@@ -4788,7 +4791,7 @@ app.post('/api/password-resets/:id/respond', async (req, res) => {
 
     db.prepare(`
       UPDATE password_reset_requests 
-      SET status = ?, actionNote = ?, isRead = 1 
+      SET status = ?, actionNote = ? 
       WHERE id = ?
     `).run(newStatus, note, id);
 
@@ -4860,10 +4863,10 @@ app.post('/api/password-resets/:id/respond', async (req, res) => {
 // REST API ENDPOINTS: KATEGORI PRODUK (3 LEVEL CRUD)
 // ==========================================
 
-// Get all categories sorted by level, orderIndex, name
+// Get all categories sorted by level, insertion order
 app.get('/api/categories', (_req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM categories ORDER BY level ASC, orderIndex ASC, rowid ASC').all();
+    const rows = db.prepare('SELECT * FROM categories ORDER BY level ASC, rowid ASC').all();
     res.json(rows);
   } catch (error) {
     return sendInternalError(res, 'GET /api/categories', error);
@@ -4873,7 +4876,7 @@ app.get('/api/categories', (_req, res) => {
 // Create category
 app.post('/api/categories', (req, res) => {
   try {
-    const { name, parentId, level, code, description, status } = req.body || {};
+    const { name, parentId, level } = req.body || {};
     const safeName = sanitizeStringInput(name, 120);
     if (!safeName) {
       return res.status(400).json({ error: 'Nama kategori wajib diisi' });
@@ -4883,16 +4886,13 @@ app.post('/api/categories', (req, res) => {
     const createdAt = new Date().toISOString();
 
     db.prepare(`
-      INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+      INSERT INTO categories (id, name, parentId, level, createdAt)
+      VALUES (?, ?, ?, ?, ?)
     `).run(
       newId,
       safeName,
       parentId ? sanitizeStringInput(parentId, 120) : null,
       parsedLevel,
-      code ? sanitizeStringInput(code, 40) : null,
-      description ? sanitizeStringInput(description, 500) : null,
-      status === 'Nonaktif' ? 'Nonaktif' : 'Aktif',
       createdAt
     );
 
@@ -4911,23 +4911,20 @@ app.put('/api/categories/:id', (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Kategori tidak ditemukan' });
     }
-    const { name, code, description, status, specSchema } = req.body || {};
+    const { name, specSchema } = req.body || {};
     const finalName = name !== undefined ? sanitizeStringInput(name, 120) : existing.name;
     if (!finalName) {
       return res.status(400).json({ error: 'Nama kategori wajib diisi' });
     }
-    const finalCode = code !== undefined ? (code ? sanitizeStringInput(code, 40) : null) : existing.code;
-    const finalDesc = description !== undefined ? (description ? sanitizeStringInput(description, 500) : null) : existing.description;
-    const finalStatus = status !== undefined ? (status === 'Nonaktif' ? 'Nonaktif' : 'Aktif') : existing.status;
     const finalSchema = specSchema !== undefined 
       ? (typeof specSchema === 'string' ? specSchema.slice(0, 50_000) : JSON.stringify(specSchema).slice(0, 50_000)) 
       : existing.specSchema;
 
     db.prepare(`
       UPDATE categories 
-      SET name = ?, code = ?, description = ?, status = ?, specSchema = ?
+      SET name = ?, specSchema = ?
       WHERE id = ?
-    `).run(finalName, finalCode, finalDesc, finalStatus, finalSchema, id);
+    `).run(finalName, finalSchema, id);
 
     const updated = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
     res.json(updated);
@@ -4952,11 +4949,10 @@ app.put('/api/categories/:id/specs', (req, res) => {
     if (!existing) {
       const safeName = sanitizeStringInput(id, 120) || 'Kategori Baru';
       const newId = id.startsWith('cat-') ? sanitizeStringInput(id, 120) : `cat-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`;
-      const catCode = safeName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'CAT';
       db.prepare(`
-        INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema)
-        VALUES (?, ?, NULL, 1, ?, 'Kategori produk', 'Aktif', 0, 99, ?, ?)
-      `).run(newId, safeName, catCode, new Date().toISOString().split('T')[0], finalSchema);
+        INSERT INTO categories (id, name, parentId, level, createdAt, specSchema)
+        VALUES (?, ?, NULL, 1, ?, ?)
+      `).run(newId, safeName, new Date().toISOString().split('T')[0], finalSchema);
       existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(newId);
       return res.json(existing);
     }
@@ -5235,7 +5231,6 @@ function generateMySqlDump(tables: {
     `  \`pinLength\` INT NOT NULL DEFAULT 8,`,
     `  \`status\` VARCHAR(64) NOT NULL DEFAULT 'Aktif',`,
     `  \`isB2B\` TINYINT(1) NOT NULL DEFAULT 0,`,
-    `  \`tags\` LONGTEXT DEFAULT NULL,`,
     `  \`redirectUrl\` TEXT DEFAULT NULL,`,
     `  \`qrType\` VARCHAR(32) DEFAULT 'dynamic',`,
     `  \`requirePin\` TINYINT(1) DEFAULT 1,`,
@@ -5247,7 +5242,7 @@ function generateMySqlDump(tables: {
     ``,
     buildMySqlInsertBlocks(
       'batches',
-      ['id', 'batchId', 'date', 'project', 'sku', 'brand', 'qty', 'specs', 'pinLength', 'status', 'isB2B', 'tags', 'redirectUrl', 'qrType', 'requirePin', 'enableGps'],
+      ['id', 'batchId', 'date', 'project', 'sku', 'brand', 'qty', 'specs', 'pinLength', 'status', 'isB2B', 'redirectUrl', 'qrType', 'requirePin', 'enableGps'],
       tables.batches
     ),
     `CREATE TABLE \`tags\` (`,
@@ -5296,7 +5291,6 @@ function generateMySqlDump(tables: {
     `  \`deviceInfo\` VARCHAR(255) DEFAULT NULL,`,
     `  \`scanHistory\` LONGTEXT DEFAULT NULL,`,
     `  \`createdAt\` VARCHAR(191) DEFAULT NULL,`,
-    `  \`updatedAt\` BIGINT DEFAULT NULL,`,
     `  PRIMARY KEY (\`id\`),`,
     `  KEY \`idx_scan_points_status\` (\`status\`),`,
     `  KEY \`idx_scan_points_brand\` (\`brand\`),`,
@@ -5305,7 +5299,7 @@ function generateMySqlDump(tables: {
     ``,
     buildMySqlInsertBlocks(
       'scan_points',
-      ['id', 'city', 'province', 'venue', 'lat', 'lng', 'totalScans', 'todayScans', 'brand', 'productType', 'batchId', 'latestTagId', 'pin', 'latestTime', 'isB2B', 'status', 'anomalyReason', 'deviceInfo', 'scanHistory', 'createdAt', 'updatedAt'],
+      ['id', 'city', 'province', 'venue', 'lat', 'lng', 'totalScans', 'todayScans', 'brand', 'productType', 'batchId', 'latestTagId', 'pin', 'latestTime', 'isB2B', 'status', 'anomalyReason', 'deviceInfo', 'scanHistory', 'createdAt'],
       tables.scanPoints
     ),
     `CREATE TABLE \`scan_activities\` (`,
@@ -5367,20 +5361,18 @@ function generateMySqlDump(tables: {
     `  \`name\` VARCHAR(191) NOT NULL,`,
     `  \`logo\` LONGTEXT DEFAULT NULL,`,
     `  \`ownerId\` VARCHAR(191) NOT NULL,`,
-    `  \`ownerName\` VARCHAR(191) NOT NULL,`,
-    `  \`ownerEmail\` VARCHAR(191) DEFAULT NULL,`,
-    `  \`ownerRole\` VARCHAR(64) DEFAULT NULL,`,
     `  \`description\` TEXT DEFAULT NULL,`,
     `  \`category\` VARCHAR(191) DEFAULT NULL,`,
     `  \`businessType\` VARCHAR(64) DEFAULT 'Retail',`,
     `  \`status\` VARCHAR(64) NOT NULL DEFAULT 'Aktif',`,
     `  \`createdAt\` VARCHAR(191) NOT NULL,`,
-    `  PRIMARY KEY (\`id\`)`,
+    `  PRIMARY KEY (\`id\`),`,
+    `  KEY \`idx_brands_ownerId\` (\`ownerId\`)`,
     `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     ``,
     buildMySqlInsertBlocks(
       'brands',
-      ['id', 'name', 'logo', 'ownerId', 'ownerName', 'ownerEmail', 'ownerRole', 'description', 'category', 'businessType', 'status', 'createdAt'],
+      ['id', 'name', 'logo', 'ownerId', 'description', 'category', 'businessType', 'status', 'createdAt'],
       tables.brands
     ),
     `CREATE TABLE \`products\` (`,
@@ -5405,21 +5397,16 @@ function generateMySqlDump(tables: {
     `CREATE TABLE \`password_reset_requests\` (`,
     `  \`id\` VARCHAR(191) NOT NULL,`,
     `  \`userId\` VARCHAR(191) DEFAULT NULL,`,
-    `  \`userName\` VARCHAR(191) NOT NULL,`,
-    `  \`userEmail\` VARCHAR(191) NOT NULL,`,
-    `  \`userRole\` VARCHAR(64) NOT NULL,`,
-    `  \`avatar\` LONGTEXT DEFAULT NULL,`,
     `  \`requestedAt\` VARCHAR(191) NOT NULL,`,
     `  \`status\` VARCHAR(64) NOT NULL DEFAULT 'Menunggu',`,
     `  \`actionNote\` TEXT DEFAULT NULL,`,
-    `  \`isRead\` TINYINT(1) DEFAULT 0,`,
     `  \`createdAtTs\` BIGINT DEFAULT NULL,`,
     `  PRIMARY KEY (\`id\`)`,
     `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
     ``,
     buildMySqlInsertBlocks(
       'password_reset_requests',
-      ['id', 'userId', 'userName', 'userEmail', 'userRole', 'avatar', 'requestedAt', 'status', 'actionNote', 'isRead', 'createdAtTs'],
+      ['id', 'userId', 'requestedAt', 'status', 'actionNote', 'createdAtTs'],
       tables.passwordResetRequests
     ),
     `CREATE TABLE \`read_notifications\` (`,
@@ -5436,11 +5423,6 @@ function generateMySqlDump(tables: {
     `  \`name\` VARCHAR(191) NOT NULL,`,
     `  \`parentId\` VARCHAR(191) DEFAULT NULL,`,
     `  \`level\` INT NOT NULL,`,
-    `  \`code\` VARCHAR(64) DEFAULT NULL,`,
-    `  \`description\` TEXT DEFAULT NULL,`,
-    `  \`status\` VARCHAR(64) DEFAULT 'Aktif',`,
-    `  \`itemCount\` INT DEFAULT 0,`,
-    `  \`orderIndex\` INT DEFAULT 0,`,
     `  \`createdAt\` VARCHAR(191) NOT NULL,`,
     `  \`specSchema\` LONGTEXT DEFAULT NULL,`,
     `  PRIMARY KEY (\`id\`),`,
@@ -5450,7 +5432,7 @@ function generateMySqlDump(tables: {
     ``,
     buildMySqlInsertBlocks(
       'categories',
-      ['id', 'name', 'parentId', 'level', 'code', 'description', 'status', 'itemCount', 'orderIndex', 'createdAt', 'specSchema'],
+      ['id', 'name', 'parentId', 'level', 'createdAt', 'specSchema'],
       tables.categories
     ),
     `CREATE TABLE \`system_settings\` (`,
@@ -5638,8 +5620,8 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
         if (batches.length > 5_000) throw new Error('BATCH_LIMIT_EXCEEDED');
         db.prepare('DELETE FROM batches').run();
         const insertBatch = db.prepare(`
-          INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, tags, redirectUrl, qrType, requirePin, enableGps)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO batches (id, batchId, date, project, sku, brand, qty, specs, pinLength, status, isB2B, redirectUrl, qrType, requirePin, enableGps)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const b of batches) {
           const urlCheck = validateHttpUrl(b.redirectUrl);
@@ -5656,7 +5638,6 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
             Math.max(4, Math.min(16, Number(b.pinLength) || 8)),
             sanitizeStringInput(b.status, 40) || 'Aktif',
             b.isB2B ? 1 : 0,
-            b.tags ?? null,
             safeRedirectUrl,
             b.qrType === 'static' ? 'static' : 'dynamic',
             b.requirePin === 0 || b.requirePin === false ? 0 : 1,
@@ -5694,8 +5675,8 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
       if (Array.isArray(scanPoints)) {
         db.prepare('DELETE FROM scan_points').run();
         const insertScan = db.prepare(`
-          INSERT INTO scan_points (id, city, province, venue, lat, lng, totalScans, todayScans, brand, productType, batchId, latestTagId, pin, latestTime, isB2B, status, anomalyReason, deviceInfo, scanHistory, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO scan_points (id, city, province, venue, lat, lng, totalScans, todayScans, brand, productType, batchId, latestTagId, pin, latestTime, isB2B, status, anomalyReason, deviceInfo, scanHistory, createdAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const s of scanPoints) {
           const historyStr = s.scanHistory
@@ -5721,8 +5702,7 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
             s.anomalyReason ?? null,
             s.deviceInfo ?? null,
             historyStr,
-            s.createdAt ?? null,
-            s.updatedAt ? Number(s.updatedAt) : null
+            s.createdAt ?? null
           );
           restoredStats.scanPoints++;
         }
@@ -5751,8 +5731,8 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
       if (Array.isArray(categories)) {
         db.prepare('DELETE FROM categories').run();
         const insertCat = db.prepare(`
-          INSERT INTO categories (id, name, parentId, level, code, description, status, itemCount, orderIndex, createdAt, specSchema)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO categories (id, name, parentId, level, createdAt, specSchema)
+          VALUES (?, ?, ?, ?, ?, ?)
         `);
         for (const c of categories) {
           insertCat.run(
@@ -5760,11 +5740,6 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
             c.name,
             c.parentId ?? null,
             Number(c.level) || 1,
-            c.code ?? null,
-            c.description ?? null,
-            c.status || 'Aktif',
-            Number(c.itemCount) || 0,
-            Number(c.orderIndex) || 0,
             c.createdAt || new Date().toISOString().split('T')[0],
             c.specSchema ?? null
           );
@@ -5775,8 +5750,8 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
       if (Array.isArray(brands)) {
         db.prepare('DELETE FROM brands').run();
         const insertBrand = db.prepare(`
-          INSERT INTO brands (id, name, logo, ownerId, ownerName, ownerEmail, ownerRole, description, category, businessType, status, createdAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO brands (id, name, logo, ownerId, description, category, businessType, status, createdAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const br of brands) {
           const logoCheck = validateSafeImageSource(br.logo);
@@ -5785,9 +5760,6 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
             sanitizeStringInput(br.name, 120),
             logoCheck.valid ? logoCheck.value : null,
             sanitizeStringInput(br.ownerId, 120),
-            sanitizeStringInput(br.ownerName, 120),
-            br.ownerEmail ? sanitizeStringInput(br.ownerEmail, 160) : null,
-            br.ownerRole ? normalizeRole(br.ownerRole) : null,
             br.description ? sanitizeStringInput(br.description, 1000) : null,
             br.category ? sanitizeStringInput(br.category, 160) : null,
             sanitizeStringInput(br.businessType, 60) || 'Retail',
@@ -5875,21 +5847,16 @@ app.post('/api/settings/restore', heavyOpsRateLimiter, (req, res) => {
       if (Array.isArray(passwordResetRequests)) {
         db.prepare('DELETE FROM password_reset_requests').run();
         const insertReset = db.prepare(`
-          INSERT INTO password_reset_requests (id, userId, userName, userEmail, userRole, avatar, requestedAt, status, actionNote, isRead, createdAtTs)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO password_reset_requests (id, userId, requestedAt, status, actionNote, createdAtTs)
+          VALUES (?, ?, ?, ?, ?, ?)
         `);
         for (const r of passwordResetRequests) {
           insertReset.run(
             r.id,
             r.userId ?? null,
-            r.userName || '',
-            r.userEmail || '',
-            normalizeRole(r.userRole || 'Admin Brand'),
-            r.avatar ?? null,
             r.requestedAt || '',
             r.status || 'Menunggu',
             r.actionNote ?? null,
-            r.isRead ? 1 : 0,
             r.createdAtTs ? Number(r.createdAtTs) : null
           );
         }

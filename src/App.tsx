@@ -1224,7 +1224,7 @@ export default function App() {
   });
 
   // State master kategori produk dari database SQLite (untuk resolusi hirarki 3 layer)
-  const [categories, setCategories] = useState<{ id: string; name: string; level: number; parentId?: string | null; code?: string | null; specSchema?: string | null }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; level: number; parentId?: string | null; specSchema?: string | null }[]>([]);
 
   // Helper resolusi teks kategori 3 layer (misal: "SUMAS Architectural & Partisi > Partisi Cubicle Toilet > Phenolic Board 12mm Standard")
   const resolveCategoryHierarchy = (categoryStr: string, categoriesList?: { id: string; name: string; level: number; parentId?: string | null }[]) => {
